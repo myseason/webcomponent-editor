@@ -82,9 +82,25 @@ export interface EditorState {
 }
 
 /** 컴포넌트 정의(렌더러는 UI 레이어에서 결합) */
-export type PropSchemaEntry<P extends Record<string, unknown>> =
-  | { key: keyof P & string; type: 'text'; label?: string; placeholder?: string; default?: unknown; when?: Record<string, unknown> }
-  | { key: keyof P & string; type: 'select'; label?: string; options: { label: string; value: unknown }[]; default?: unknown; when?: Record<string, unknown> };
+export type PropSchemaEntry<P extends Record<string, unknown> = Record<string, unknown>> =
+    | {
+    key: keyof P & string;
+    type: 'text';
+    label?: string;
+    placeholder?: string;
+    default?: unknown;
+    when?: Record<string, unknown>;   // 기존: 단순 동등 비교
+    whenExpr?: string;                // 신설: 안전 표현식 (data/node/project 사용)
+}
+    | {
+    key: keyof P & string;
+    type: 'select';
+    label?: string;
+    options: { label: string; value: unknown }[];
+    default?: unknown;
+    when?: Record<string, unknown>;
+    whenExpr?: string;
+};
 
 export interface ComponentDefinition<
   P extends Record<string, unknown> = Record<string, unknown>,
