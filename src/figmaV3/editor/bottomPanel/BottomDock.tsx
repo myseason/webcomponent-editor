@@ -1,15 +1,16 @@
 'use client';
 /**
- * BottomDock: Actions / Data / Flows 패널 탭
+ * BottomDock: Actions / Data / Flows / Fragments 패널 탭
  * - 훅은 최상위에서만 사용(useState)
  */
 import React, { useState } from 'react';
 import { ActionsPanel } from './panels/ActionsPanel';
 import { DataPanel } from './panels/DataPanel';
 import { FlowsPanel } from './panels/FlowsPanel';
+import { FragmentsPanel } from './panels/FragmentsPanel';
 
 export function BottomDock() {
-    const [tab, setTab] = useState<'actions' | 'data' | 'flows'>('actions');
+    const [tab, setTab] = useState<'actions' | 'data' | 'flows' | 'fragments'>('actions');
 
     return (
         <div className="border-t bg-white">
@@ -32,10 +33,18 @@ export function BottomDock() {
                 >
                     Flows
                 </button>
+                <button
+                    className={`px-2 py-1 rounded ${tab === 'fragments' ? 'bg-gray-100' : ''}`}
+                    onClick={() => setTab('fragments')}
+                >
+                    Fragments
+                </button>
             </div>
+
             {tab === 'actions' && <ActionsPanel />}
             {tab === 'data' && <DataPanel />}
             {tab === 'flows' && <FlowsPanel />}
+            {tab === 'fragments' && <FragmentsPanel />}
         </div>
     );
 }

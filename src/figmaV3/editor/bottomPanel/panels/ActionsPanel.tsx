@@ -3,43 +3,47 @@
  * ActionsPanel
  * - 선택된 노드의 이벤트별 ActionStep 목록을 편집/실행
  * - 제공 스텝: Alert / Navigate / OpenFragment / CloseFragment
+ * - 🔑 훅 규칙: 모든 훅(useEditor, useState 등)은 조건 없이 최상위에서 호출
  */
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import type { SupportedEvent, ActionStep } from '../../../core/types';
 import { useEditor } from '../../useEditor';
 import { editorStore } from '../../../store/editStore';
 import { runActions } from '../../../runtime/actions';
 
 const SUPPORTED_EVENTS: SupportedEvent[] = ['onClick', 'onChange', 'onSubmit', 'onLoad'];
-
 type ActionsBag = Record<SupportedEvent, { steps: ActionStep[] }>;
 
 export function ActionsPanel() {
+    // 1) 훅은 최상위에서 무조건 호출
     const state = useEditor();
-    const nodeId = state.ui.selectedId;
-    if (!nodeId) return <div className="p-3 text-xs text-gray-500">노드를 선택하세요</div>;
-
-    const node = state.project.nodes[nodeId];
-    const actions = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
-
     const [evt, setEvt] = useState<SupportedEvent>('onClick');
+
+    // 2) 선택 노드 파생값은 훅 이후에 안전하게 계산
+    const nodeId = state.ui.selectedId;
+    const node = nodeId ? state.project.nodes[nodeId] : undefined;
+    const actions: ActionsBag | undefined = node
+        ? ((node.props as Record<string, unknown>).__actions as ActionsBag | undefined)
+        : undefined;
     const steps: ActionStep[] = actions?.[evt]?.steps ?? [];
 
     const pages = state.project.pages;
     const fragments = state.project.fragments;
 
-    // 드롭다운 선택 상태
+    // 드롭다운(네비/프래그먼트) 초기값 — 훅은 이미 호출되었으므로 OK
     const [navPageId, setNavPageId] = useState<string>(pages[0]?.id ?? 'page_home');
     const [openFragId, setOpenFragId] = useState<string>(fragments[0]?.id ?? '');
 
     const setSteps = (next: ActionStep[]) => {
+        if (!nodeId) return;
         const nextActions: ActionsBag = { ...(actions ?? ({} as ActionsBag)), [evt]: { steps: next } };
         state.updateNodeProps(nodeId, { __actions: nextActions });
     };
 
     const addAlert = () => setSteps([...steps, { kind: 'Alert', message: 'Hello' }]);
     const addNavigate = () => setSteps([...steps, { kind: 'Navigate', toPageId: navPageId }]);
-    const addOpenFragment = () => setSteps([...steps, { kind: 'OpenFragment', fragmentId: openFragId }]);
+    const addOpenFragment = () =>
+        setSteps([...steps, { kind: 'OpenFragment', fragmentId: openFragId }]);
     const addCloseFragment = () => setSteps([...steps, { kind: 'CloseFragment' }]); // top-of-stack 닫기
 
     const runNow = async () => {
@@ -58,23 +62,10 @@ export function ActionsPanel() {
         });
     };
 
-    const StepRow = ({ s, i }: { s: ActionStep; i: number }) => {
-        return (
-            <div className="text-xs border rounded px-2 py-1 flex items-center gap-2">
-                <span className="px-1 rounded bg-gray-100">{s.kind}</span>
-                {s.kind === 'Alert' && <span className="text-gray-600 truncate">“{s.message}”</span>}
-                {s.kind === 'Navigate' && <span className="text-gray-600">→ {s.toPageId}</span>}
-                {s.kind === 'OpenFragment' && <span className="text-gray-600">open: {s.fragmentId}</span>}
-                {s.kind === 'CloseFragment' && <span className="text-gray-600">close {s.fragmentId ?? '(top)'}</span>}
-                <button
-                    className="ml-auto text-red-500"
-                    onClick={() => setSteps(steps.filter((_, idx: number) => idx !== i))}
-                >
-                    삭제
-                </button>
-            </div>
-        );
-    };
+    // 3) 노드가 없으면 안내 UI를 렌더(훅 호출은 이미 끝났으므로 안전)
+    if (!nodeId || !node) {
+        return <div className="p-3 text-xs text-gray-500">노드를 선택하세요</div>;
+    }
 
     return (
         <div className="p-3 space-y-3">
@@ -97,7 +88,19 @@ export function ActionsPanel() {
                     <div className="text-xs text-gray-400">스텝이 없습니다. 아래 컨트롤로 추가하세요.</div>
                 )}
                 {steps.map((s: ActionStep, i: number) => (
-                    <StepRow key={`${s.kind}-${i}`} s={s} i={i} />
+                    <div key={`${s.kind}-${i}`} className="text-xs border rounded px-2 py-1 flex items-center gap-2">
+                        <span className="px-1 rounded bg-gray-100">{s.kind}</span>
+                        {s.kind === 'Alert' && <span className="text-gray-600 truncate">“{s.message}”</span>}
+                        {s.kind === 'Navigate' && <span className="text-gray-600">→ {s.toPageId}</span>}
+                        {s.kind === 'OpenFragment' && <span className="text-gray-600">open: {s.fragmentId}</span>}
+                        {s.kind === 'CloseFragment' && <span className="text-gray-600">close {s.fragmentId ?? '(top)'}</span>}
+                        <button
+                            className="ml-auto text-red-500"
+                            onClick={() => setSteps(steps.filter((_, idx: number) => idx !== i))}
+                        >
+                            삭제
+                        </button>
+                    </div>
                 ))}
             </div>
 
