@@ -1,7 +1,7 @@
 'use client';
 /**
  * Canvas: 노드 트리를 재귀 렌더하며, fire(evt)로 Actions → Flows를 실행합니다.
- * - 컨테이너 스타일( node.styles.element ) 내부에 children을 포함해 렌더
+ * - 컨테이너 스타일 박스 안에 children 포함 렌더(레이아웃 일관성)
  */
 import React from 'react';
 import type { NodeId, SupportedEvent } from '../../core/types';
@@ -12,12 +12,13 @@ import { findEdges, applyEdge, checkWhen } from '../../runtime/flow';
 import { editorStore } from '../../store/editStore';
 
 function RenderNode({ id }: { id: NodeId }) {
-    const state = editorStore.getState();
+    const state = editorStore.getState(); // 상태+액션
     const node = state.project.nodes[id];
     const selected = state.ui.selectedId === id;
     const renderer = getRenderer(node.componentId);
 
     const fire = (evt: SupportedEvent) => {
+        // 1) Node 액션 실행
         const actions =
             (node.props as Record<string, unknown>).__actions as
                 | Record<string, { steps: import('../../core/types').ActionStep[] }>
@@ -37,7 +38,9 @@ function RenderNode({ id }: { id: NodeId }) {
             emit: (_topic, _payload) => {},
         });
 
-        const edges = findEdges(editorStore.getState(), node.id, evt);
+        // 2) 플로우 평가/적용
+        const curr = editorStore.getState();
+        const edges = findEdges(curr, node.id, evt);
         edges.forEach((edge) => {
             if (checkWhen(edge, editorStore.getState())) {
                 applyEdge(edge, {
@@ -65,7 +68,6 @@ function RenderNode({ id }: { id: NodeId }) {
 
     return (
         <div className={`relative ${selected ? 'outline outline-blue-400' : ''}`} onClick={onSelect}>
-            {/* 컨테이너 스타일 박스 안에 렌더러 + children */}
             <div style={style} data-node={node.id}>
                 {renderer({ node, fire })}
                 {(node.children ?? []).map((cid: NodeId) => (
@@ -77,7 +79,7 @@ function RenderNode({ id }: { id: NodeId }) {
 }
 
 export function Canvas() {
-    void useEditor();
+    void useEditor(); // 리렌더 트리거
     const root = editorStore.getState().project.rootId;
 
     return (

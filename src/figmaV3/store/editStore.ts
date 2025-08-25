@@ -1,11 +1,6 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { EditorState, NodeId, Node, FlowEdge } from '../core/types';
 
-/** 얕은 복사 유틸 — 배열/객체만 처리 */
-function shallowClone<T extends object>(obj: T): T {
-    return Array.isArray(obj) ? ([...obj] as unknown as T) : ({ ...obj } as T);
-}
-
 /** 초기 상태(빈 프로젝트) */
 const initialProject: EditorState['project'] = {
     pages: [{ id: 'page_home', name: 'Home', rootId: 'node_root_home', slug: '/' }],
@@ -24,7 +19,7 @@ const initialProject: EditorState['project'] = {
 
 const initialState: EditorState = {
     project: initialProject,
-    ui: { selectedId: null, canvasWidth: 640, overlays: [] }, // ← overlays 초기화
+    ui: { selectedId: null, canvasWidth: 640, overlays: [] }, // ← overlays 추가
     data: {},
     settings: {},
     flowEdges: {},
@@ -56,9 +51,9 @@ type EditorActions = {
     setData: (path: string, value: unknown) => void;
     setSetting: (path: string, value: unknown) => void;
 
-    // for page
+    /** ← 신규: 오버레이 스택 제어 */
     openFragment: (fragmentId: string) => void;
-    closeFragment: (fragmentId?: string) => void; // undefined면 최상단 닫기
+    closeFragment: (fragmentId?: string) => void;
 };
 
 export type EditorStoreState = EditorState & EditorActions;
@@ -69,8 +64,7 @@ const genId = (prefix: string): string => `${prefix}_${++_seq}`;
 
 export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreState>((set, get) => {
     /** 내부 헬퍼: 상태 필드만 교체(액션은 유지) */
-    const replaceState = (next: EditorState) =>
-        set((prev) => ({ ...prev, ...next }));
+    const replaceState = (next: EditorState) => set((prev) => ({ ...prev, ...next }));
 
     const update: EditorActions['update'] = (fn) => {
         const cur = get();
@@ -83,7 +77,7 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
                 nodes: { ...cur.project.nodes },
                 rootId: cur.project.rootId,
             },
-            ui: { ...cur.ui },
+            ui: { ...cur.ui, overlays: [...(cur.ui.overlays ?? [])] },
             data: { ...cur.data },
             settings: { ...cur.settings },
             flowEdges: { ...cur.flowEdges },
@@ -94,7 +88,6 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
 
     const getParentOf: EditorActions['getParentOf'] = (id) => {
         const nodes = get().project.nodes;
-        // Object.values로 Node로 안전 순회
         for (const node of Object.values(nodes) as Node[]) {
             if ((node.children ?? []).includes(id)) {
                 return node.id;
@@ -284,17 +277,16 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         });
     };
 
-    // createStore 내부 반환에 아래 추가
+    /** 오버레이 스택 조작 */
     const openFragment: EditorActions['openFragment'] = (fragmentId) => {
         update((s) => {
             s.ui = { ...s.ui, overlays: [...s.ui.overlays, fragmentId] };
         });
     };
-
     const closeFragment: EditorActions['closeFragment'] = (fragmentId) => {
         update((s) => {
             const overlays = [...s.ui.overlays];
-            if (!fragmentId) { overlays.pop(); }
+            if (!fragmentId) overlays.pop();
             else {
                 const idx = overlays.lastIndexOf(fragmentId);
                 if (idx >= 0) overlays.splice(idx, 1);
@@ -324,6 +316,6 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         setData,
         setSetting,
         openFragment,
-        closeFragment
+        closeFragment,
     };
 });

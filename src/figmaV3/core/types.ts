@@ -38,7 +38,7 @@ export interface Project {
 export interface EditorUI {
     selectedId: NodeId | null;
     canvasWidth: number;
-    overlays: string[];          // ← 추가: 열린 fragmentId 스택 (상단이 top-most)
+    overlays: string[];          // 열린 fragmentId 스택 (상단이 top-most)
 }
 
 export interface BindingScope {

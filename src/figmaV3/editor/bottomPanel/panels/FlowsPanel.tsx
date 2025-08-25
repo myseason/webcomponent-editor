@@ -1,10 +1,10 @@
 'use client';
 /**
  * FlowsPanel
- * - FlowEdge CRUD: from(nodeId,event) → to(Navigate/Open/Close)
- * - 단순 추가/삭제 UI (조건식 when은 추후 안전 파서 도입 후 확장)
+ * - from(nodeId,event) → to(Navigate/Open/Close)
+ * - 대상(to)은 toKind에 따라 드롭다운(페이지/프래그먼트)로 선택
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { SupportedEvent, FlowEdge, NodeId } from '../../../core/types';
 import { useEditor } from '../../useEditor';
 
@@ -12,22 +12,25 @@ const SUPPORTED_EVENTS: SupportedEvent[] = ['onClick', 'onChange', 'onSubmit', '
 type ToKind = 'Navigate' | 'OpenFragment' | 'CloseFragment';
 
 export function FlowsPanel() {
-    const state = useEditor(); // 상태+액션
+    const state = useEditor();
 
     const [fromNode, setFromNode] = useState<NodeId>(state.ui.selectedId ?? state.project.rootId);
     const [evt, setEvt] = useState<SupportedEvent>('onClick');
     const [toKind, setToKind] = useState<ToKind>('Navigate');
-    const [toValue, setToValue] = useState<string>(state.project.pages[0]?.id ?? 'page_home');
+
+    // 대상 선택 상태
+    const [toPage, setToPage] = useState<string>(state.project.pages[0]?.id ?? 'page_home');
+    const [toFrag, setToFrag] = useState<string>(state.project.fragments[0]?.id ?? '');
 
     const edges: FlowEdge[] = Object.values(state.flowEdges);
 
     const onAdd = () => {
         const edge: FlowEdge =
             toKind === 'Navigate'
-                ? { from: { nodeId: fromNode, event: evt }, to: { kind: 'Navigate', toPageId: toValue } }
+                ? { from: { nodeId: fromNode, event: evt }, to: { kind: 'Navigate', toPageId: toPage } }
                 : toKind === 'OpenFragment'
-                    ? { from: { nodeId: fromNode, event: evt }, to: { kind: 'OpenFragment', fragmentId: toValue } }
-                    : { from: { nodeId: fromNode, event: evt }, to: { kind: 'CloseFragment', fragmentId: toValue || undefined } };
+                    ? { from: { nodeId: fromNode, event: evt }, to: { kind: 'OpenFragment', fragmentId: toFrag } }
+                    : { from: { nodeId: fromNode, event: evt }, to: { kind: 'CloseFragment', fragmentId: toFrag || undefined } };
 
         state.addFlowEdge(edge);
     };
@@ -76,15 +79,30 @@ export function FlowsPanel() {
                     </select>
                 </label>
 
-                <label className="col-span-3 flex items-center gap-2">
-                    <span className="w-6">to</span>
-                    <input
-                        className="flex-1 border rounded px-2 py-1"
-                        value={toValue}
-                        onChange={(e) => setToValue(e.target.value)}
-                        placeholder="pageId/fragmentId"
-                    />
-                </label>
+                {/* 대상 선택: 페이지/프래그먼트 */}
+                {toKind === 'Navigate' ? (
+                    <label className="col-span-3 flex items-center gap-2">
+                        <span className="w-6">to</span>
+                        <select
+                            className="flex-1 border rounded px-2 py-1"
+                            value={toPage}
+                            onChange={(e) => setToPage(e.target.value)}
+                        >
+                            {state.project.pages.map((p) => <option key={p.id} value={p.id}>{p.name || p.id}</option>)}
+                        </select>
+                    </label>
+                ) : (
+                    <label className="col-span-3 flex items-center gap-2">
+                        <span className="w-6">to</span>
+                        <select
+                            className="flex-1 border rounded px-2 py-1"
+                            value={toFrag}
+                            onChange={(e) => setToFrag(e.target.value)}
+                        >
+                            {state.project.fragments.map((f) => <option key={f.id} value={f.id}>{f.name || f.id}</option>)}
+                        </select>
+                    </label>
+                )}
 
                 <div className="col-span-12 flex">
                     <button className="ml-auto text-xs px-2 py-1 rounded border" onClick={onAdd}>추가</button>
