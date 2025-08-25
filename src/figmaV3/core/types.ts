@@ -11,7 +11,7 @@ export interface Node<P extends Record<string, unknown> = Record<string, unknown
   componentId: string;
   props: P;
   styles: S;
-  children: NodeId[];
+  children?: NodeId[];
   locked?: boolean;
 }
 
