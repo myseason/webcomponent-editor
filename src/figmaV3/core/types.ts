@@ -114,9 +114,32 @@ export interface ComponentDefinition<
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// DnD(드래그 앤 드롭) 사전 타입 — 구현은 추후
+// Props 가시성(Visibility) 오버라이드 메타 (노드별)
 // ──────────────────────────────────────────────────────────────────────────────
 
+/** 특정 프로퍼티를 노드 인스턴스 단위로 표시/비표시 제어하기 위한 오버라이드 */
+export interface PropVisibilityOverride {
+    /** 안전 표현식 whenExpr (data/node/project 컨텍스트에서 평가) */
+    whenExpr?: string;
+}
+
+/**
+ * 컴포넌트 인스턴스의 props에 선택적으로 포함되는 메타 컨테이너.
+ * - key: prop key
+ * - value: PropVisibilityOverride
+ *
+ * 저장 위치(권장): node.props.__propVisibility
+ */
+export type PropVisibilityMap = Record<string, PropVisibilityOverride>;
+
+/** props에 메타가 포함된 경우를 위한 유틸 타입(접근 시 캐스트에 사용) */
+export type NodePropsWithMeta = Record<string, unknown> & {
+    __propVisibility?: PropVisibilityMap;
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// DnD(드래그 앤 드롭) 사전 타입 — 구현은 추후
+// ──────────────────────────────────────────────────────────────────────────────
 export type DndDragType = 'palette-component' | 'canvas-node' | 'layers-node';
 export type DropPosition = 'inside' | 'before' | 'after';
 
