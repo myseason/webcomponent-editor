@@ -102,6 +102,12 @@ export type BottomRightPanelKind = 'SchemaEditor' | 'PropVisibility' | 'Logs' | 
 // 페이지 편집 / 컴포넌트(템플릿) 설계 모드
 export type EditorMode = 'Page' | 'Component';
 
+// EditorUI 위쪽에 배치 추천
+export type LeftTabKind = 'Explorer' | 'Composer';
+
+// Explorer 하단 정보 패널에 표시할 선택 미리보기
+export type ExplorerPreviewSel = { kind: 'page' | 'component'; id: string } | null;
+
 /** 편집기 UI 상태 */
 export interface EditorUI {
     selectedId: NodeId | null;
@@ -120,6 +126,9 @@ export interface EditorUI {
     bottomHeightPx?: number;
     mode?: EditorMode;        // 페이지/컴포넌트 모드
     expertMode?: boolean;     // 전문가 모드(템플릿 필터 무시) — 단, 태그 정책은 항상 적용
+    leftTab?: LeftTabKind;   // 'Explorer' | 'Insert' (기본 Explorer)
+    leftSplitPct?: number;   // 좌측 탭의 상/하 분할 비율(%) - 기본 60
+    explorerPreview?: ExplorerPreviewSel; // Explorer 트리에서 선택한 항목의 요약 표시용
 }
 
 // 컴포넌트가 갖는 "기본 능력치"
