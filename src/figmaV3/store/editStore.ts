@@ -7,6 +7,8 @@ import type {
     CSSDict,
 } from '../core/types';
 
+import { filterStyleKeysByTag } from '../runtime/capabilities';
+
 /**
  * 초기 상태(빈 프로젝트)
  * - Home 페이지 1개
@@ -218,9 +220,28 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         };
 
         const updateNodeStyles: EditorActions['updateNodeStyles'] = (id, styles) => {
-            update((s: EditorState) => {
+            update((s) => {
                 const node = s.project.nodes[id];
                 if (!node) return;
+
+                // 태그 결정: Common meta __tag 없으면 'div'
+                const tag = ((node.props as Record<string, unknown>).__tag as string | undefined) ?? 'div';
+
+                // 들어온 element 스타일 키/값 추출 (값 타입을 CSSDict의 value로 단언)
+                const incoming = Object.entries(styles.element ?? {}) as [string, string | number | undefined][];
+
+                // 태그 정책으로 키 필터
+                const allowedKeys = filterStyleKeysByTag(
+                    tag,
+                    incoming.map(([k]) => k),
+                    s.project.tagPolicies
+                );
+
+                const picked: CSSDict = {};
+                for (const [k, v] of incoming) {
+                    if (allowedKeys.includes(k)) picked[k] = v;
+                }
+
                 const prev = node.styles ?? { element: {} };
                 s.project.nodes = {
                     ...s.project.nodes,
@@ -228,7 +249,7 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
                         ...node,
                         styles: {
                             ...prev,
-                            element: { ...(prev.element ?? {}), ...(styles.element ?? {}) },
+                            element: { ...(prev.element ?? {}), ...picked },
                         },
                     },
                 };

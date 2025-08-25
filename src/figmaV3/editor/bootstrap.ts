@@ -1,11 +1,67 @@
+'use client';
 /**
- * 에디터 부팅 로직
- * - 컴포넌트 기본 4종을 레지스트리에 등록
- * - 초기 상태/설정 등을 확장하려면 이 파일에서 처리
+ * bootstrapEditor
+ * - 컴포넌트 등록(registerBasics는 side-effect import)
+ * - 로컬스토리지에서 프로젝트/UI 복원
+ * - 상태 변경을 debounce로 저장
  */
-import '../editor/components/registerBasics';
 
-export function bootstrapEditor(): void {
-    // 현재는 사이드 이펙트 import만으로 충분.
-    // 추후: 서버에서 프로젝트 로드, 데이터 바인딩 초기화 등 추가 가능.
+import './components/registerBasics'; // ← side-effect import (호출 불필요)
+import { editorStore } from '../store/editStore';
+import {
+    loadProjectFromLocal,
+    loadUiFromLocal,
+    saveProjectToLocal,
+    saveUiToLocal,
+} from '../runtime/persistence';
+import type { EditorState, Project } from '../core/types';
+
+// 가변 인자 제네릭 debounce (인자 타입 유지)
+function debounce<A extends unknown[]>(
+    fn: (...args: A) => void,
+    ms: number
+): (...args: A) => void {
+    let t: ReturnType<typeof setTimeout> | null = null;
+    return (...args: A) => {
+        if (t) clearTimeout(t);
+        t = setTimeout(() => fn(...args), ms);
+    };
+}
+
+const saveProjectDebounced = debounce((p: Project) => saveProjectToLocal(p), 120);
+const saveUiDebounced = debounce((ui: EditorState['ui']) => saveUiToLocal(ui), 120);
+
+export function bootstrapEditor() {
+    // 로컬 복원(클라이언트에서만)
+    if (typeof window !== 'undefined') {
+        const st = editorStore.getState();
+
+        const p = loadProjectFromLocal();
+        if (p) {
+            editorStore.setState({ ...st, project: p });
+        }
+        const ui = loadUiFromLocal();
+        if (ui) {
+            editorStore.setState((prev) => ({ ...prev, ui: { ...prev.ui, ...ui } }));
+        }
+
+        // 변경 감지 저장
+        let prevProjectJson = JSON.stringify(editorStore.getState().project);
+        let prevUiJson = JSON.stringify(editorStore.getState().ui);
+
+        editorStore.subscribe((next) => {
+            // 프로젝트 저장
+            const pj = JSON.stringify(next.project);
+            if (pj !== prevProjectJson) {
+                prevProjectJson = pj;
+                saveProjectDebounced(next.project);
+            }
+            // UI 저장
+            const uj = JSON.stringify(next.ui);
+            if (uj !== prevUiJson) {
+                prevUiJson = uj;
+                saveUiDebounced(next.ui);
+            }
+        });
+    }
 }
