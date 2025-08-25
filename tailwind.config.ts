@@ -5,7 +5,10 @@ import { CSSRuleObject } from "tailwindcss/types/config";
 export default {
   darkMode: ["class"],
   content: [
-      "./src/figmaV3/**/*.{ts,tsx}",
+      './src/**/*.{ts,tsx}',          // ← figmaV3 전체 포함
+      './src/figmaV3/**/*.{ts,tsx}',
+      './src/app/**/*.{ts,tsx}',
+      './src/pages/**/*.{ts,tsx}',    // (pages 라우터를 쓰지 않아도 안전하게 포함)
   ],
   theme: {
     extend: {

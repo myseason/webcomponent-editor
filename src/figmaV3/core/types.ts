@@ -36,8 +36,9 @@ export interface Project {
 }
 
 export interface EditorUI {
-  selectedId: NodeId | null;
-  canvasWidth: number; // 기본 640
+    selectedId: NodeId | null;
+    canvasWidth: number;
+    overlays: string[];          // ← 추가: 열린 fragmentId 스택 (상단이 top-most)
 }
 
 export interface BindingScope {

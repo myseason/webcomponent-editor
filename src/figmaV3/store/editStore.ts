@@ -24,7 +24,7 @@ const initialProject: EditorState['project'] = {
 
 const initialState: EditorState = {
     project: initialProject,
-    ui: { selectedId: null, canvasWidth: 640 },
+    ui: { selectedId: null, canvasWidth: 640, overlays: [] }, // ← overlays 초기화
     data: {},
     settings: {},
     flowEdges: {},
@@ -55,6 +55,10 @@ type EditorActions = {
 
     setData: (path: string, value: unknown) => void;
     setSetting: (path: string, value: unknown) => void;
+
+    // for page
+    openFragment: (fragmentId: string) => void;
+    closeFragment: (fragmentId?: string) => void; // undefined면 최상단 닫기
 };
 
 export type EditorStoreState = EditorState & EditorActions;
@@ -280,6 +284,25 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         });
     };
 
+    // createStore 내부 반환에 아래 추가
+    const openFragment: EditorActions['openFragment'] = (fragmentId) => {
+        update((s) => {
+            s.ui = { ...s.ui, overlays: [...s.ui.overlays, fragmentId] };
+        });
+    };
+
+    const closeFragment: EditorActions['closeFragment'] = (fragmentId) => {
+        update((s) => {
+            const overlays = [...s.ui.overlays];
+            if (!fragmentId) { overlays.pop(); }
+            else {
+                const idx = overlays.lastIndexOf(fragmentId);
+                if (idx >= 0) overlays.splice(idx, 1);
+            }
+            s.ui = { ...s.ui, overlays };
+        });
+    };
+
     return {
         ...initialState,
         update,
@@ -300,5 +323,7 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         removeFlowEdge,
         setData,
         setSetting,
+        openFragment,
+        closeFragment
     };
 });

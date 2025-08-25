@@ -13,6 +13,7 @@ import { Layers } from './leftPanel/Layers';
 import { Canvas } from './centerPanel/Canvas';
 import { Inspector } from './rightPanel/Inspector';
 import { BottomDock } from './bottomPanel/BottomDock';
+import { OverlayHost } from './centerPanel/OverlayHost';
 
 bootstrapEditor();
 
@@ -37,8 +38,10 @@ export default function ComponentEditor() {
                     <Layers />
                 </aside>
 
-                <main className="overflow-auto">
+                <main className="overflow-auto relative">
                     <Canvas />
+                    {/* 오버레이: 상위에 렌더 */}
+                    <OverlayHost />
                 </main>
 
                 <aside className="border-l bg-white overflow-auto">
