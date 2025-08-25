@@ -1,10 +1,15 @@
 'use client';
 /**
  * TemplatesPanel
- * - Project Templates만 관리/삽입 (Common Components는 Palette에서만 노출 → 중복 제거)
- * - settings.templates에 저장(서버 연동 전까지 로컬)
- * 규약: 훅 최상위, any 금지, 얕은 복사 update()
+ * - Project Templates(또는 settings.templates) 관리/삽입
+ * - query로 id/title/defId 매칭 필터링
+ *
+ * 규칙
+ *  - any 금지
+ *  - 훅 최상위
+ *  - 얕은 복사 update()
  */
+
 import React from 'react';
 import { listDefinitions, getDefinition } from '../../core/registry';
 import { useEditor } from '../useEditor';
@@ -18,20 +23,53 @@ type TemplateLite = {
     styles?: { element?: CSSDict };
 };
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-    return <div className="text-[11px] font-semibold text-gray-600 mb-1">{children}</div>;
+function isTemplateLite(x: unknown): x is TemplateLite {
+    if (!x || typeof x !== 'object') return false;
+    const o = x as Record<string, unknown>;
+    return typeof o.id === 'string' && typeof o.defId === 'string' && typeof o.title === 'string';
 }
 
-export function TemplatesPanel() {
+function SectionTitle({ children }: { children: React.ReactNode }) {
+    return (
+        <div className="text-[11px] text-gray-500 mb-1">{children}</div>
+    );
+}
+
+export function TemplatesPanel({ query = '' }: { query?: string }) {
     const state = useEditor();
 
-    // Base component 목록(새 템플릿 생성에만 사용)
+    // Base component 목록(신규 템플릿 작성용)
     const defs = listDefinitions();
 
-    // Project Templates
-    const templates = (state.settings['templates'] as Record<string, TemplateLite> | undefined) ?? {};
+    // Project Templates (우선) → 없으면 settings.templates
+    const projectTemplates = state.project.templates
+        ? Object.values(state.project.templates).map((t) => ({
+            id: t.id,
+            defId: t.baseDefId,
+            title: t.title,
+            props: (t.defaults?.props as Record<string, unknown> | undefined) ?? undefined,
+            styles: t.defaults?.styles ? { element: t.defaults.styles as CSSDict } : undefined,
+        }))
+        : [];
 
-    // 삽입: Template (props/styles 병합)
+    const settingsTemplates = React.useMemo<TemplateLite[]>(() => {
+        const raw = state.settings['templates'];
+        if (!raw || typeof raw !== 'object') return [];
+        if (Array.isArray(raw)) return (raw as unknown[]).filter(isTemplateLite);
+        return Object.values(raw as Record<string, unknown>).filter(isTemplateLite);
+    }, [state.settings]);
+
+    const templates: TemplateLite[] = (projectTemplates.length ? projectTemplates : settingsTemplates).filter((t) => {
+        if (!query.trim()) return true;
+        const q = query.trim().toLowerCase();
+        return (
+            t.id.toLowerCase().includes(q) ||
+            t.title.toLowerCase().includes(q) ||
+            t.defId.toLowerCase().includes(q)
+        );
+    });
+
+    // 삽입: Template(props/styles 병합)
     const insertTemplate = (tpl: TemplateLite) => {
         const parent = state.ui.selectedId ?? state.project.rootId;
         const nodeId = state.addByDef(tpl.defId, parent);
@@ -45,11 +83,10 @@ export function TemplatesPanel() {
 
     // 신규 작성 폼
     const [openNew, setOpenNew] = React.useState(false);
-    const [baseDef, setBaseDef] = React.useState<string>('');
-    const [title, setTitle] = React.useState<string>('');
-    const [captureFromNode, setCaptureFromNode] = React.useState<boolean>(true);
+    const [baseDef, setBaseDef] = React.useState('');
+    const [title, setTitle] = React.useState('');
+    const [captureFromNode, setCaptureFromNode] = React.useState(true);
 
-    // 현재 선택 노드에서 props/styles 캡처(컴포넌트 동일 시)
     const captureSnapshot = (): { props?: Record<string, unknown>; styles?: { element?: CSSDict } } => {
         if (!captureFromNode) return {};
         const nid = state.ui.selectedId;
@@ -63,7 +100,6 @@ export function TemplatesPanel() {
         };
     };
 
-    // 템플릿 생성
     const createTemplate = () => {
         if (!baseDef) {
             alert('Base component를 선택해 주세요.');
@@ -72,7 +108,6 @@ export function TemplatesPanel() {
         const def = getDefinition(baseDef);
         const name = (title || def?.title || baseDef).trim();
         const id = `tpl_${baseDef}_${Date.now().toString(36)}`;
-
         const snap = captureSnapshot();
 
         state.update((s) => {
@@ -87,12 +122,11 @@ export function TemplatesPanel() {
                         title: name,
                         ...(snap.props ? { props: snap.props } : {}),
                         ...(snap.styles ? { styles: snap.styles } : {}),
-                    } as TemplateLite,
+                    },
                 },
             };
         });
 
-        // 폼 리셋
         setOpenNew(false);
         setBaseDef('');
         setTitle('');
@@ -120,90 +154,110 @@ export function TemplatesPanel() {
     };
 
     return (
-        <div className="p-2 text-sm">
-            <div className="font-semibold mb-2">Templates</div>
-
-            {/* New Template Form 토글 */}
-            <div className="mb-3">
-                <button className="text-[12px] border rounded px-2 py-1" onClick={() => setOpenNew((v) => !v)}>
+        <div className="space-y-3">
+            {/* 신규 템플릿 작성 토글 */}
+            <div className="flex items-center justify-between">
+                <SectionTitle>Templates</SectionTitle>
+                <button
+                    type="button"
+                    className="text-[12px] px-2 py-1 border rounded"
+                    onClick={() => setOpenNew((v) => !v)}
+                >
                     {openNew ? 'Close' : '+ New Template'}
                 </button>
-                {openNew && (
-                    <div className="mt-2 border rounded p-2 space-y-2">
-                        <div>
-                            <SectionTitle>Base Component</SectionTitle>
-                            <select
-                                className="w-full border rounded px-2 py-1 text-sm bg-white"
-                                value={baseDef}
-                                onChange={(e) => setBaseDef(e.target.value)}
-                            >
-                                <option value="">선택...</option>
-                                {defs.map((d) => (
-                                    <option key={d.id} value={d.id}>
-                                        {d.title} ({d.id})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <SectionTitle>Title</SectionTitle>
-                            <input
-                                className="w-full border rounded px-2 py-1 text-sm"
-                                placeholder="Template title"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                            />
-                        </div>
-
-                        <label className="flex items-center gap-2 text-[12px]">
-                            <input
-                                type="checkbox"
-                                checked={captureFromNode}
-                                onChange={(e) => setCaptureFromNode(e.target.checked)}
-                            />
-                            현재 선택 노드의 props/styles를 캡처(컴포넌트가 동일할 때만)
-                        </label>
-
-                        <div className="flex items-center justify-end">
-                            <button className="text-[12px] border rounded px-2 py-1" onClick={createTemplate}>
-                                Create
-                            </button>
-                        </div>
-                    </div>
-                )}
             </div>
 
-            {/* Project Templates 목록 */}
-            <SectionTitle>Project Templates</SectionTitle>
-            {Object.keys(templates).length === 0 ? (
-                <div className="text-[12px] text-gray-500 mb-3">아직 템플릿이 없습니다.</div>
-            ) : (
-                <div className="mb-3 space-y-2">
-                    {Object.values(templates).map((t) => (
-                        <div key={t.id} className="border rounded p-2">
-                            <div className="flex items-center gap-2">
-                                <input
-                                    className="flex-1 border rounded px-2 py-1 text-sm"
-                                    value={t.title}
-                                    onChange={(e) => renameTemplate(t.id, e.target.value)}
-                                />
-                                <button className="text-[12px] border rounded px-2 py-1" onClick={() => insertTemplate(t)}>
-                                    Insert
-                                </button>
-                                <button className="text-[12px] border rounded px-2 py-1" onClick={() => removeTemplate(t.id)}>
-                                    Delete
-                                </button>
-                            </div>
-                            <div className="mt-1 text-[11px] text-gray-500">
-                                base: <b>{t.defId}</b>
-                                {t.props && Object.keys(t.props).length ? ' · props' : ''}
-                                {t.styles?.element && Object.keys(t.styles.element).length ? ' · styles' : ''}
-                            </div>
-                        </div>
-                    ))}
+            {openNew && (
+                <div className="border rounded p-2 space-y-2">
+                    <div>
+                        <div className="text-[12px] text-gray-600 mb-1">Base Component</div>
+                        <select
+                            className="w-full border rounded px-2 py-1 text-sm bg-white"
+                            value={baseDef}
+                            onChange={(e) => setBaseDef(e.target.value)}
+                        >
+                            <option value="">선택...</option>
+                            {defs.map((d) => (
+                                <option key={d.id} value={d.id}>
+                                    {d.title} ({d.id})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <div className="text-[12px] text-gray-600 mb-1">Title</div>
+                        <input
+                            className="w-full border rounded px-2 py-1 text-sm"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="Template title"
+                        />
+                    </div>
+
+                    <label className="text-[12px] flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            checked={captureFromNode}
+                            onChange={(e) => setCaptureFromNode(e.target.checked)}
+                        />
+                        현재 선택 노드의 props/styles를 캡처(동일 컴포넌트일 때만)
+                    </label>
+
+                    <div>
+                        <button type="button" className="text-[12px] px-2 py-1 border rounded" onClick={createTemplate}>
+                            Create
+                        </button>
+                    </div>
                 </div>
             )}
+
+            {/* 템플릿 목록 */}
+            <div className="space-y-2">
+                <SectionTitle>Project Templates</SectionTitle>
+                {templates.length === 0 ? (
+                    <div className="text-[12px] text-gray-500">No templates</div>
+                ) : (
+                    <ul className="space-y-1">
+                        {templates.map((t) => (
+                            <li key={t.id} className="border rounded p-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <input
+                                        className="flex-1 border rounded px-2 py-1 text-sm"
+                                        value={t.title}
+                                        onChange={(e) => renameTemplate(t.id, e.target.value)}
+                                        title={t.id}
+                                    />
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            className="text-[12px] px-2 py-1 border rounded"
+                                            onClick={() => insertTemplate(t)}
+                                            title="Insert into current page"
+                                        >
+                                            Insert
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="text-[12px] px-2 py-1 border rounded"
+                                            onClick={() => removeTemplate(t.id)}
+                                            title="Delete template"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="mt-1 text-[11px] text-gray-500">
+                                    base: {t.defId}
+                                    {t.props && Object.keys(t.props).length ? ' · props' : ''}
+                                    {t.styles?.element && Object.keys(t.styles.element).length ? ' · styles' : ''}
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
         </div>
     );
 }

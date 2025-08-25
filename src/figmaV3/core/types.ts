@@ -126,7 +126,10 @@ export interface EditorUI {
     mode?: EditorMode;        // 페이지/컴포넌트 모드
     expertMode?: boolean;     // 전문가 모드(템플릿 필터 무시) — 단, 태그 정책은 항상 적용
     bottomHeightPx?: number;
-    rightWidthPx?: number;   // 우측 패널 사용자 리사이즈 폭, 기본 420, min 320 ~ max 720
+    /** 우측 패널 사용자 리사이즈 폭, 기본 420 (min 320 ~ max 720) */
+    rightWidthPx?: number;
+    /** 좌측 패널 사용자 리사이즈 폭, 기본 320 (min 260 ~ max 520) */
+    leftWidthPx?: number;
     leftTab?: LeftTabKind;   // 'Explorer' | 'Insert' (기본 Explorer)
     leftSplitPct?: number;   // 좌측 탭의 상/하 분할 비율(%) - 기본 60
     explorerPreview?: ExplorerPreviewSel; // Explorer 트리에서 선택한 항목의 요약 표시용
