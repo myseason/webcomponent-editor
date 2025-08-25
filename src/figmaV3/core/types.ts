@@ -6,6 +6,32 @@ export interface StyleBase {
   element?: CSSDict;
 }
 
+/** 컴포넌트 정의(렌더러는 UI 레이어에서 결합) */
+export type PropSchemaEntry<P extends Record<string, unknown> = Record<string, unknown>> =
+    | {
+    key: keyof P & string;
+    type: 'text';
+    label?: string;
+    placeholder?: string;
+    default?: unknown;
+    when?: Record<string, unknown>;   // 기존: 단순 동등 비교
+    whenExpr?: string;                // 신설: 안전 표현식 (data/node/project 사용)
+}
+    | {
+    key: keyof P & string;
+    type: 'select';
+    label?: string;
+    options: { label: string; value: unknown }[];
+    default?: unknown;
+    when?: Record<string, unknown>;
+    whenExpr?: string;
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 컴포넌트 스키마 오버라이드 (프로젝트 단위)
+// ──────────────────────────────────────────────────────────────────────────────
+export type ComponentSchemaOverrides = Record<string, PropSchemaEntry[]>;
+
 export interface Node<P extends Record<string, unknown> = Record<string, unknown>, S extends StyleBase = StyleBase> {
   id: NodeId;
   componentId: string;
@@ -27,12 +53,16 @@ export interface Fragment {
   name: string;
   rootId: NodeId;
 }
+/** Project에 스키마 오버라이드 보관(선언만 추가) */
+declare module './types' {} // (모듈 경로 보정 필요 시 제거)
 
 export interface Project {
   pages: Page[];
   fragments: Fragment[];
   nodes: Record<NodeId, Node>;
   rootId: NodeId; // 현재 표시 중인 페이지 root
+  /** 컴포넌트 정의(propsSchema) 오버라이드 — key: defId */
+  schemaOverrides?: ComponentSchemaOverrides;
 }
 
 export interface EditorUI {
@@ -80,27 +110,6 @@ export interface EditorState {
   settings: Record<string, unknown>;
   flowEdges: Record<string, FlowEdge>;
 }
-
-/** 컴포넌트 정의(렌더러는 UI 레이어에서 결합) */
-export type PropSchemaEntry<P extends Record<string, unknown> = Record<string, unknown>> =
-    | {
-    key: keyof P & string;
-    type: 'text';
-    label?: string;
-    placeholder?: string;
-    default?: unknown;
-    when?: Record<string, unknown>;   // 기존: 단순 동등 비교
-    whenExpr?: string;                // 신설: 안전 표현식 (data/node/project 사용)
-}
-    | {
-    key: keyof P & string;
-    type: 'select';
-    label?: string;
-    options: { label: string; value: unknown }[];
-    default?: unknown;
-    when?: Record<string, unknown>;
-    whenExpr?: string;
-};
 
 export interface ComponentDefinition<
   P extends Record<string, unknown> = Record<string, unknown>,
