@@ -1,12 +1,19 @@
 /* SSOT: 모든 타입은 본 파일에서만 정의/수출합니다. (any 사용 금지) */
+
 export type NodeId = string;
 
-export type CSSDict = Record<string, unknown>;
+/** 간단한 인라인 CSS 딕셔너리 */
+export type CSSDict = Record<string, string | number | undefined>;
+
 export interface StyleBase {
-  element?: CSSDict;
+    element?: CSSDict;
 }
 
-/** 컴포넌트 정의(렌더러는 UI 레이어에서 결합) */
+/**
+ * 스키마 항목(PropsAutoSection 자동 생성 기준)
+ * - when: 단순 동등비교 기반 표시 조건
+ * - whenExpr: 안전 표현식(브라우저 내 파서로 평가; data/node/project 접근 허용)
+ */
 export type PropSchemaEntry<P extends Record<string, unknown> = Record<string, unknown>> =
     | {
     key: keyof P & string;
@@ -14,8 +21,8 @@ export type PropSchemaEntry<P extends Record<string, unknown> = Record<string, u
     label?: string;
     placeholder?: string;
     default?: unknown;
-    when?: Record<string, unknown>;   // 기존: 단순 동등 비교
-    whenExpr?: string;                // 신설: 안전 표현식 (data/node/project 사용)
+    when?: Record<string, unknown>;
+    whenExpr?: string;
 }
     | {
     key: keyof P & string;
@@ -27,99 +34,127 @@ export type PropSchemaEntry<P extends Record<string, unknown> = Record<string, u
     whenExpr?: string;
 };
 
-// ──────────────────────────────────────────────────────────────────────────────
-// 컴포넌트 스키마 오버라이드 (프로젝트 단위)
-// ──────────────────────────────────────────────────────────────────────────────
-export type ComponentSchemaOverrides = Record<string, PropSchemaEntry[]>;
-
-export interface Node<P extends Record<string, unknown> = Record<string, unknown>, S extends StyleBase = StyleBase> {
-  id: NodeId;
-  componentId: string;
-  props: P;
-  styles: S;
-  children?: NodeId[];
-  locked?: boolean;
+/** 컴포넌트 정의(렌더러는 UI 레이어에서 결합: React 의존 방지) */
+export interface ComponentDefinition<
+    P extends Record<string, unknown> = Record<string, unknown>,
+    S extends StyleBase = StyleBase
+> {
+    id: string;
+    title: string;
+    defaults: {
+        props: Partial<P>;
+        styles: Partial<S>;
+    };
+    propsSchema?: Array<PropSchemaEntry<P>>;
 }
 
+/** 노드(페이지 트리의 원자 요소) */
+export interface Node<
+    P extends Record<string, unknown> = Record<string, unknown>,
+    S extends StyleBase = StyleBase
+> {
+    id: NodeId;
+    componentId: string;
+    props: P;
+    styles: S;
+    children?: NodeId[];
+    locked?: boolean;
+}
+
+/** 페이지/프래그먼트/프로젝트 */
 export interface Page {
-  id: string;
-  name: string;
-  rootId: NodeId;
-  slug?: string;
+    id: string;
+    name: string;
+    rootId: NodeId;
+    slug?: string;
 }
 
 export interface Fragment {
-  id: string;
-  name: string;
-  rootId: NodeId;
-}
-/** Project에 스키마 오버라이드 보관(선언만 추가) */
-declare module './types' {} // (모듈 경로 보정 필요 시 제거)
-
-export interface Project {
-  pages: Page[];
-  fragments: Fragment[];
-  nodes: Record<NodeId, Node>;
-  rootId: NodeId; // 현재 표시 중인 페이지 root
-  /** 컴포넌트 정의(propsSchema) 오버라이드 — key: defId */
-  schemaOverrides?: ComponentSchemaOverrides;
+    id: string;
+    name: string;
+    rootId: NodeId;
 }
 
+/** 프로젝트 단위 스키마 오버라이드: defId -> rows */
+export type ComponentSchemaOverrides = Record<string, PropSchemaEntry[]>;
+
+/** BottomDock의 우측 고급 패널 종류 */
+export type BottomRightPanelKind = 'SchemaEditor' | 'PropVisibility' | 'Logs' | 'None';
+
+/** 편집기 UI 상태 */
 export interface EditorUI {
     selectedId: NodeId | null;
     canvasWidth: number;
-    overlays: string[];          // 열린 fragmentId 스택 (상단이 top-most)
+
+    /** 열린 fragmentId 스택(상단이 top-most) */
+    overlays: string[];
+
+    /** 하단 우측 고급 패널 상태 */
+    bottomRight?: {
+        open: boolean;
+        kind: BottomRightPanelKind;
+        /** 전체 너비 대비 우측 패널 비율(%) */
+        widthPct: number; // 20 ~ 60 권장
+    };
+    bottomHeightPx?: number;
 }
 
+export interface Project {
+    pages: Page[];
+    fragments: Fragment[];
+    /** 모든 노드: id -> Node */
+    nodes: Record<NodeId, Node>;
+    /** 현재 표시 중인 페이지의 루트 노드 id */
+    rootId: NodeId;
+
+    /** 컴포넌트 정의(propsSchema) 오버라이드 — key: defId */
+    schemaOverrides?: ComponentSchemaOverrides;
+}
+
+/** whenExpr 평가 컨텍스트 */
 export interface BindingScope {
-  data: Record<string, unknown>;
-  node: Node | null;
-  project: Project | null;
+    data: Record<string, unknown>;
+    node: Node | null;
+    project: Project | null;
 }
 
+/** 지원 이벤트 */
 export type SupportedEvent = 'onClick' | 'onChange' | 'onSubmit' | 'onLoad';
 
+/** 액션 스텝 */
 export type ActionStep =
-  | { kind: 'Alert'; message: string }
-  | { kind: 'SetData'; path: string; value: unknown }
-  | { kind: 'SetProps'; nodeId: NodeId; patch: Record<string, unknown> }
-  | { kind: 'Http'; method: 'GET' | 'POST'; url: string; body?: unknown; headers?: Record<string, string> }
-  | { kind: 'Emit'; topic: string; payload?: unknown }
-  | { kind: 'Navigate'; toPageId: string }
-  | { kind: 'OpenFragment'; fragmentId: string }
-  | { kind: 'CloseFragment'; fragmentId?: string };
-
-export interface ActionSpec {
-  steps: ActionStep[];
-}
-
-export interface FlowEdge {
-  id?: string;
-  from: { nodeId: NodeId; event: SupportedEvent };
-  when?: { expr: string };
-  to:
+    | { kind: 'Alert'; message: string }
+    | { kind: 'SetData'; path: string; value: unknown }
+    | { kind: 'SetProps'; nodeId: NodeId; patch: Record<string, unknown> }
+    | { kind: 'Http'; method: 'GET' | 'POST'; url: string; body?: unknown; headers?: Record<string, string> }
+    | { kind: 'Emit'; topic: string; payload?: unknown }
     | { kind: 'Navigate'; toPageId: string }
     | { kind: 'OpenFragment'; fragmentId: string }
     | { kind: 'CloseFragment'; fragmentId?: string };
+
+export interface ActionSpec {
+    steps: ActionStep[];
 }
 
+/** 플로우 엣지(from 이벤트 → to 동작, 선택적 when) */
+export interface FlowEdge {
+    id?: string;
+    from: { nodeId: NodeId; event: SupportedEvent };
+    when?: { expr: string };
+    to:
+        | { kind: 'Navigate'; toPageId: string }
+        | { kind: 'OpenFragment'; fragmentId: string }
+        | { kind: 'CloseFragment'; fragmentId?: string };
+}
+
+/** 전역 상태 */
 export interface EditorState {
-  project: Project;
-  ui: EditorUI;
-  data: Record<string, unknown>;
-  settings: Record<string, unknown>;
-  flowEdges: Record<string, FlowEdge>;
-}
-
-export interface ComponentDefinition<
-  P extends Record<string, unknown> = Record<string, unknown>,
-  S extends StyleBase = StyleBase
-> {
-  id: string;
-  title: string;
-  defaults: { props: Partial<P>; styles: Partial<S> };
-  propsSchema?: Array<PropSchemaEntry<P>>;
-  // Render는 UI 레이어에서 결합합니다. (React 의존 방지)
+    project: Project;
+    ui: EditorUI;
+    data: Record<string, unknown>;
+    settings: Record<string, unknown>;
+    /** flowEdges: id -> FlowEdge */
+    flowEdges: Record<string, FlowEdge>;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -149,6 +184,7 @@ export type NodePropsWithMeta = Record<string, unknown> & {
 // ──────────────────────────────────────────────────────────────────────────────
 // DnD(드래그 앤 드롭) 사전 타입 — 구현은 추후
 // ──────────────────────────────────────────────────────────────────────────────
+
 export type DndDragType = 'palette-component' | 'canvas-node' | 'layers-node';
 export type DropPosition = 'inside' | 'before' | 'after';
 
