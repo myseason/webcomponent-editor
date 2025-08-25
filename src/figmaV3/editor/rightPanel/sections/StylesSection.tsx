@@ -137,6 +137,18 @@ export function StylesSection() {
         background: ['backgroundColor', 'backgroundImage', 'backgroundSize', 'backgroundRepeat', 'backgroundPosition'],
         effects: ['boxShadow', 'filter', 'opacity'],
         flex: ['flexDirection', 'justifyContent', 'alignItems', 'gap'],
+        grid: [
+            'gridTemplateColumns',
+            'gridTemplateRows',
+            'gridAutoFlow',
+            'gap',
+            'columnGap',
+            'rowGap',
+            'justifyItems',
+            'alignItems',
+            'justifyContent',
+            'alignContent',
+        ],
     };
 
     const allow = {
@@ -148,6 +160,7 @@ export function StylesSection() {
         background: useAllowed(KEYS.background, tf, tag, state.project.tagPolicies, expert),
         effects: useAllowed(KEYS.effects, tf, tag, state.project.tagPolicies, expert),
         flex: useAllowed(KEYS.flex, tf, tag, state.project.tagPolicies, expert),
+        grid: useAllowed(KEYS.grid, tf, tag, state.project.tagPolicies, expert),
     };
 
     // 가드/상태
@@ -319,10 +332,10 @@ export function StylesSection() {
                 {container && (el.display as string) === 'flex' && (
                     <div className="mt-2">
                         {/*
-      주축/교차축 아이콘 세트 계산:
-      - row/row-reverse:  justify => Horizontal, align => Vertical
-      - column/column-reverse: justify => Vertical,   align => Horizontal
-    */}
+                          주축/교차축 아이콘 세트 계산:
+                          - row/row-reverse:  justify => Horizontal, align => Vertical
+                          - column/column-reverse: justify => Vertical,   align => Horizontal
+                        */}
                         {(() => {
                             const dir = (el.flexDirection as string) ?? 'row';
                             const isColumn = dir === 'column' || dir === 'column-reverse';
@@ -453,6 +466,242 @@ export function StylesSection() {
                                             </div>
                                         )}
                                     </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                )}
+                {/* ───────────────── Grid 컨트롤(프리셋 + 상세 v1) ───────────────── */}
+                {container && (el.display as string) === 'grid' && (
+                    <div className="mt-2">
+                        {(() => {
+                            // repeat(n, 1fr) 파서 (columns / rows 공용)
+                            const parseRepeat = (v: unknown): number | null => {
+                                if (typeof v !== 'string') return null;
+                                const m = v.trim().match(/^repeat\((\d+),\s*1fr\)$/);
+                                return m ? Number(m[1]) : null;
+                            };
+                            const cols = parseRepeat(el.gridTemplateColumns);
+                            const rows = parseRepeat(el.gridTemplateRows);
+
+                            const setCols = (n: number | 'auto') => {
+                                if (!allow.grid.has('gridTemplateColumns')) return;
+                                if (n === 'auto') {
+                                    patch({ gridTemplateColumns: undefined } as CSSDict);
+                                } else {
+                                    patch({ gridTemplateColumns: `repeat(${n}, 1fr)` } as CSSDict);
+                                }
+                            };
+
+                            const setRows = (n: number | 'auto') => {
+                                if (!allow.grid.has('gridTemplateRows')) return;
+                                if (n === 'auto') {
+                                    patch({ gridTemplateRows: undefined } as CSSDict);
+                                } else {
+                                    patch({ gridTemplateRows: `repeat(${n}, 1fr)` } as CSSDict);
+                                }
+                            };
+
+                            return (
+                                <div className="grid grid-cols-12 gap-2 items-start">
+                                    {/* Columns 프리셋 */}
+                                    <div className="col-span-6">
+                                        <Label>columns</Label>
+                                        {allow.grid.has('gridTemplateColumns') ? (
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                <button
+                                                    type="button"
+                                                    className={`h-8 px-2 border rounded text-[12px] ${cols === null ? 'bg-gray-900 text-white' : ''}`}
+                                                    title="auto"
+                                                    aria-label="gridTemplateColumns auto"
+                                                    onClick={() => setCols('auto')}
+                                                >Auto</button>
+                                                {[1,2,3,4,5,6].map((n) => (
+                                                    <button
+                                                        key={n}
+                                                        type="button"
+                                                        className={`h-8 w-8 border rounded text-[12px] grid place-items-center ${cols === n ? 'bg-gray-900 text-white' : ''}`}
+                                                        title={`${n} columns (repeat(${n}, 1fr))`}
+                                                        aria-label={`${n} columns`}
+                                                        onClick={() => setCols(n)}
+                                                    >{n}</button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-[12px] text-gray-400">
+                                                제한됨 <DisabledHint reason={dis('gridTemplateColumns') ?? 'template'} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Rows 프리셋 */}
+                                    <div className="col-span-6">
+                                        <Label>rows</Label>
+                                        {allow.grid.has('gridTemplateRows') ? (
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                <button
+                                                    type="button"
+                                                    className={`h-8 px-2 border rounded text-[12px] ${rows === null ? 'bg-gray-900 text-white' : ''}`}
+                                                    title="auto"
+                                                    aria-label="gridTemplateRows auto"
+                                                    onClick={() => setRows('auto')}
+                                                >Auto</button>
+                                                {[1,2,3,4].map((n) => (
+                                                    <button
+                                                        key={n}
+                                                        type="button"
+                                                        className={`h-8 w-8 border rounded text-[12px] grid place-items-center ${rows === n ? 'bg-gray-900 text-white' : ''}`}
+                                                        title={`${n} rows (repeat(${n}, 1fr))`}
+                                                        aria-label={`${n} rows`}
+                                                        onClick={() => setRows(n)}
+                                                    >{n}</button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-[12px] text-gray-400">
+                                                제한됨 <DisabledHint reason={dis('gridTemplateRows') ?? 'template'} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Gap / RowGap / ColumnGap */}
+                                    <div className="col-span-4">
+                                        <Label>gap</Label>
+                                        {allow.grid.has('gap') ? (
+                                            <div className="mt-1">
+                                                <MiniInput
+                                                    value={el.gap}
+                                                    placeholder="e.g. 8px"
+                                                    onChange={(v) => patch({ gap: v })}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="text-[12px] text-gray-400">
+                                                제한됨 <DisabledHint reason={dis('gap') ?? 'template'} />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="col-span-4">
+                                        <Label>rowGap</Label>
+                                        {allow.grid.has('rowGap') ? (
+                                            <div className="mt-1">
+                                                <MiniInput
+                                                    value={el.rowGap}
+                                                    placeholder="e.g. 8px"
+                                                    onChange={(v) => patch({ rowGap: v })}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="text-[12px] text-gray-400">
+                                                제한됨 <DisabledHint reason={dis('rowGap') ?? 'template'} />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="col-span-4">
+                                        <Label>columnGap</Label>
+                                        {allow.grid.has('columnGap') ? (
+                                            <div className="mt-1">
+                                                <MiniInput
+                                                    value={el.columnGap}
+                                                    placeholder="e.g. 8px"
+                                                    onChange={(v) => patch({ columnGap: v })}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="text-[12px] text-gray-400">
+                                                제한됨 <DisabledHint reason={dis('columnGap') ?? 'template'} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Auto-flow */}
+                                    <div className="col-span-6">
+                                        <Label>auto-flow</Label>
+                                        {allow.grid.has('gridAutoFlow') ? (
+                                            <div className="mt-1">
+                                                <MiniSelect
+                                                    value={el.gridAutoFlow as string | undefined}
+                                                    options={['row','column','row dense','column dense','dense']}
+                                                    onChange={(v) => patch({ gridAutoFlow: v })}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="text-[12px] text-gray-400">
+                                                제한됨 <DisabledHint reason={dis('gridAutoFlow') ?? 'template'} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Alignments */}
+                                    <div className="col-span-6">
+                                        <Label>justifyItems / alignItems</Label>
+                                        <div className="mt-1 grid grid-cols-2 gap-2">
+                                            <div>
+                                                {allow.grid.has('justifyItems') ? (
+                                                    <MiniSelect
+                                                        value={el.justifyItems as string | undefined}
+                                                        options={['start','center','end','stretch']}
+                                                        onChange={(v) => patch({ justifyItems: v })}
+                                                    />
+                                                ) : (
+                                                    <div className="text-[12px] text-gray-400">
+                                                        제한됨 <DisabledHint reason={dis('justifyItems') ?? 'template'} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                {allow.grid.has('alignItems') ? (
+                                                    <MiniSelect
+                                                        value={el.alignItems as string | undefined}
+                                                        options={['start','center','end','stretch']}
+                                                        onChange={(v) => patch({ alignItems: v })}
+                                                    />
+                                                ) : (
+                                                    <div className="text-[12px] text-gray-400">
+                                                        제한됨 <DisabledHint reason={dis('alignItems') ?? 'template'} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="col-span-12">
+                                        <Label>justifyContent / alignContent</Label>
+                                        <div className="mt-1 grid grid-cols-2 gap-2">
+                                            <div>
+                                                {allow.grid.has('justifyContent') ? (
+                                                    <MiniSelect
+                                                        value={el.justifyContent as string | undefined}
+                                                        options={['start','center','end','space-between','space-around','space-evenly','stretch']}
+                                                        onChange={(v) => patch({ justifyContent: v })}
+                                                    />
+                                                ) : (
+                                                    <div className="text-[12px] text-gray-400">
+                                                        제한됨 <DisabledHint reason={dis('justifyContent') ?? 'template'} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                {allow.grid.has('alignContent') ? (
+                                                    <MiniSelect
+                                                        value={el.alignContent as string | undefined}
+                                                        options={['start','center','end','space-between','space-around','space-evenly','stretch']}
+                                                        onChange={(v) => patch({ alignContent: v })}
+                                                    />
+                                                ) : (
+                                                    <div className="text-[12px] text-gray-400">
+                                                        제한됨 <DisabledHint reason={dis('alignContent') ?? 'template'} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {!container && (
+                                        <div className="col-span-12 text-[11px] text-amber-700 mt-1">
+                                            이 태그는 컨테이너가 아니므로 Grid를 사용할 수 없습니다.
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })()}
