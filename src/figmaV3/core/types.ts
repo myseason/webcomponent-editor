@@ -112,3 +112,36 @@ export interface ComponentDefinition<
   propsSchema?: Array<PropSchemaEntry<P>>;
   // Render는 UI 레이어에서 결합합니다. (React 의존 방지)
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// DnD(드래그 앤 드롭) 사전 타입 — 구현은 추후
+// ──────────────────────────────────────────────────────────────────────────────
+
+export type DndDragType = 'palette-component' | 'canvas-node' | 'layers-node';
+export type DropPosition = 'inside' | 'before' | 'after';
+
+export interface DndDragPayloadPalette {
+    kind: 'palette-component';
+    defId: string;
+}
+
+export interface DndDragPayloadNode {
+    kind: 'canvas-node' | 'layers-node';
+    nodeId: NodeId;
+}
+
+export type DndDragPayload = DndDragPayloadPalette | DndDragPayloadNode;
+
+export interface DndDropTarget {
+    nodeId: NodeId;
+    position: DropPosition;
+}
+
+export interface DndApi {
+    /** 드래그 시작(전역 1개만 활성) */
+    beginDrag(payload: DndDragPayload): void;
+    /** 현재 호버 대상 업데이트 */
+    hover(target: DndDropTarget | null): void;
+    /** 드래그 종료(드롭 or 취소). 내부에서 addByDef/addByDefAt 등 호출 예정 */
+    endDrag(): void;
+}

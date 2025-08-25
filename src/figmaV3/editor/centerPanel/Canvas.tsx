@@ -5,6 +5,8 @@
  */
 import React from 'react';
 import type { NodeId, SupportedEvent } from '../../core/types';
+import { evalWhenExpr } from '../../runtime/expr';
+
 import { useEditor } from '../useEditor';
 import { getRenderer } from '../../core/registry';
 import { runActions } from '../../runtime/actions';
@@ -24,6 +26,16 @@ function RenderNode({ id }: { id: NodeId }) {
                 | Record<string, { steps: import('../../core/types').ActionStep[] }>
                 | undefined;
         const steps = actions?.[evt]?.steps ?? [];
+
+        // 이벤트 조건 확인
+        const bag = (node.props as Record<string, unknown>).__actions as
+            | Record<string, { steps: import('../../core/types').ActionStep[]; when?: { expr: string } }>
+            | undefined;
+        const whenExpr = bag?.[evt]?.when?.expr;
+        if (whenExpr && !evalWhenExpr(whenExpr, { data: editorStore.getState().data, node, project: editorStore.getState().project })) {
+            return; // 조건 불충족 → 실행하지 않음
+        }
+
         void runActions(steps, {
             alert: (msg) => alert(msg),
             setData: (path, value) => editorStore.getState().setData(path, value),

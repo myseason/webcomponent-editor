@@ -215,14 +215,17 @@ class Parser {
     private parseExpr(minPrec: number): Expr {
         let left = this.parsePrimary();
 
-        while (true) {
-            const p = this.prec(this.cur.t);
-            if (p === 0 || p <= minPrec) break;
+        // 루프 조건을 p 값으로 명시적으로 갱신해 무한루프 의심 해소
+        let p = this.prec(this.cur.t);
+        while (p > minPrec) {
+            const opTok = this.cur.t;      // eq/ne/gt/ge/lt/le/and/or 중 하나
+            this.eat(opTok);               // 연산자 소비(진행 보장)
 
-            const opTok = this.cur.t;
-            this.eat(opTok);
-            const right = this.parseExpr(p);
+            const right = this.parseExpr(p); // 우변: 같은 우선순위 이상을 재귀 파싱
             left = { k: 'binary', op: this.binOp(opTok), l: left, r: right };
+
+            // 다음 토큰 기준으로 우선순위 갱신 → 반복/탈출 결정
+            p = this.prec(this.cur.t);
         }
         return left;
     }
