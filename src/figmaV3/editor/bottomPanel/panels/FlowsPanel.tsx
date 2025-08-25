@@ -5,6 +5,10 @@
  * - 대상(to)은 toKind에 따라 드롭다운(페이지/프래그먼트)로 선택
  */
 import React, { useMemo, useState } from 'react';
+
+import { SelectPage } from '../../common/SelectPage';
+import { SelectFragment } from '../../common/SelectFragment';
+
 import type { SupportedEvent, FlowEdge, NodeId } from '../../../core/types';
 import { useEditor } from '../../useEditor';
 
@@ -83,24 +87,21 @@ export function FlowsPanel() {
                 {toKind === 'Navigate' ? (
                     <label className="col-span-3 flex items-center gap-2">
                         <span className="w-6">to</span>
-                        <select
+                        <SelectPage
                             className="flex-1 border rounded px-2 py-1"
                             value={toPage}
-                            onChange={(e) => setToPage(e.target.value)}
-                        >
-                            {state.project.pages.map((p) => <option key={p.id} value={p.id}>{p.name || p.id}</option>)}
-                        </select>
+                            onChange={setToPage}
+                        />
                     </label>
                 ) : (
                     <label className="col-span-3 flex items-center gap-2">
                         <span className="w-6">to</span>
-                        <select
+                        <SelectFragment
                             className="flex-1 border rounded px-2 py-1"
                             value={toFrag}
-                            onChange={(e) => setToFrag(e.target.value)}
-                        >
-                            {state.project.fragments.map((f) => <option key={f.id} value={f.id}>{f.name || f.id}</option>)}
-                        </select>
+                            onChange={setToFrag}
+                            allowEmpty={toKind === 'CloseFragment'}
+                        />
                     </label>
                 )}
 

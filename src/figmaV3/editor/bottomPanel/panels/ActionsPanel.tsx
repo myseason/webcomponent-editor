@@ -6,6 +6,10 @@
  * - 🔑 훅 규칙: 모든 훅(useEditor, useState 등)은 조건 없이 최상위에서 호출
  */
 import React, { useState } from 'react';
+
+import { SelectPage } from '../../common/SelectPage';
+import { SelectFragment } from '../../common/SelectFragment';
+
 import type { SupportedEvent, ActionStep } from '../../../core/types';
 import { useEditor } from '../../useEditor';
 import { editorStore } from '../../../store/editStore';
@@ -13,6 +17,7 @@ import { runActions } from '../../../runtime/actions';
 
 const SUPPORTED_EVENTS: SupportedEvent[] = ['onClick', 'onChange', 'onSubmit', 'onLoad'];
 type ActionsBag = Record<SupportedEvent, { steps: ActionStep[] }>;
+
 
 export function ActionsPanel() {
     // 1) 훅은 최상위에서 무조건 호출
@@ -30,9 +35,9 @@ export function ActionsPanel() {
     const pages = state.project.pages;
     const fragments = state.project.fragments;
 
-    // 드롭다운(네비/프래그먼트) 초기값 — 훅은 이미 호출되었으므로 OK
-    const [navPageId, setNavPageId] = useState<string>(pages[0]?.id ?? 'page_home');
-    const [openFragId, setOpenFragId] = useState<string>(fragments[0]?.id ?? '');
+    // 드롭다운(네비/프래그먼트) 초기값
+    const [navPageId, setNavPageId] = useState<string>(state.project.pages[0]?.id ?? 'page_home');
+    const [openFragId, setOpenFragId] = useState<string>(state.project.fragments[0]?.id ?? '');
 
     const setSteps = (next: ActionStep[]) => {
         if (!nodeId) return;
@@ -109,29 +114,31 @@ export function ActionsPanel() {
                 <div className="grid grid-cols-12 gap-2 text-xs items-center">
                     <label className="col-span-6 flex items-center gap-2">
                         <span className="w-14">Navigate</span>
-                        <select
+                        <SelectPage
                             className="flex-1 border rounded px-2 py-1"
                             value={navPageId}
-                            onChange={(e) => setNavPageId(e.target.value)}
-                        >
-                            {pages.map((p) => <option key={p.id} value={p.id}>{p.name || p.id}</option>)}
-                        </select>
+                            onChange={setNavPageId}
+                        />
                     </label>
-                    <button className="col-span-2 text-xs px-2 py-1 rounded border" onClick={addNavigate}>+ Navigate</button>
+                    <button className="col-span-2 text-xs px-2 py-1 rounded border" onClick={addNavigate}>
+                        + Navigate
+                    </button>
 
                     <label className="col-span-6 flex items-center gap-2">
                         <span className="w-14">Fragment</span>
-                        <select
+                        <SelectFragment
                             className="flex-1 border rounded px-2 py-1"
                             value={openFragId}
-                            onChange={(e) => setOpenFragId(e.target.value)}
-                        >
-                            {fragments.map((f) => <option key={f.id} value={f.id}>{f.name || f.id}</option>)}
-                        </select>
+                            onChange={setOpenFragId}
+                        />
                     </label>
                     <div className="col-span-6 flex gap-2">
-                        <button className="text-xs px-2 py-1 rounded border" onClick={addOpenFragment}>+ OpenFragment</button>
-                        <button className="text-xs px-2 py-1 rounded border" onClick={addCloseFragment}>+ CloseFragment</button>
+                        <button className="text-xs px-2 py-1 rounded border" onClick={addOpenFragment}>
+                            + OpenFragment
+                        </button>
+                        <button className="text-xs px-2 py-1 rounded border" onClick={addCloseFragment}>
+                            + CloseFragment
+                        </button>
                     </div>
                 </div>
             </div>

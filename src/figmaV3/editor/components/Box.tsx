@@ -14,7 +14,7 @@ export const BoxDef: ComponentDefinition<BoxProps> = {
     title: 'Box',
     defaults: {
         props: {},
-        styles: { element: { display: 'flex', flexDirection: 'column' } },
+        styles: { element: { display: 'flex', flexDirection: 'column', width: 320, height: 40 }, },
     },
     propsSchema: [],
 };
