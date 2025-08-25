@@ -1,8 +1,10 @@
 'use client';
 /**
  * FlowsPanel
- * - from(nodeId,event) → to(Navigate/OpenFragment/CloseFragment) 플로우를 관리합니다.
- * - when 조건식 편집기를 내장(WhenBuilder)하여 안전 표현식을 바로 구성/저장할 수 있습니다.
+ * - from(nodeId,event) → to(Navigate/OpenFragment/CloseFragment) 플로우를 관리
+ * - when 조건식 편집기(WhenBuilder) 포함
+ * - 템플릿 정책(flows.allowKinds, actions.allowEvents) 반영
+ *   (전문가 모드 ON이면 템플릿 정책 무시)
  *
  * 규칙
  * - 훅은 최상위에서만 호출(useEditor, useState 등)
@@ -10,8 +12,8 @@
  * - 스토어 갱신은 얕은 복사 규약(update/개별 액션) 사용
  */
 
-import React, { useState } from 'react';
-import type { SupportedEvent, FlowEdge, NodeId } from '../../../core/types';
+import React from 'react';
+import type { SupportedEvent, FlowEdge, NodeId, EditorState } from '../../../core/types';
 import { useEditor } from '../../useEditor';
 import { SelectPage } from '../../common/SelectPage';
 import { SelectFragment } from '../../common/SelectFragment';
@@ -25,21 +27,45 @@ export function FlowsPanel() {
     const state = useEditor();
 
     // 2) 입력 폼 상태 (from/event/toKind/target)
-    const [fromNode, setFromNode] = useState<NodeId>(
-        state.ui.selectedId ?? state.project.rootId,
-    );
-    const [evt, setEvt] = useState<SupportedEvent>('onClick');
-    const [toKind, setToKind] = useState<ToKind>('Navigate');
+    const defaultFrom = state.ui.selectedId ?? state.project.rootId;
+    const [fromNode, setFromNode] = React.useState<NodeId>(defaultFrom);
+
+    // 정책 계산을 위해 fromNode가 바뀔 때마다 대상 노드/정책을 구합니다
+    const fromNodeObj = state.project.nodes[fromNode];
+    const expert = Boolean(state.ui.expertMode);
+    const filter = fromNodeObj ? state.project.inspectorFilters?.[fromNodeObj.componentId] : undefined;
+
+    // 이벤트 정책
+    const allowedEvents = (!expert && filter?.actions?.allowEvents) ? new Set(filter.actions.allowEvents) : null;
+    const firstAllowedEvent: SupportedEvent = React.useMemo(() => {
+        if (allowedEvents && allowedEvents.size > 0) return Array.from(allowedEvents)[0] as SupportedEvent;
+        return 'onClick';
+    }, [allowedEvents]);
+    const [evt, setEvt] = React.useState<SupportedEvent>(firstAllowedEvent);
+    React.useEffect(() => {
+        if (allowedEvents && !allowedEvents.has(evt)) setEvt(firstAllowedEvent);
+    }, [allowedEvents, evt, firstAllowedEvent]);
+
+    // toKind 정책
+    const allowedKinds = (!expert && filter?.flows?.allowKinds) ? new Set(filter.flows.allowKinds) : null;
+    const firstAllowedKind: ToKind = React.useMemo(() => {
+        if (allowedKinds && allowedKinds.size > 0) return Array.from(allowedKinds)[0] as ToKind;
+        return 'Navigate';
+    }, [allowedKinds]);
+    const [toKind, setToKind] = React.useState<ToKind>(firstAllowedKind);
+    React.useEffect(() => {
+        if (allowedKinds && !allowedKinds.has(toKind)) setToKind(firstAllowedKind);
+    }, [allowedKinds, toKind, firstAllowedKind]);
 
     // 대상(페이지/프래그먼트) 선택 상태 — 공용 셀렉트와 함께 사용
-    const [toPage, setToPage] = useState<string>(state.project.pages[0]?.id ?? 'page_home');
-    const [toFrag, setToFrag] = useState<string>(state.project.fragments[0]?.id ?? '');
+    const [toPage, setToPage] = React.useState<string>(state.project.pages[0]?.id ?? 'page_home');
+    const [toFrag, setToFrag] = React.useState<string>(state.project.fragments[0]?.id ?? '');
 
     // 3) 행별 when 편집 토글 상태
-    const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null);
+    const [editingEdgeId, setEditingEdgeId] = React.useState<string | null>(null);
 
     // 4) 현재 플로우 목록
-    const edges: FlowEdge[] = Object.values(state.flowEdges);
+    const edges: FlowEdge[] = React.useMemo(() => Object.values(state.flowEdges), [state.flowEdges]);
 
     // 5) 액션
     const onAdd = () => {
@@ -61,125 +87,122 @@ export function FlowsPanel() {
 
     // 6) 렌더
     return (
-        <div className="p-3 space-y-3">
-            <div className="text-xs font-semibold text-gray-500">Flows</div>
+        <div className="p-2 text-sm">
+            <div className="font-semibold mb-2">Flows</div>
 
             {/* 작성 폼 */}
-            <div className="grid grid-cols-12 gap-2 text-xs items-center">
+            <div className="mb-3 space-y-2">
                 {/* from (node id) */}
-                <label className="col-span-5 flex items-center gap-2">
-                    <span className="w-10">from</span>
+                <div className="flex items-center gap-2">
+                    <span className="w-12 text-[12px] text-gray-600">from</span>
                     <input
-                        className="flex-1 border rounded px-2 py-1"
+                        className="flex-1 border rounded px-2 py-1 text-sm"
                         value={fromNode}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            setFromNode(e.target.value as NodeId)
-                        }
+                        onChange={(e) => setFromNode(e.target.value as NodeId)}
                         placeholder="node id"
                     />
-                </label>
+                </div>
 
-                {/* event */}
-                <label className="col-span-2">
+                {/* event (정책 반영) */}
+                <div className="flex items-center gap-2">
+                    <span className="w-12 text-[12px] text-gray-600">event</span>
                     <select
-                        className="w-full border rounded px-2 py-1"
+                        className="flex-1 border rounded px-2 py-1 bg-white text-sm"
                         value={evt}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                            setEvt(e.target.value as SupportedEvent)
-                        }
+                        onChange={(e) => setEvt(e.target.value as SupportedEvent)}
                     >
-                        {SUPPORTED_EVENTS.map((ev: SupportedEvent) => (
+                        {SUPPORTED_EVENTS.filter((ev) => !allowedEvents || allowedEvents.has(ev)).map((ev) => (
                             <option key={ev} value={ev}>
                                 {ev}
                             </option>
                         ))}
                     </select>
-                </label>
+                    {!expert && allowedEvents && (
+                        <span className="text-[12px] text-gray-500">
+              제한 이벤트: {Array.from(allowedEvents).join(', ')}
+            </span>
+                    )}
+                </div>
 
-                {/* to kind */}
-                <label className="col-span-2">
+                {/* to kind (정책 반영) */}
+                <div className="flex items-center gap-2">
+                    <span className="w-12 text-[12px] text-gray-600">to</span>
                     <select
-                        className="w-full border rounded px-2 py-1"
+                        className="flex-1 border rounded px-2 py-1 bg-white text-sm"
                         value={toKind}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                            setToKind(e.target.value as ToKind)
-                        }
+                        onChange={(e) => setToKind(e.target.value as ToKind)}
                     >
-                        <option value="Navigate">Navigate</option>
-                        <option value="OpenFragment">OpenFragment</option>
-                        <option value="CloseFragment">CloseFragment</option>
+                        {(['Navigate', 'OpenFragment', 'CloseFragment'] as ToKind[])
+                            .filter((k) => !allowedKinds || allowedKinds.has(k))
+                            .map((k) => (
+                                <option key={k} value={k}>
+                                    {k}
+                                </option>
+                            ))}
                     </select>
-                </label>
+                    {!expert && allowedKinds && (
+                        <span className="text-[12px] text-gray-500">
+              제한 동작: {Array.from(allowedKinds).join(', ')}
+            </span>
+                    )}
+                </div>
 
                 {/* to target (페이지/프래그먼트) */}
-                {toKind === 'Navigate' ? (
-                    <label className="col-span-3 flex items-center gap-2">
-                        <span className="w-6">to</span>
-                        <SelectPage
-                            className="flex-1 border rounded px-2 py-1"
-                            value={toPage}
-                            onChange={setToPage}
-                        />
-                    </label>
-                ) : (
-                    <label className="col-span-3 flex items-center gap-2">
-                        <span className="w-6">to</span>
-                        <SelectFragment
-                            className="flex-1 border rounded px-2 py-1"
-                            value={toFrag}
-                            onChange={setToFrag}
-                            allowEmpty={toKind === 'CloseFragment'} // Close는 (none)=top-of-stack 허용
-                        />
-                    </label>
-                )}
+                <div className="flex items-center gap-2">
+                    <span className="w-12" />
+                    {toKind === 'Navigate' ? (
+                        <SelectPage value={toPage} onChange={setToPage} />
+                    ) : (
+                        <SelectFragment value={toFrag} onChange={setToFrag} />
+                    )}
+                </div>
 
-                <div className="col-span-12 flex">
-                    <button className="ml-auto text-xs px-2 py-1 rounded border" onClick={onAdd}>
+                <div className="flex items-center justify-end">
+                    <button className="text-[12px] border rounded px-2 py-1" onClick={onAdd}>
                         추가
                     </button>
                 </div>
             </div>
 
             {/* 목록 */}
-            <div className="space-y-1">
-                {edges.map((e: FlowEdge, idx: number) => (
-                    <div key={e.id ?? `edge-${idx}`} className="text-xs border rounded px-2 py-1">
-                        <div className="flex items-center gap-2">
-              <span className="px-1 rounded bg-gray-100">
-                {e.from.nodeId}.{e.from.event}
-              </span>
-
-                            <span className="text-gray-600">
-                →
+            <div className="space-y-2">
+                {edges.map((e: FlowEdge) => (
+                    <div key={e.id ?? `${e.from.nodeId}-${e.from.event}-${Math.random()}`} className="border rounded p-2">
+                        <div className="flex items-center justify-between">
+                            <div className="text-xs">
+                                <b>
+                                    {e.from.nodeId}.{e.from.event}
+                                </b>{' '}
+                                →
                                 {e.to.kind === 'Navigate'
                                     ? ` ${e.to.toPageId}`
                                     : e.to.kind === 'OpenFragment'
                                         ? ` open:${e.to.fragmentId}`
                                         : ` close:${e.to.fragmentId ?? '(top)'}`}
-              </span>
+                                <span className="ml-2 text-[11px] text-gray-500">
+                  {e.when?.expr ? `when: ${e.when.expr}` : 'when: (none)'}
+                </span>
+                            </div>
 
-                            {/* 현재 조건 스니펫 */}
-                            <span className="ml-2 text-[10px] text-gray-500">
-                {e.when?.expr ? `when: ${e.when.expr}` : 'when: (none)'}
-              </span>
-
-                            <button
-                                className="ml-auto"
-                                onClick={() => setEditingEdgeId(editingEdgeId === e.id ? null : (e.id ?? null))}
-                            >
-                                조건
-                            </button>
-                            <button className="text-red-500" onClick={() => onRemove(e.id)}>
-                                삭제
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    className="text-[12px] border rounded px-2 py-1"
+                                    onClick={() => setEditingEdgeId(editingEdgeId === e.id ? null : (e.id ?? null))}
+                                >
+                                    조건
+                                </button>
+                                <button className="text-[12px] border rounded px-2 py-1" onClick={() => onRemove(e.id)}>
+                                    삭제
+                                </button>
+                            </div>
                         </div>
 
                         {/* when 편집기 (토글 렌더; 훅 호출 아님 → 안전) */}
                         {editingEdgeId === e.id && e.id && (
                             <div className="mt-2">
                                 <WhenBuilder
-                                    value={e.when?.expr}
-                                    onChange={(expr: string) => {
+                                    value={e.when?.expr ?? ''}
+                                    onChange={(expr) => {
                                         const trimmed = expr.trim();
                                         state.updateFlowEdge(
                                             e.id as string,
@@ -192,8 +215,9 @@ export function FlowsPanel() {
                         )}
                     </div>
                 ))}
+
                 {edges.length === 0 && (
-                    <div className="text-xs text-gray-400">등록된 플로우가 없습니다. 위에서 추가하세요.</div>
+                    <div className="text-[12px] text-gray-500">등록된 플로우가 없습니다. 위에서 추가하세요.</div>
                 )}
             </div>
         </div>
