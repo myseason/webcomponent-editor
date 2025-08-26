@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { InspectorFilter, TagPolicy, TagPolicyMap } from '../../../../core/types';
+import type { InspectorFilter, TagPolicy, TagPolicyMap, CSSDict } from '../../../../core/types';
 import { filterStyleKeysByTemplateAndTag } from '../../../../runtime/capabilities';
 
 export const Section: React.FC<{

@@ -1,6 +1,8 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
+import { getDefinition } from '../core/registry';
 import type {
     EditorState,
+    Project,
     NodeId,
     Node,
     FlowEdge,
@@ -92,6 +94,7 @@ type EditorActions = {
     /** 오버레이(프래그먼트) 스택 제어 */
     openFragment: (fragmentId: string) => void;
     closeFragment: (fragmentId?: string) => void;
+    hydrateDefaults: () => void;
 };
 
 /** 스토어가 내보내는 상태 + 액션 (useEditor의 반환 타입) */
@@ -100,6 +103,62 @@ export type EditorStoreState = EditorState & EditorActions;
 /** 간단 키 생성기(SSR 렌더 중 호출 금지) */
 let _seq = 0;
 const genId = (prefix: string): string => `${prefix}_${++_seq}`;
+
+// 파일 상단 쪽( genId 아래 )에 추가
+function buildNodeWithDefaults(defId: string, id: string): Node {
+    const def = getDefinition(defId);
+    const defProps = (def?.defaults?.props ?? {}) as Record<string, unknown>;
+
+    // styles 기본은 element 안/밖 어느 형태든 허용적으로 병합
+    const defStylesRaw = (def?.defaults?.styles ?? {}) as Record<string, unknown>;
+    const defElem =
+        ((defStylesRaw as any).element as CSSDict | undefined) ??
+        (defStylesRaw as CSSDict);
+
+    return {
+        id,
+        componentId: defId,
+        props: { ...defProps },
+        styles: { element: { ...(defElem ?? {}) } },
+        children: [],
+    };
+}
+
+
+// 부모 찾기(빠름/간단): project.nodes를 순회해서 childId를 포함한 노드 검색
+function findParentId(p: Project, childId: NodeId): NodeId | null {
+    for (const nid of Object.keys(p.nodes)) {
+        const n = p.nodes[nid];
+        if (n.children && n.children.includes(childId)) return nid;
+    }
+    return null;
+}
+
+// 해당 defId가 컨테이너인지 판정
+function isContainerDef(defId: string): boolean {
+    const def = getDefinition(defId);
+    return !!def?.capabilities?.canHaveChildren;
+}
+
+// 현재 위치(desiredParent)에서 가장 가까운 "컨테이너 조상"을 선택
+function chooseValidParentId(p: Project, desiredParent: NodeId | null | undefined, fallbackRoot: NodeId): NodeId {
+    let cur: NodeId = desiredParent && p.nodes[desiredParent] ? desiredParent : fallbackRoot;
+
+    // cur가 컨테이너면 즉시 OK
+    if (isContainerDef(p.nodes[cur].componentId)) return cur;
+
+    // 위로 타고 올라가며 컨테이너를 찾는다
+    let guard = 0;
+    while (guard++ < 999) {
+        const parent = findParentId(p, cur);
+        if (!parent) break;
+        if (isContainerDef(p.nodes[parent].componentId)) return parent;
+        cur = parent;
+    }
+
+    // 그래도 못 찾으면 root 보장 (root는 Box이므로 컨테이너)
+    return fallbackRoot;
+}
 
 /**
  * editorStore
@@ -153,13 +212,10 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
             update((s: EditorState) => {
                 const p = s.project;
                 p.nodes = { ...p.nodes };
-                p.nodes[newId] = {
-                    id: newId,
-                    componentId: defId,
-                    props: {},
-                    styles: { element: {} },
-                    children: [],
-                };
+
+                // ✅ 기본값 포함하여 생성
+                p.nodes[newId] = buildNodeWithDefaults(defId, newId);
+
                 const targetParent = parentId ?? p.rootId;
                 const parent = p.nodes[targetParent];
                 if (!parent) throw new Error(`Parent not found: ${targetParent}`);
@@ -168,18 +224,16 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
             return newId;
         };
 
+        // addByDefAt
         const addByDefAt: EditorActions['addByDefAt'] = (defId, parentId, index) => {
             const newId = genId(`node_${defId}`);
             update((s: EditorState) => {
                 const p = s.project;
                 p.nodes = { ...p.nodes };
-                p.nodes[newId] = {
-                    id: newId,
-                    componentId: defId,
-                    props: {},
-                    styles: { element: {} },
-                    children: [],
-                };
+
+                // ✅ 기본값 포함하여 생성
+                p.nodes[newId] = buildNodeWithDefaults(defId, newId);
+
                 const parent = p.nodes[parentId];
                 if (!parent) throw new Error(`Parent not found: ${parentId}`);
                 const children = [...(parent.children ?? [])];
@@ -264,25 +318,26 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
             });
         };
 
+        // addPage (루트 박스도 기본값으로)
         const addPage: EditorActions['addPage'] = (name) => {
             const id = genId('page');
             const rootId = genId('node_root');
+
+            const root = buildNodeWithDefaults('box', rootId);
+            (root.styles.element as Record<string, unknown>) = {
+                ...(root.styles.element ?? {}),
+                width: '100%',
+                minHeight: 600, // 필요시
+            };
+
             update((s: EditorState) => {
                 s.project = {
                     ...s.project,
-                    pages: [
-                        ...s.project.pages,
-                        { id, name: name ?? 'Page', rootId, slug: undefined },
-                    ],
+                    pages: [...s.project.pages, { id, name: name ?? 'Page', rootId, slug: undefined }],
                     nodes: {
                         ...s.project.nodes,
-                        [rootId]: {
-                            id: rootId,
-                            componentId: 'box',
-                            props: {},
-                            styles: { element: {} },
-                            children: [],
-                        },
+                        // ✅ box 기본값 적용
+                        [rootId]: root,
                     },
                 };
             });
@@ -304,25 +359,26 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
             });
         };
 
+        // addFragment (루트 박스도 기본값으로)
         const addFragment: EditorActions['addFragment'] = (name) => {
             const id = genId('fragment');
             const rootId = genId('frag_root');
+
+            const root = buildNodeWithDefaults('box', rootId);
+            (root.styles.element as Record<string, unknown>) = {
+                ...(root.styles.element ?? {}),
+                width: '100%',
+                minHeight: 600, // 필요시
+            };
+
             update((s: EditorState) => {
                 s.project = {
                     ...s.project,
-                    fragments: [
-                        ...s.project.fragments,
-                        { id, name: name ?? 'Fragment', rootId },
-                    ],
+                    fragments: [...s.project.fragments, { id, name: name ?? 'Fragment', rootId }],
                     nodes: {
                         ...s.project.nodes,
-                        [rootId]: {
-                            id: rootId,
-                            componentId: 'box',
-                            props: {},
-                            styles: { element: {} },
-                            children: [],
-                        },
+                        // ✅ box 기본값 적용
+                        [rootId]: root,
                     },
                 };
             });
@@ -401,6 +457,33 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
             });
         };
 
+        // EditorActions 타입에 추가
+        //   hydrateDefaults: () => void;
+        // 구현부 추가 (다른 액션들과 같은 위치)
+        const hydrateDefaults: EditorActions['hydrateDefaults'] = () => {
+            update((s: EditorState) => {
+                const nodes = s.project.nodes;
+                for (const id of Object.keys(nodes)) {
+                    const n = nodes[id] as Node;
+                    const def = getDefinition(n.componentId);
+                    if (!def) continue;
+
+                    const defProps = (def.defaults?.props ?? {}) as Record<string, unknown>;
+                    const defStylesRaw = (def.defaults?.styles ?? {}) as Record<string, unknown>;
+                    const defElem =
+                        ((defStylesRaw as any).element as CSSDict | undefined) ??
+                        (defStylesRaw as CSSDict);
+
+                    const curElem = (n.styles?.element ?? {}) as CSSDict;
+
+                    const mergedProps = { ...defProps, ...n.props };
+                    const mergedStyles = { element: { ...(defElem ?? {}), ...curElem } };
+
+                    nodes[id] = { ...n, props: mergedProps, styles: mergedStyles };
+                }
+            });
+        };
+
         // 반환: 상태 + 액션
         return {
             ...initialState,
@@ -424,6 +507,7 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
             setSetting,
             openFragment,
             closeFragment,
+            hydrateDefaults, // ✅ 추가
         };
     }
 );

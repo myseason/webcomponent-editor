@@ -9,23 +9,19 @@
 import React from 'react';
 import type { ComponentDefinition, Node, SupportedEvent } from './types';
 
-/**
- * 에디터용 렌더러 시그니처
+/** 에디터용 렌더러 시그니처
  * - fire(evt): Actions/Flows 트리거
- * - renderChildren(slotId?): 컴포넌트가 자식이 들어갈 위치(슬롯)를 스스로 결정
- *   (slotId 미사용 컴포넌트는 renderChildren?.() 호출)
  */
 export type Renderer = (args: {
     node: Node<Record<string, unknown>>;
     fire?: (evt: SupportedEvent) => void;
-    renderChildren?: (slotId?: string) => React.ReactNode;
 }) => React.ReactNode;
 
 type DefinitionMap = Record<string, ComponentDefinition>;
-type RendererMap = Record<string, Renderer>;
+type RendererMap   = Record<string, Renderer>;
 
 const definitions: DefinitionMap = Object.create(null);
-const renderers: RendererMap = Object.create(null);
+const renderers:   RendererMap   = Object.create(null);
 
 /** Definition 등록 */
 export function registerDefinition(def: ComponentDefinition): void {
@@ -49,9 +45,11 @@ export function register(def: ComponentDefinition, renderer: Renderer): void {
 export function getDefinition(id: string): ComponentDefinition | undefined {
     return definitions[id];
 }
+
 export function listDefinitions(): ComponentDefinition[] {
     return Object.values(definitions);
 }
+
 export function getRenderer(id: string): Renderer | undefined {
     return renderers[id];
 }

@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * Text: 단순 텍스트 노드
- * - content는 머스태시 바인딩 지원: "Hello {{data.user}}"
+ * Text
+ * - host 요소(SPAN)를 반드시 반환
+ * - content는 머스태시 바인딩 지원
  */
 
 import React from 'react';
@@ -26,9 +27,10 @@ export const TextDef: ComponentDefinition<TextProps> = {
 
 export function TextRender({ node }: { node: Node<TextProps> }) {
     const p = getBoundProps(node.props, { data: {}, node, project: null }) as TextProps;
-    const style = (node.styles?.element ?? {}) as React.CSSProperties;
-
-    return <span style={style}>{String(p.content ?? '')}</span>;
+    const content = String(p.content ?? '');
+    // ✅ SPAN 반환
+    return <span>{content}</span>;
 }
 
-register(TextDef, TextRender);
+// 등록
+register(TextDef, TextRender as any);

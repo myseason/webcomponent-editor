@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Button: 다양한 태그로 렌더 가능한 버튼
+ * Button: host 요소를 반드시 반환해야 한다.
  * - props: as(button|a|div|span), content, href(when as='a')
  * - onClick → fire('onClick')
  */
@@ -51,20 +51,20 @@ export function ButtonRender({
     node: Node<ButtonProps>;
     fire?: (evt: SupportedEvent) => void;
 }) {
-    // 머스태시 바인딩 지원
     const p = getBoundProps(node.props, { data: {}, node, project: null }) as ButtonProps;
-    const style = (node.styles?.element ?? {}) as React.CSSProperties;
 
     const Tag = (p.as ?? 'button') as keyof JSX.IntrinsicElements;
     const onClick = fire ? () => fire('onClick') : undefined;
     const content = String(p.content ?? '');
     const href = p.as === 'a' ? (String(p.href ?? '') || undefined) : undefined;
 
+    // ✅ 반드시 실제 DOM 요소 반환
     return (
-        <Tag style={style} onClick={onClick} href={href}>
+        <Tag onClick={onClick} href={href}>
             {content}
         </Tag>
     );
 }
 
-register(ButtonDef, ButtonRender);
+// 등록
+register(ButtonDef, ButtonRender as any);

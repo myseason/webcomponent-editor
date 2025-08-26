@@ -146,6 +146,9 @@ export interface ComponentCapabilities {
      * 주의: 템플릿/프로젝트에서는 "추가 허용" 금지, "추가 제한"만 가능.
      */
     baseTagPolicy?: Record<string /*tag*/, TagPolicy>;
+
+    /** 이 컴포넌트 인스턴스가 자식을 가질 수 있는가? (기본 false) */
+    canHaveChildren?: boolean;
 }
 
 

@@ -2,8 +2,8 @@
 
 /**
  * Image
- * - src가 빈 문자열("")이면 undefined로 치환하여 브라우저의 재요청 경고 방지
- * - 스타일은 node.styles.element를 그대로 host(img)에 적용
+ * - src === "" → undefined 로 치환하여 브라우저 경고 방지
+ * - host 요소(IMG)를 반드시 반환
  */
 
 import React from 'react';
@@ -31,15 +31,15 @@ export const ImageDef: ComponentDefinition<ImageProps> = {
 };
 
 export function ImageRender({ node }: { node: Node<ImageProps> }) {
-    const style = (node.styles?.element ?? {}) as React.CSSProperties;
     const rawSrc = (node.props as Record<string, unknown>).src;
     const rawAlt = (node.props as Record<string, unknown>).alt;
 
-    // "" → undefined 로 치환
     const src = typeof rawSrc === 'string' && rawSrc.trim().length > 0 ? rawSrc : undefined;
     const alt = typeof rawAlt === 'string' ? rawAlt : undefined;
 
-    return <img style={style} src={src} alt={alt} />;
+    // ✅ IMG 반환
+    return <img src={src} alt={alt} />;
 }
 
-register(ImageDef, ImageRender);
+// 등록
+register(ImageDef, ImageRender as any);

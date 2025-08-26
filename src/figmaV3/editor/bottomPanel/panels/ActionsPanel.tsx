@@ -1,78 +1,108 @@
 'use client';
 /**
  * ActionsPanel
- * - 선택된 노드의 이벤트별 ActionStep 목록을 편집/실행
- * - 저장 위치: node.props.__actions[event] = { steps }
- * - 템플릿 정책(actions.allowEvents)을 반영해 이벤트 탭을 제한
- *   (전문가 모드가 ON이면 정책 무시)
+ * - 선택 노드의 이벤트별(Action) 스텝을 구성/실행
+ * - when 조건식(WhenBuilder) 토글 제공
+ *
+ * 규약:
+ * - 훅은 최상위에서만 호출 (조기 return 이후 X)
+ * - any 금지
+ * - 스토어 갱신은 얕은 복사 규약(updateNodeProps / update) 사용
  */
 
 import React from 'react';
-import type { SupportedEvent, ActionStep, EditorState } from '../../../core/types';
+import type { SupportedEvent, ActionStep } from '../../../core/types';
 import { useEditor } from '../../useEditor';
 import { editorStore } from '../../../store/editStore';
 import { runActions } from '../../../runtime/actions';
+import { SelectPage } from '../../common/SelectPage';
+import { SelectFragment } from '../../common/SelectFragment';
+import { WhenBuilder } from '../../common/WhenBuilder';
+import { evalWhenExpr } from '../../../runtime/expr';
 
 const SUPPORTED_EVENTS: SupportedEvent[] = ['onClick', 'onChange', 'onSubmit', 'onLoad'];
 
-type ActionsBag = Partial<Record<SupportedEvent, { steps: ActionStep[] }>>;
+/** 이벤트별 액션 컨테이너 타입(when 추가) */
+type ActionsBag = Record<
+    SupportedEvent,
+    { steps: ActionStep[]; when?: { expr: string } }
+>;
 
 export function ActionsPanel() {
-    const state = useEditor();
+    // 1) 훅: 항상 최상위 고정 호출
+    const state = useEditor(); // useSyncExternalStore 내부 사용
+    const [evt, setEvt] = React.useState<SupportedEvent>('onClick');
+    const [editingWhen, setEditingWhen] = React.useState<boolean>(false);
+    const [navPageId, setNavPageId] = React.useState<string>(state.project.pages[0]?.id ?? '');
+    const [openFragId, setOpenFragId] = React.useState<string>(state.project.fragments[0]?.id ?? '');
 
-    // --- 선택 노드 ---
+    // 2) 파생값: 훅 이후 "변수"로 계산 (훅 추가 금지)
     const nodeId = state.ui.selectedId;
-    if (!nodeId) return <>노드를 선택하세요</>;
-    const node = state.project.nodes[nodeId];
+    const node = nodeId ? state.project.nodes[nodeId] : undefined;
 
-    // --- 템플릿 정책(actions.allowEvents) 계산 ---
-    const expert = Boolean(state.ui.expertMode);
-    const filter = state.project.inspectorFilters?.[node.componentId];
-    const policyAllowed = (!expert && filter?.actions?.allowEvents) ? new Set(filter.actions.allowEvents) : null;
+    const actions = (node?.props as Record<string, unknown> | undefined)?.__actions as
+        | ActionsBag
+        | undefined;
 
-    // 이벤트 선택 상태(허용 집합이 바뀌면 보정)
-    const firstAllowed = React.useMemo<SupportedEvent>(() => {
-        if (policyAllowed && policyAllowed.size > 0) {
-            const first = Array.from(policyAllowed)[0] as SupportedEvent;
-            return first;
-        }
-        return 'onClick';
-    }, [policyAllowed]);
-
-    const [evt, setEvt] = React.useState<SupportedEvent>(firstAllowed);
-    React.useEffect(() => {
-        if (policyAllowed && !policyAllowed.has(evt)) {
-            setEvt(firstAllowed);
-        }
-    }, [policyAllowed, evt, firstAllowed]);
-
-    // --- 현재 이벤트의 스텝 목록 ---
-    const actions = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
     const steps: ActionStep[] = actions?.[evt]?.steps ?? [];
+    const whenExpr: string | undefined = actions?.[evt]?.when?.expr;
 
-    // --- 스텝 갱신 헬퍼 ---
+    // 3) 이벤트 선택 보정: 현재 evt가 목록에 없으면 첫 항목으로 보정
+    React.useEffect(() => {
+        if (!SUPPORTED_EVENTS.includes(evt)) {
+            setEvt(SUPPORTED_EVENTS[0] ?? 'onClick');
+        }
+    }, [evt]);
+
+    // 4) 저장기 (steps/when)
     const setSteps = (next: ActionStep[]) => {
-        const nextActions: ActionsBag = { ...(actions ?? {}), [evt]: { steps: next } };
-        state.updateNodeProps(nodeId, { __actions: nextActions });
+        if (!nodeId) return;
+        const nextBag: ActionsBag = {
+            ...(actions ?? ({} as ActionsBag)),
+            [evt]: { steps: next, when: actions?.[evt]?.when },
+        };
+        state.updateNodeProps(nodeId, { __actions: nextBag });
     };
 
-    // --- 스텝 추가 샘플(필요 시 확장) ---
-    const addAlert = () => setSteps([...steps, { kind: 'Alert', message: 'Hello' }]);
-    const addNavigate = () =>
-        setSteps([
-            ...steps,
-            { kind: 'Navigate', toPageId: state.project.pages[0]?.id ?? 'page_home' },
-        ]);
+    const setWhen = (expr: string) => {
+        if (!nodeId) return;
+        const trimmed = expr.trim();
+        const nextBag: ActionsBag = {
+            ...(actions ?? ({} as ActionsBag)),
+            [evt]: {
+                steps: actions?.[evt]?.steps ?? [],
+                when: trimmed ? { expr: trimmed } : undefined,
+            },
+        };
+        state.updateNodeProps(nodeId, { __actions: nextBag });
+    };
 
-    // --- 즉시 실행(미리보기) ---
+    // 5) 스텝 추가/삭제
+    const addAlert = () => setSteps([...steps, { kind: 'Alert', message: 'Hello' }]);
+    const addNavigate = () => setSteps([...steps, { kind: 'Navigate', toPageId: navPageId }]);
+    const addOpenFragment = () => setSteps([...steps, { kind: 'OpenFragment', fragmentId: openFragId }]);
+    const addCloseFragment = () => setSteps([...steps, { kind: 'CloseFragment' }]); // top-of-stack close
+    const removeStep = (idx: number) => setSteps(steps.filter((_, i) => i !== idx));
+
+    // 6) Run Now (현재 state에서 즉시 실행) — when 조건 평가 후 실행
     const runNow = async () => {
+        if (!nodeId || !node) return;
+
+        if (whenExpr && whenExpr.trim()) {
+            const ok = evalWhenExpr(whenExpr, { data: state.data, node, project: state.project });
+            if (!ok) {
+                alert('조건(when)이 false 이므로 실행되지 않습니다.');
+                return;
+            }
+        }
+
         await runActions(steps, {
             alert: (msg) => alert(msg),
             setData: (path, value) => editorStore.getState().setData(path, value),
             setProps: (nid, patch) => editorStore.getState().updateNodeProps(nid, patch),
             navigate: (toPageId) => editorStore.getState().selectPage(toPageId),
-            openFragment: (_id) => {},
-            closeFragment: (_id) => {},
+            openFragment: (id) => editorStore.getState().openFragment(id),
+            closeFragment: (id) => editorStore.getState().closeFragment(id),
             http: async (m, url, body, headers) => {
                 const res = await fetch(url, {
                     method: m,
@@ -89,48 +119,64 @@ export function ActionsPanel() {
         });
     };
 
-    // --- 렌더 ---
-    return (
-        <div className="p-2 text-sm">
-            <div className="font-semibold mb-2">Actions</div>
+    // 7) 선택 노드 없을 때 안내 (훅 호출 뒤 분기 — Rules of Hooks 안전)
+    if (!nodeId || !node) {
+        return (
+            <div className="p-3 text-sm text-neutral-600">
+                노드를 선택하세요
+            </div>
+        );
+    }
 
-            {/* 이벤트 선택 (정책에 맞게 필터링) */}
-            <div className="mb-2 flex gap-2">
+    // 8) 뷰
+    return (
+        <div className="flex flex-col gap-3 p-3">
+            {/* 헤더: 이벤트 선택 + 조건 토글 */}
+            <div className="flex items-center gap-2">
+                <div className="font-medium">Actions</div>
                 <select
-                    className="border rounded px-2 py-1 bg-white"
+                    className="border rounded px-2 py-1"
                     value={evt}
                     onChange={(e) => setEvt(e.target.value as SupportedEvent)}
                 >
-                    {SUPPORTED_EVENTS.filter((e) => !policyAllowed || policyAllowed.has(e)).map((e) => (
+                    {SUPPORTED_EVENTS.map((e) => (
                         <option key={e} value={e}>
                             {e}
                         </option>
                     ))}
                 </select>
 
-                {!expert && policyAllowed && (
-                    <span className="text-[12px] text-gray-500 self-center">
-            제한 이벤트: {Array.from(policyAllowed).join(', ')}
-          </span>
-                )}
+                <button
+                    className={`ml-auto border rounded px-2 py-1 ${editingWhen ? 'bg-amber-100' : ''}`}
+                    onClick={() => setEditingWhen((v) => !v)}
+                    title="이 이벤트의 실행 조건(when)을 편집"
+                >
+                    조건
+                </button>
             </div>
 
-            {/* 스텝 목록 */}
-            {steps.length === 0 && (
-                <div className="text-[12px] text-gray-500 mb-2">스텝이 없습니다. 아래 버튼으로 추가하세요.</div>
+            {/* 조건(when) 빌더 — 토글 렌더 */}
+            {editingWhen && (
+                <div className="border rounded p-2">
+                    <WhenBuilder value={whenExpr} onChange={setWhen} previewNodeId={nodeId} />
+                </div>
             )}
 
-            <div className="space-y-2">
-                {steps.map((s: ActionStep, i: number) => (
-                    <div key={i} className="border rounded p-2 flex items-center justify-between">
-                        <div className="text-xs">
-                            <b>{s.kind}</b>{' '}
-                            {s.kind === 'Alert' && `“${s.message}”`}
-                            {s.kind === 'Navigate' && `→ ${s.toPageId}`}
-                        </div>
+            {/* 현재 스텝 목록 */}
+            <div className="flex flex-col gap-2">
+                {steps.length === 0 && (
+                    <div className="text-neutral-500 text-sm">스텝이 없습니다. 아래 컨트롤로 추가하세요.</div>
+                )}
+                {steps.map((s, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                        <div className="min-w-[96px] font-mono">{s.kind}</div>
+                        {s.kind === 'Alert' && <div>“{s.message}”</div>}
+                        {s.kind === 'Navigate' && <div>→ {s.toPageId}</div>}
+                        {s.kind === 'OpenFragment' && <div>open: {s.fragmentId}</div>}
+                        {s.kind === 'CloseFragment' && <div>close {s.fragmentId ?? '(top)'} </div>}
                         <button
-                            className="text-[12px] border rounded px-2 py-1"
-                            onClick={() => setSteps(steps.filter((_, idx: number) => idx !== i))}
+                            className="ml-auto border rounded px-2 py-1"
+                            onClick={() => removeStep(i)}
                         >
                             삭제
                         </button>
@@ -138,15 +184,29 @@ export function ActionsPanel() {
                 ))}
             </div>
 
-            {/* 추가/실행 */}
-            <div className="mt-3 flex gap-2">
-                <button className="text-[12px] border rounded px-2 py-1" onClick={addAlert}>
-                    + Alert
-                </button>
-                <button className="text-[12px] border rounded px-2 py-1" onClick={addNavigate}>
+            {/* 컨트롤: 대상 선택 + 스텝 추가 */}
+            <div className="flex items-center gap-2">
+                <div className="text-sm text-neutral-600">Navigate</div>
+                <SelectPage value={navPageId} onChange={setNavPageId} />
+                <button className="border rounded px-2 py-1" onClick={addNavigate}>
                     + Navigate
                 </button>
-                <button className="ml-auto text-[12px] border rounded px-2 py-1" onClick={runNow}>
+            </div>
+
+            <div className="flex items-center gap-2">
+                <div className="text-sm text-neutral-600">Fragment</div>
+                <SelectFragment value={openFragId} onChange={setOpenFragId} />
+                <button className="border rounded px-2 py-1" onClick={addOpenFragment}>
+                    + OpenFragment
+                </button>
+                <button className="border rounded px-2 py-1" onClick={addCloseFragment}>
+                    + CloseFragment
+                </button>
+            </div>
+
+            {/* 실행 */}
+            <div className="flex">
+                <button className="ml-auto border rounded px-3 py-1" onClick={runNow}>
                     Run Now
                 </button>
             </div>
