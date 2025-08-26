@@ -100,6 +100,10 @@ export function effectiveTag(node: Node, def?: ComponentDefinition): string {
     return t;
 }
 
+
+// 전역(글로벌) 속성은 항상 허용: id, class, data-*, aria-*
+const GLOBAL_ALWAYS_ALLOWED = new Set(['id', 'class', 'className']);
+
 /** data-/aria- 는 항상 허용 */
 export function isDataOrAriaAttr(key: string): boolean {
     return key.startsWith('data-') || key.startsWith('aria-');
@@ -109,12 +113,16 @@ export function isDataOrAriaAttr(key: string): boolean {
 export function isAttrAllowedByPolicy(
     project: Project | undefined,
     tag: string,
-    key: string
+    key: string,
 ): boolean {
+    // ✅ 전역 속성 우선 허용
+    if (GLOBAL_ALWAYS_ALLOWED.has(key)) return true;
+    if (isDataOrAriaAttr(key)) return true;
+
     if (!project?.tagPolicies) return true;
     const pol: TagPolicy | undefined = project.tagPolicies[tag];
     if (!pol?.allowedAttributes) return true;
-    if (isDataOrAriaAttr(key)) return true;
+
     return pol.allowedAttributes.includes(key);
 }
 
@@ -122,7 +130,7 @@ export function isAttrAllowedByPolicy(
 export function sanitizeAttrsForTag(
     project: Project | undefined,
     tag: string,
-    attrs: Record<string, string>
+    attrs: Record<string, unknown>,
 ): Record<string, string> {
     const out: Record<string, string> = {};
     for (const [k, v] of Object.entries(attrs)) {
