@@ -103,7 +103,7 @@ export function Inspector() {
             {/* Body */}
             <div className="flex-1 overflow-auto px-2 pb-4">
                 {/* 1) 공통 메타 */}
-                <CommonSection />
+                <CommonSection nodeId={id as NodeId} defId={node.componentId} />
 
                 {/* 2) Props (구분선만, 박스 제거) */}
                 <div className="mt-4">

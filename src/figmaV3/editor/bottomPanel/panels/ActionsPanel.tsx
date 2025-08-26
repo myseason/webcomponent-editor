@@ -1,215 +1,319 @@
 'use client';
+
 /**
- * ActionsPanel
- * - 선택 노드의 이벤트별(Action) 스텝을 구성/실행
- * - when 조건식(WhenBuilder) 토글 제공
- *
- * 규약:
- * - 훅은 최상위에서만 호출 (조기 return 이후 X)
- * - any 금지
- * - 스토어 갱신은 얕은 복사 규약(updateNodeProps / update) 사용
+ * ActionsPanel (Scope 구조 반영)
+ * - 상단 스코프 탭: Page / Fragment / Component
+ * - (현 단계) Component 스코프만 실동작:
+ *   · 이벤트(onLoad/onClick/onChange/onSubmit) 선택
+ *   · Step 목록/추가/삭제
+ *   · Tag 전환(동적) + Tag Attributes(동적) → SetProps 스텝으로 추가
+ * - Page/Fragment 스코프는 골격만(향후 Flows·FragmentsPanel 연계)
  */
 
-import React from 'react';
-import type { SupportedEvent, ActionStep } from '../../../core/types';
+import * as React from 'react';
 import { useEditor } from '../../useEditor';
 import { editorStore } from '../../../store/editStore';
 import { runActions } from '../../../runtime/actions';
-import { SelectPage } from '../../common/SelectPage';
-import { SelectFragment } from '../../common/SelectFragment';
-import { WhenBuilder } from '../../common/WhenBuilder';
-import { evalWhenExpr } from '../../../runtime/expr';
-
-const SUPPORTED_EVENTS: SupportedEvent[] = ['onClick', 'onChange', 'onSubmit', 'onLoad'];
-
-/** 이벤트별 액션 컨테이너 타입(when 추가) */
-type ActionsBag = Record<
+import { getDefinition } from '../../../core/registry';
+import type {
     SupportedEvent,
-    { steps: ActionStep[]; when?: { expr: string } }
->;
+    ActionStep,
+    NodeId,
+    EditorState,
+} from '../../../core/types';
 
-export function ActionsPanel() {
-    // 1) 훅: 항상 최상위 고정 호출
-    const state = useEditor(); // useSyncExternalStore 내부 사용
-    const [evt, setEvt] = React.useState<SupportedEvent>('onClick');
-    const [editingWhen, setEditingWhen] = React.useState<boolean>(false);
-    const [navPageId, setNavPageId] = React.useState<string>(state.project.pages[0]?.id ?? '');
-    const [openFragId, setOpenFragId] = React.useState<string>(state.project.fragments[0]?.id ?? '');
+const EVENTS: SupportedEvent[] = ['onLoad', 'onClick', 'onChange', 'onSubmit'];
 
-    // 2) 파생값: 훅 이후 "변수"로 계산 (훅 추가 금지)
-    const nodeId = state.ui.selectedId;
-    const node = nodeId ? state.project.nodes[nodeId] : undefined;
+type ActionsBag = Partial<Record<SupportedEvent, { steps: ActionStep[] }>>;
+type Scope = 'Page' | 'Fragment' | 'Component';
 
-    const actions = (node?.props as Record<string, unknown> | undefined)?.__actions as
-        | ActionsBag
-        | undefined;
+/* ───────────── 공통 유틸 ───────────── */
+function isSetProps(step: ActionStep): step is Extract<ActionStep, { kind: 'SetProps' }> {
+    return step.kind === 'SetProps';
+}
 
-    const steps: ActionStep[] = actions?.[evt]?.steps ?? [];
-    const whenExpr: string | undefined = actions?.[evt]?.when?.expr;
+/* ───────────── Component: Tag 전환(동적) ───────────── */
+function TagSwitchRow({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent }) {
+    const state = useEditor();
+    const node = state.project.nodes[nodeId];
+    const def = getDefinition(node.componentId);
+    const allowed = def?.capabilities?.allowedTags ?? [];
+    const currentTag = String((node.props as Record<string, unknown>).__tag ?? def?.capabilities?.defaultTag ?? '');
 
-    // 3) 이벤트 선택 보정: 현재 evt가 목록에 없으면 첫 항목으로 보정
+    const [sel, setSel] = React.useState<string>(currentTag);
+
     React.useEffect(() => {
-        if (!SUPPORTED_EVENTS.includes(evt)) {
-            setEvt(SUPPORTED_EVENTS[0] ?? 'onClick');
-        }
-    }, [evt]);
+        setSel(currentTag);
+    }, [nodeId, currentTag]);
 
-    // 4) 저장기 (steps/when)
-    const setSteps = (next: ActionStep[]) => {
-        if (!nodeId) return;
-        const nextBag: ActionsBag = {
-            ...(actions ?? ({} as ActionsBag)),
-            [evt]: { steps: next, when: actions?.[evt]?.when },
-        };
-        state.updateNodeProps(nodeId, { __actions: nextBag });
+    const readSteps = (): ActionStep[] => {
+        const bag = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
+        return bag?.[event]?.steps ?? [];
     };
-
-    const setWhen = (expr: string) => {
-        if (!nodeId) return;
-        const trimmed = expr.trim();
-        const nextBag: ActionsBag = {
-            ...(actions ?? ({} as ActionsBag)),
-            [evt]: {
-                steps: actions?.[evt]?.steps ?? [],
-                when: trimmed ? { expr: trimmed } : undefined,
-            },
-        };
-        state.updateNodeProps(nodeId, { __actions: nextBag });
-    };
-
-    // 5) 스텝 추가/삭제
-    const addAlert = () => setSteps([...steps, { kind: 'Alert', message: 'Hello' }]);
-    const addNavigate = () => setSteps([...steps, { kind: 'Navigate', toPageId: navPageId }]);
-    const addOpenFragment = () => setSteps([...steps, { kind: 'OpenFragment', fragmentId: openFragId }]);
-    const addCloseFragment = () => setSteps([...steps, { kind: 'CloseFragment' }]); // top-of-stack close
-    const removeStep = (idx: number) => setSteps(steps.filter((_, i) => i !== idx));
-
-    // 6) Run Now (현재 state에서 즉시 실행) — when 조건 평가 후 실행
-    const runNow = async () => {
-        if (!nodeId || !node) return;
-
-        if (whenExpr && whenExpr.trim()) {
-            const ok = evalWhenExpr(whenExpr, { data: state.data, node, project: state.project });
-            if (!ok) {
-                alert('조건(when)이 false 이므로 실행되지 않습니다.');
-                return;
-            }
-        }
-
-        await runActions(steps, {
-            alert: (msg) => alert(msg),
-            setData: (path, value) => editorStore.getState().setData(path, value),
-            setProps: (nid, patch) => editorStore.getState().updateNodeProps(nid, patch),
-            navigate: (toPageId) => editorStore.getState().selectPage(toPageId),
-            openFragment: (id) => editorStore.getState().openFragment(id),
-            closeFragment: (id) => editorStore.getState().closeFragment(id),
-            http: async (m, url, body, headers) => {
-                const res = await fetch(url, {
-                    method: m,
-                    headers,
-                    body: body ? JSON.stringify(body) : undefined,
-                });
-                try {
-                    return await res.json();
-                } catch {
-                    return await res.text();
-                }
-            },
-            emit: (_t, _p) => {},
+    const writeSteps = (next: ActionStep[]) => {
+        state.update((s: EditorState) => {
+            const p = s.project.nodes[nodeId].props as Record<string, unknown>;
+            const bag = (p.__actions as ActionsBag | undefined) ?? {};
+            bag[event] = { steps: next };
+            p.__actions = bag;
         });
     };
 
-    // 7) 선택 노드 없을 때 안내 (훅 호출 뒤 분기 — Rules of Hooks 안전)
-    if (!nodeId || !node) {
+    const add = () => {
+        if (!sel) return;
+        const steps = readSteps();
+        const patch = { __tag: sel };
+        const next: ActionStep = { kind: 'SetProps', nodeId, patch };
+        const dup = steps.some((s) => isSetProps(s) && s.nodeId === nodeId && JSON.stringify(s.patch) === JSON.stringify(patch));
+        if (dup) return;
+        writeSteps([...steps, next]);
+    };
+
+    if (allowed.length <= 1) return null;
+
+    return (
+        <div className="flex items-center gap-2 px-1">
+            <div className="text-xs w-24 shrink-0 text-neutral-500">Tag</div>
+            <select
+                className="text-[11px] border rounded px-2 py-1"
+                value={sel}
+                onChange={(e) => setSel(e.target.value)}
+            >
+                {allowed.map((t) => (
+                    <option key={t} value={t}>
+                        {t}
+                    </option>
+                ))}
+            </select>
+            <button
+                type="button"
+                className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50"
+                onClick={add}
+                title="선택한 태그로 SetProps 스텝 추가"
+            >
+                Set
+            </button>
+        </div>
+    );
+}
+
+/* ───────────── Component: Attributes(동적) ───────────── */
+function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent }) {
+    const state = useEditor();
+    const node = state.project.nodes[nodeId];
+    const props = (node.props ?? {}) as Record<string, unknown>;
+    const tagAttrs = (props.__tagAttrs as Record<string, string> | undefined) ?? {};
+    const [exprMap, setExprMap] = React.useState<Record<string, string>>({});
+
+    React.useEffect(() => {
+        const init: Record<string, string> = {};
+        Object.entries(tagAttrs).forEach(([k, v]) => (init[k] = typeof v === 'string' ? v : ''));
+        setExprMap(init);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [nodeId]);
+
+    const setExpr = (k: string, v: string) => setExprMap((m) => (m[k] === v ? m : { ...m, [k]: v }));
+
+    const readSteps = (): ActionStep[] => {
+        const bag = (props.__actions as ActionsBag | undefined);
+        return bag?.[event]?.steps ?? [];
+    };
+    const writeSteps = (next: ActionStep[]) => {
+        state.update((s) => {
+            const p = s.project.nodes[nodeId].props as Record<string, unknown>;
+            const bag = (p.__actions as ActionsBag | undefined) ?? {};
+            bag[event] = { steps: next };
+            p.__actions = bag;
+        });
+    };
+
+    const addSetAttr = (key: string, value: string) => {
+        const steps = readSteps();
+        const patch = { __tagAttrs: { ...(props.__tagAttrs as Record<string, string> ?? {}), [key]: value } };
+        const next: ActionStep = { kind: 'SetProps', nodeId, patch };
+        const dup = steps.some((s) => isSetProps(s) && s.nodeId === nodeId && JSON.stringify(s.patch) === JSON.stringify(patch));
+        if (dup) return;
+        writeSteps([...steps, next]);
+    };
+
+    const keys = Object.keys(tagAttrs);
+    if (keys.length === 0) {
         return (
-            <div className="p-3 text-sm text-neutral-600">
-                노드를 선택하세요
+            <div className="text-[11px] text-neutral-400 px-1">
+                Tag Attributes 없음(정적 속성은 Inspector › props에서 추가)
             </div>
         );
     }
 
-    // 8) 뷰
     return (
-        <div className="flex flex-col gap-3 p-3">
-            {/* 헤더: 이벤트 선택 + 조건 토글 */}
-            <div className="flex items-center gap-2">
-                <div className="font-medium">Actions</div>
-                <select
-                    className="border rounded px-2 py-1"
-                    value={evt}
-                    onChange={(e) => setEvt(e.target.value as SupportedEvent)}
-                >
-                    {SUPPORTED_EVENTS.map((e) => (
-                        <option key={e} value={e}>
-                            {e}
-                        </option>
-                    ))}
-                </select>
-
-                <button
-                    className={`ml-auto border rounded px-2 py-1 ${editingWhen ? 'bg-amber-100' : ''}`}
-                    onClick={() => setEditingWhen((v) => !v)}
-                    title="이 이벤트의 실행 조건(when)을 편집"
-                >
-                    조건
-                </button>
+        <div className="space-y-2">
+            <div className="text-[11px] font-semibold text-neutral-700 px-1">Attributes (Dynamic)</div>
+            <div className="text-[11px] text-neutral-500 px-1 -mt-1">
+                값은 일반 문자열 또는 머스태치 <code>{'{{ expr }}'}</code> 사용 가능
             </div>
-
-            {/* 조건(when) 빌더 — 토글 렌더 */}
-            {editingWhen && (
-                <div className="border rounded p-2">
-                    <WhenBuilder value={whenExpr} onChange={setWhen} previewNodeId={nodeId} />
-                </div>
-            )}
-
-            {/* 현재 스텝 목록 */}
-            <div className="flex flex-col gap-2">
-                {steps.length === 0 && (
-                    <div className="text-neutral-500 text-sm">스텝이 없습니다. 아래 컨트롤로 추가하세요.</div>
-                )}
-                {steps.map((s, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm">
-                        <div className="min-w-[96px] font-mono">{s.kind}</div>
-                        {s.kind === 'Alert' && <div>“{s.message}”</div>}
-                        {s.kind === 'Navigate' && <div>→ {s.toPageId}</div>}
-                        {s.kind === 'OpenFragment' && <div>open: {s.fragmentId}</div>}
-                        {s.kind === 'CloseFragment' && <div>close {s.fragmentId ?? '(top)'} </div>}
+            {keys.map((k) => {
+                const cur = exprMap[k] ?? '';
+                return (
+                    <div key={k} className="flex items-center gap-2 px-1">
+                        <div className="text-xs w-24 text-neutral-500 truncate" title={k}>
+                            {k}
+                        </div>
+                        <input
+                            className="text-[11px] border rounded px-2 py-1 flex-1"
+                            value={cur}
+                            onChange={(e) => setExpr(k, e.target.value)}
+                            placeholder="e.g. /path or {{ data.link }}"
+                        />
                         <button
-                            className="ml-auto border rounded px-2 py-1"
-                            onClick={() => removeStep(i)}
+                            className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50"
+                            onClick={() => addSetAttr(k, cur)}
+                            type="button"
+                            title="이 값으로 SetProps 스텝 추가"
                         >
-                            삭제
+                            Set
                         </button>
                     </div>
+                );
+            })}
+        </div>
+    );
+}
+
+/* ───────────── 메인 패널 ───────────── */
+export function ActionsPanel() {
+    const state = useEditor();
+    const [scope, setScope] = React.useState<Scope>('Component');
+
+    // 선택 컨텍스트
+    const nodeId = state.ui.selectedId ?? null;
+
+    // Component 스코프만 실동작
+    const [evt, setEvt] = React.useState<SupportedEvent>('onClick');
+    const steps: ActionStep[] = React.useMemo(() => {
+        if (!nodeId || scope !== 'Component') return [];
+        const node = state.project.nodes[nodeId];
+        const bag = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
+        return bag?.[evt]?.steps ?? [];
+    }, [nodeId, evt, scope, state.project.nodes]);
+
+    const setSteps = (next: ActionStep[]) => {
+        if (!nodeId) return;
+        const node = state.project.nodes[nodeId];
+        const bag = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
+        const nextBag: ActionsBag = { ...(bag ?? {}), [evt]: { steps: next } };
+        state.updateNodeProps(nodeId, { __actions: nextBag });
+    };
+
+    const addAlert = () => setSteps([...(steps ?? []), { kind: 'Alert', message: 'Hello' }]);
+    const addNavigate = () =>
+        setSteps([...(steps ?? []), { kind: 'Navigate', toPageId: state.project.pages[0]?.id ?? state.project.rootId }]);
+
+    const runNow = async () => {
+        await runActions(steps ?? [], {
+            alert: (m) => alert(m),
+            setData: (p, v) => editorStore.getState().setData(p, v),
+            setProps: (nid, patch) => editorStore.getState().updateNodeProps(nid, patch),
+            navigate: (pid) => editorStore.getState().selectPage(pid),
+            openFragment: () => {},
+            closeFragment: () => {},
+            http: async (m, url, body, headers) => {
+                const res = await fetch(url, { method: m, headers, body: body ? JSON.stringify(body) : undefined });
+                try { return await res.json(); } catch { return await res.text(); }
+            },
+            emit: () => {},
+        });
+    };
+
+    return (
+        <div className="p-2 space-y-3">
+            <div className="flex items-center gap-1">
+                {(['Page', 'Fragment', 'Component'] as Scope[]).map((s) => (
+                    <button
+                        key={s}
+                        type="button"
+                        className={`text-[11px] px-2 py-1 border rounded ${scope === s ? 'bg-neutral-100' : 'hover:bg-neutral-50'}`}
+                        onClick={() => setScope(s)}
+                    >
+                        {s}
+                    </button>
                 ))}
             </div>
 
-            {/* 컨트롤: 대상 선택 + 스텝 추가 */}
-            <div className="flex items-center gap-2">
-                <div className="text-sm text-neutral-600">Navigate</div>
-                <SelectPage value={navPageId} onChange={setNavPageId} />
-                <button className="border rounded px-2 py-1" onClick={addNavigate}>
-                    + Navigate
-                </button>
-            </div>
+            {/* Page/Fragment: 이후 단계에서 연결 */}
+            {scope !== 'Component' && (
+                <div className="text-[11px] text-neutral-500">
+                    {scope} 액션은 향후 단계에서 Flows/Fragments와 통합됩니다.
+                </div>
+            )}
 
-            <div className="flex items-center gap-2">
-                <div className="text-sm text-neutral-600">Fragment</div>
-                <SelectFragment value={openFragId} onChange={setOpenFragId} />
-                <button className="border rounded px-2 py-1" onClick={addOpenFragment}>
-                    + OpenFragment
-                </button>
-                <button className="border rounded px-2 py-1" onClick={addCloseFragment}>
-                    + CloseFragment
-                </button>
-            </div>
+            {/* Component scope */}
+            {scope === 'Component' && (
+                <>
+                    {!nodeId && <div className="text-[11px] text-neutral-400">노드를 선택하세요.</div>}
+                    {nodeId && (
+                        <>
+                            {/* 이벤트 선택 */}
+                            <div className="flex items-center gap-2">
+                                <select
+                                    className="text-[11px] border rounded px-2 py-1"
+                                    value={evt}
+                                    onChange={(e) => setEvt(e.target.value as SupportedEvent)}
+                                >
+                                    {EVENTS.map((e) => (
+                                        <option key={e} value={e}>
+                                            {e}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="text-[11px] text-neutral-500">이벤트별 액션을 구성합니다.</div>
+                            </div>
 
-            {/* 실행 */}
-            <div className="flex">
-                <button className="ml-auto border rounded px-3 py-1" onClick={runNow}>
-                    Run Now
-                </button>
-            </div>
+                            {/* 스텝 목록 */}
+                            {(steps?.length ?? 0) === 0 && (
+                                <div className="text-[11px] text-neutral-400">스텝이 없습니다. 아래 버튼으로 추가하세요.</div>
+                            )}
+                            <div className="space-y-1">
+                                {(steps ?? []).map((s, i) => (
+                                    <div key={i} className="flex items-center justify-between border rounded px-2 py-1 text-[11px]">
+                                        <div className="truncate">
+                                            <span className="font-semibold">{s.kind}</span>{' '}
+                                            {s.kind === 'Alert' && `“${s.message}”`}
+                                            {s.kind === 'Navigate' && `→ ${s.toPageId}`}
+                                            {isSetProps(s) && ` (SetProps ${s.nodeId})`}
+                                        </div>
+                                        <button
+                                            className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50"
+                                            onClick={() => setSteps((steps ?? []).filter((_, idx) => idx !== i))}
+                                            type="button"
+                                        >
+                                            삭제
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* 기본 추가 & 실행 */}
+                            <div className="flex items-center gap-2">
+                                <button className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50" onClick={addAlert} type="button">
+                                    + Alert
+                                </button>
+                                <button className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50" onClick={addNavigate} type="button">
+                                    + Navigate
+                                </button>
+                                <button className="ml-auto text-[11px] px-2 py-1 border rounded hover:bg-neutral-50" onClick={runNow} type="button">
+                                    Run Now
+                                </button>
+                            </div>
+
+                            {/* 동적 Tag 전환 & 동적 Attributes */}
+                            <div className="pt-2 border-t space-y-2">
+                                <TagSwitchRow nodeId={nodeId} event={evt} />
+                                <NodeAttrsDynamicSection nodeId={nodeId} event={evt} />
+                            </div>
+                        </>
+                    )}
+                </>
+            )}
         </div>
     );
 }
