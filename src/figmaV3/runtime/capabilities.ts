@@ -4,10 +4,13 @@
  * - 템플릿 InspectorFilter는 전문가 모드에서 무시(표시 UX 전용)
  */
 import type {
+    Project,
+    Node,
     TagPolicyMap,
     TagPolicy,
     InspectorFilter,
     BaseDefTagWhitelist,
+    ComponentDefinition,
 } from '../core/types';
 
 // HTML void 요소(자식 불가)
@@ -88,4 +91,43 @@ export function isTagAllowedForBase(defId: string, tag: string, whitelistOverrid
 export function getAllowedTagsForBase(defId: string, whitelistOverride?: BaseDefTagWhitelist): string[] {
     const wl = (whitelistOverride && whitelistOverride[defId]) ?? DEFAULT_BASEDEF_TAG_WHITELIST[defId];
     return wl ?? ['div'];
+}
+
+/** 노드의 실제 렌더 태그: __tag → defaultTag → 'div' */
+export function effectiveTag(node: Node, def?: ComponentDefinition): string {
+    const p = node.props as Record<string, unknown>;
+    const t = (p?.__tag as string) || def?.capabilities?.defaultTag || 'div';
+    return t;
+}
+
+/** data-/aria- 는 항상 허용 */
+export function isDataOrAriaAttr(key: string): boolean {
+    return key.startsWith('data-') || key.startsWith('aria-');
+}
+
+/** TagPolicy 기반 허용 여부(없으면 관대하게 true) */
+export function isAttrAllowedByPolicy(
+    project: Project | undefined,
+    tag: string,
+    key: string
+): boolean {
+    if (!project?.tagPolicies) return true;
+    const pol: TagPolicy | undefined = project.tagPolicies[tag];
+    if (!pol?.allowedAttributes) return true;
+    if (isDataOrAriaAttr(key)) return true;
+    return pol.allowedAttributes.includes(key);
+}
+
+/** 렌더 직전 속성 정리(Phase1: 허용 외는 무시만 함) */
+export function sanitizeAttrsForTag(
+    project: Project | undefined,
+    tag: string,
+    attrs: Record<string, string>
+): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(attrs)) {
+        if (typeof v !== 'string') continue; // 문자열만 허용(SSR 안전)
+        if (isAttrAllowedByPolicy(project, tag, k)) out[k] = v;
+    }
+    return out;
 }

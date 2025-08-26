@@ -1,4 +1,3 @@
-// src/figmaV3/editor/components/Box.tsx
 'use client';
 
 import React, {JSX} from 'react';

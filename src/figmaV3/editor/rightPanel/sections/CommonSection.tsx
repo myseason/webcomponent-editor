@@ -1,254 +1,208 @@
-'use client';
-/**
- * Inspector > CommonSection
- * - 공통 속성: id(읽기), __name, __slotId, __tag, __tagAttrs
- * - __tag: 컴포넌트 capability(허용 태그) 기반 드롭다운
- * - __tagAttrs: TagPolicy.allowedAttributes 기반 KV 편집 + 커스텀(key/value) 추가(허용 attr만)
- *
- * 규칙
- * - 훅은 최상위
- * - any 금지
- * - 얕은 복사 update 시그니처 사용
- */
-import React from 'react';
+import * as React from 'react';
 import { useEditor } from '../../useEditor';
-import type {
-    EditorState,
-    NodeId,
-    NodePropsWithMeta,
-    TagPolicyMap,
-} from '../../../core/types';
-import { getAllowedTagsForBase, getTagPolicy } from '../../../runtime/capabilities';
+import { getDefinition } from '../../../core/registry';
+import { effectiveTag, isAttrAllowedByPolicy } from '../../../runtime/capabilities';
+import {JSX} from "react";
 
-export function CommonSection() {
+/** 동일 섹션 타이틀 스타일(StylesSection 계열과 톤 맞춤) */
+const SectionTitle: React.FC<{ label: string; className?: string }> = ({ label, className }) => (
+    <div className={`flex items-center gap-2 select-none ${className ?? ''}`}>
+        <span className="text-[12px] font-semibold text-gray-700">{label}</span>
+        <div className="h-[1px] bg-gray-200 flex-1" />
+    </div>
+);
+
+/** key-value row */
+type KV = { key: string; value: string };
+
+/** 라벨/필드 공통 레이아웃 */
+const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+    <div className="flex items-center gap-2 px-1">
+        <label className="text-xs w-20 text-neutral-500">{label}</label>
+        <div className="flex-1 min-w-0">{children}</div>
+    </div>
+);
+
+export function CommonSection(): JSX.Element {
     const state = useEditor();
-    const nodeId: NodeId = state.ui.selectedId ?? state.project.rootId;
+
+    // 현재 선택 노드 (없으면 root)
+    const nodeId = state.ui.selectedId ?? state.project.rootId;
     const node = state.project.nodes[nodeId];
+    const def = getDefinition(node.componentId);
+    const proj = state.project;
 
-    // 안전 캐스팅(메타 접근)
-    const props = (node.props as NodePropsWithMeta) ?? {};
-    const currentTag =
-        (props.__tag as string | undefined) ??
-        getAllowedTagsForBase(node.componentId)[0] ??
-        'div';
+    // props 안전 캐스팅
+    const props = (node.props ?? {}) as Record<string, unknown>;
 
-    const projectPolicies: TagPolicyMap | undefined = state.project.tagPolicies;
-    const tagPolicy = getTagPolicy(currentTag, projectPolicies);
-    const allowedAttrs = tagPolicy?.allowedAttributes ?? [];
+    // ── 공통 필드: 읽기/쓰기
+    const nodeIdReadable = node.id;
+    const nodeName = String(props.name ?? '');
+    const slotId = String(props.slotId ?? '');
 
-    const onChangeMeta = (patch: Partial<Record<string, unknown>>) => {
-        state.update((s: EditorState) => {
-            const n = s.project.nodes[nodeId];
-            if (!n) return;
-            s.project.nodes = {
-                ...s.project.nodes,
-                [nodeId]: {
-                    ...n,
-                    props: { ...n.props, ...patch },
-                },
-            };
-        });
+    // ── As (=Tag)
+    const tag = effectiveTag(node, def);
+    const allowedTags = (def?.capabilities?.allowedTags?.length
+        ? def.capabilities!.allowedTags
+        : [def?.capabilities?.defaultTag ?? 'div']) as string[];
+
+    const onChangeName = (e: React.ChangeEvent<HTMLInputElement>) => {
+        state.updateNodeProps(nodeId, { name: e.currentTarget.value });
     };
 
-    const onChangeTag = (tag: string) => {
-        // 태그 변경 시, 허용되지 않은 attribute들은 즉시 제거하여 정합성 유지
-        const newPolicy = getTagPolicy(tag, projectPolicies);
-        const allowSet = new Set(newPolicy?.allowedAttributes ?? []);
-        const nextAttrs = Object.fromEntries(
-            Object.entries((props.__tagAttrs as Record<string, string>) ?? {}).filter(
-                ([k]) => allowSet.has(k),
-            ),
-        );
-        onChangeMeta({ __tag: tag, __tagAttrs: nextAttrs });
+    const onChangeSlotId = (e: React.ChangeEvent<HTMLInputElement>) => {
+        state.updateNodeProps(nodeId, { slotId: e.currentTarget.value });
     };
 
-    const allowedTags = getAllowedTagsForBase(node.componentId);
+    const onChangeTag = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const next = e.currentTarget.value;
+        state.updateNodeProps(nodeId, { __tag: next });
+        // Phase1: 정책 위반은 차단하지 않고 경고 표시만 유지
+        // 필요 시 여기서 태그 전환 부작용 정리 로직(예: a가 아니면 href/target 제거) 추가 가능
+    };
 
-    // __tagAttrs 편집 로컬 상태 (apply로 커밋)
-    const [draft, setDraft] = React.useState<Record<string, string>>(() => ({
-        ...(((props.__tagAttrs as Record<string, string>) ?? {}) as Record<
-            string,
-            string
-        >),
-    }));
+    // ── Tag Attributes
+    const tagAttrs: Record<string, string> = (props.__tagAttrs as Record<string, string> | undefined) ?? {};
+    const rows: KV[] = Object.entries(tagAttrs).map(([k, v]) => ({ key: k, value: v }));
 
-    React.useEffect(() => {
-        // 선택 노드/태그 바뀌면 동기화
-        setDraft({
-            ...(((props.__tagAttrs as Record<string, string>) ?? {}) as Record<
-                string,
-                string
-            >),
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [nodeId, currentTag]);
+    const addAttr = () => {
+        const base = 'data-attr';
+        let k = base;
+        let i = 1;
+        while (tagAttrs[k] !== undefined) k = `${base}-${i++}`;
+        state.updateNodeProps(nodeId, { __tagAttrs: { ...tagAttrs, [k]: '' } });
+    };
 
-    const unusedAttrOptions = allowedAttrs.filter((a) => !(a in draft));
-    const onApplyAttrs = () => onChangeMeta({ __tagAttrs: { ...draft } });
-
-    // ✨ 커스텀 key/value 추가 (TagPolicy 허용 항목만)
-    const [customKey, setCustomKey] = React.useState('');
-    const [customVal, setCustomVal] = React.useState('');
-    const addCustomAttr = () => {
-        const k = customKey.trim();
-        if (!k) return;
-        if (!allowedAttrs.includes(k)) {
-            alert(`'${k}' 속성은 현재 태그('${currentTag}')에서 허용되지 않습니다(TagPolicy).`);
+    const updateKey = (oldKey: string, newKeyRaw: string) => {
+        const newKey = newKeyRaw.trim();
+        if (!newKey || newKey === oldKey) return;
+        if (tagAttrs[newKey] !== undefined) {
+            alert('이미 존재하는 속성 키입니다.');
             return;
         }
-        setDraft((prev) => ({ ...prev, [k]: customVal }));
-        setCustomKey('');
-        setCustomVal('');
+        const next: Record<string, string> = {};
+        for (const [k, v] of Object.entries(tagAttrs)) {
+            next[k === oldKey ? newKey : k] = v;
+        }
+        state.updateNodeProps(nodeId, { __tagAttrs: next });
+    };
+
+    const updateVal = (k: string, v: string) => {
+        if (tagAttrs[k] === v) return;
+        state.updateNodeProps(nodeId, { __tagAttrs: { ...tagAttrs, [k]: v } });
+    };
+
+    const removeAttr = (k: string) => {
+        const next = { ...tagAttrs };
+        delete next[k];
+        state.updateNodeProps(nodeId, { __tagAttrs: next });
     };
 
     return (
-        <section className="space-y-3">
-            {/* 타이틀 */}
-            <div className="text-sm font-semibold text-gray-700">Common</div>
-
+        <section className="space-y-2">
+            {/* 구분선 스타일(Inspector 전체 톤과 맞춤) */}
+            <SectionTitle label="common" />
             {/* ID (읽기 전용) */}
-            <div className="grid grid-cols-3 items-center gap-2 text-xs">
-                <div className="text-gray-500">ID</div>
-                <input
-                    className="col-span-2 bg-gray-50 border rounded px-2 py-1"
-                    value={nodeId}
-                    readOnly
-                />
-            </div>
+            <Row label="ID">
+                <div className="text-[11px] text-neutral-500 truncate" title={nodeIdReadable}>
+                    {nodeIdReadable}
+                </div>
+            </Row>
 
             {/* Name */}
-            <div className="grid grid-cols-3 items-center gap-2 text-xs">
-                <div className="text-gray-500">Name</div>
+            <Row label="Name">
                 <input
-                    className="col-span-2 border rounded px-2 py-1"
-                    value={String(props.__name ?? '')}
-                    onChange={(e) => onChangeMeta({ __name: e.target.value })}
+                    className="text-[11px] border rounded px-2 py-1 w-full"
+                    value={nodeName}
+                    onChange={onChangeName}
+                    placeholder="optional name"
                 />
-            </div>
+            </Row>
 
             {/* Slot Id */}
-            <div className="grid grid-cols-3 items-center gap-2 text-xs">
-                <div className="text-gray-500">Slot</div>
+            <Row label="Slot Id">
                 <input
-                    className="col-span-2 border rounded px-2 py-1"
-                    placeholder="ex) header, footer..."
-                    value={String(props.__slotId ?? '')}
-                    onChange={(e) => onChangeMeta({ __slotId: e.target.value })}
+                    className="text-[11px] border rounded px-2 py-1 w-full"
+                    value={slotId}
+                    onChange={onChangeSlotId}
+                    placeholder="slot id (for composition)"
                 />
-            </div>
+            </Row>
 
-            {/* Tag */}
-            <div className="grid grid-cols-3 items-center gap-2 text-xs">
-                <div className="text-gray-500">Tag</div>
-                <select
-                    className="col-span-2 border rounded px-2 py-1"
-                    value={currentTag}
-                    onChange={(e) => onChangeTag(e.target.value)}
-                >
-                    {allowedTags.map((t) => (
-                        <option key={t} value={t}>
-                            {t}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            {!!tagPolicy?.isVoid && (
-                <div className="text-[11px] text-amber-600">
-                    This is a void element. Children are not allowed.
-                </div>
-            )}
-
-            {/* Tag Attributes (KV) */}
-            <div className="mt-2 rounded border p-2">
-                <div className="flex items-center justify-between">
-                    <div className="text-xs font-medium">Tag Attributes</div>
-                    <button
-                        className="text-xs px-2 py-1 border rounded hover:bg-gray-50"
-                        onClick={onApplyAttrs}
-                        title="Apply attributes to the node"
-                    >
-                        Apply
-                    </button>
-                </div>
-
-                {/* 추가 가능한 attr */}
-                <div className="flex items-center gap-2 mt-2">
+            {/* As (= Tag) */}
+            <Row label="As (Tag)">
+                <div className="flex items-center gap-2">
                     <select
-                        className="border rounded px-2 py-1 text-xs"
-                        defaultValue=""
-                        onChange={(e) => {
-                            const k = e.target.value;
-                            if (!k) return;
-                            setDraft((prev) => ({ ...prev, [k]: '' }));
-                            e.currentTarget.value = '';
-                        }}
+                        className="text-xs border rounded px-2 py-1"
+                        value={tag}
+                        onChange={onChangeTag}
                     >
-                        <option value="">+ Add attribute</option>
-                        {unusedAttrOptions.map((a) => (
-                            <option key={a} value={a}>
-                                {a}
+                        {allowedTags.map((t) => (
+                            <option key={t} value={t}>
+                                {t}
                             </option>
                         ))}
                     </select>
 
-                    {/* 🔹 커스텀 key/value 추가 */}
-                    <input
-                        className="border rounded px-2 py-1 text-xs w-10"
-                        placeholder="key"
-                        value={customKey}
-                        onChange={(e) => setCustomKey(e.target.value)}
-                    />
-                    <input
-                        className="border rounded px-2 py-1 text-xs w-10"
-                        placeholder="value"
-                        value={customVal}
-                        onChange={(e) => setCustomVal(e.target.value)}
-                    />
+                    {/* 정책 힌트: 현재 태그 기준 */}
+                    <span className="text-[10px] text-neutral-400">
+            Allowed by component: {allowedTags.join(', ')}
+          </span>
+                </div>
+            </Row>
+
+            {/* Tag Attributes */}
+            <div className="px-1">
+                <div className="flex items-center justify-between mb-1">
+                    <div className="text-xs text-neutral-500">Tag Attributes</div>
                     <button
-                        className="text-xs px-2 py-1 border rounded hover:bg-gray-50"
-                        onClick={addCustomAttr}
-                        title="Add custom attribute (must be allowed by TagPolicy)"
+                        className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50"
+                        onClick={addAttr}
+                        type="button"
                     >
-                        + Add
+                        + add
                     </button>
                 </div>
 
-                {/* 현재 attr 리스트 */}
-                <div className="mt-2 space-y-1">
-                    {Object.entries(draft).map(([k, v]) => (
-                        <div
-                            key={k}
-                            className="grid grid-cols-[120px_1fr_auto] items-center gap-2 text-xs"
-                        >
-                            <div className="truncate text-gray-600">{k}</div>
-                            <input
-                                className="border rounded px-2 py-1"
-                                value={v}
-                                onChange={(e) =>
-                                    setDraft((prev) => ({ ...prev, [k]: e.target.value }))
-                                }
-                            />
-                            <button
-                                className="px-2 py-1 text-[11px] text-red-600 hover:bg-red-50 border rounded"
-                                onClick={() =>
-                                    setDraft((prev) => {
-                                        const next = { ...prev };
-                                        delete next[k];
-                                        return next;
-                                    })
-                                }
-                                title="Remove attribute"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    ))}
-                    {Object.keys(draft).length === 0 && (
-                        <div className="text-[11px] text-gray-500">
-                            No attributes set. Add from the dropdown or use custom key/value.
-                        </div>
+                <div className="space-y-1">
+                    {rows.length === 0 && (
+                        <div className="text-[11px] text-neutral-400">No attributes</div>
                     )}
+
+                    {rows.map(({ key, value }) => {
+                        const allowedByPolicy = isAttrAllowedByPolicy(proj, tag, key);
+                        return (
+                            <div key={key} className="flex items-center gap-2">
+                                <input
+                                    className="text-[11px] border rounded px-2 py-1 w-36"
+                                    defaultValue={key}
+                                    onBlur={(e) => updateKey(key, e.currentTarget.value)}
+                                    placeholder="key"
+                                />
+                                <input
+                                    className="text-[11px] border rounded px-2 py-1 flex-1"
+                                    value={value}
+                                    onChange={(e) => updateVal(key, e.currentTarget.value)}
+                                    placeholder="value"
+                                />
+                                {!allowedByPolicy && (
+                                    <span
+                                        title="TagPolicy에 없는 속성입니다. 렌더/익스포트 시 무시될 수 있습니다."
+                                        className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-300"
+                                    >
+                    not in policy
+                  </span>
+                                )}
+                                <button
+                                    className="text-[11px] px-2 py-1 border rounded hover:bg-red-50"
+                                    onClick={() => removeAttr(key)}
+                                    type="button"
+                                >
+                                    remove
+                                </button>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </section>
