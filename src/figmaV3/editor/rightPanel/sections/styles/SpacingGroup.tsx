@@ -1,9 +1,31 @@
 'use client';
+/**
+ * SpacingGroup v2
+ * - margin / padding: 기본(전체) + 고급(각 방향) 입력
+ * - 프리셋(0, 4, 8, 12, 16, 24)
+ * - 링크 토글(전체 ↔ 개별) UI
+ * - 허용 키 필터(useAllowed), 제한 배지(DisabledHint)
+ */
 
 import React from 'react';
-import type { CSSDict, InspectorFilter, TagPolicy, TagPolicyMap } from '../../../../core/types';
-import { useAllowed, Label, MiniInput, DisabledHint, type DisallowReason } from './common';
+import type {
+    CSSDict,
+    InspectorFilter,
+    TagPolicy,
+    TagPolicyMap,
+} from '../../../../core/types';
+import {
+    Label,
+    MiniInput,
+    ChipBtn,
+    DisabledHint,
+    IconBtn,
+    useAllowed,
+    reasonForKey,
+    type DisallowReason,
+} from './common';
 import { coerceLen } from '../../../../runtime/styleUtils';
+import { Link as LinkIcon, Link2Off as UnlinkIcon } from 'lucide-react';
 
 export function SpacingGroup(props: {
     el: Record<string, unknown>;
@@ -16,119 +38,195 @@ export function SpacingGroup(props: {
     open: boolean;
     onToggle: () => void;
 }) {
-    const { el, patch, tag, tf, map, expert, tagPolicy, open, onToggle } = props;
+    const { el, patch, tag, tagPolicy, tf, map, expert, open, onToggle } = props;
 
-    const allowSimple = useAllowed(['margin', 'padding'], tf, tag, map, expert);
-    const allowAdvanced = useAllowed(
-        ['marginTop','marginRight','marginBottom','marginLeft','paddingTop','paddingRight','paddingBottom','paddingLeft','marginInline','marginBlock','paddingInline','paddingBlock'],
-        tf, tag, map, expert
-    );
+    // 허용 키
+    const KEYS = [
+        'margin', 'padding',
+        'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+        'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+    ] as string[];
+    const allow = useAllowed(KEYS, tf, tag, map, expert);
 
-    const dis = (k: string): DisallowReason => {
-        if (tagPolicy?.styles?.allow && !tagPolicy.styles.allow.includes(k)) return 'tag';
-        if (tagPolicy?.styles?.deny && tagPolicy.styles.deny.includes(k)) return 'tag';
-        if (!expert && tf?.styles) {
-            if (tf.styles.allow && !tf.styles.allow.includes(k)) return 'template';
-            if (tf.styles.deny && tf.styles.deny.includes(k)) return 'template';
+    const dis = (k: string): DisallowReason => reasonForKey(k, tagPolicy, tf, expert);
+
+    // 링크(전체 ↔ 개별) 토글
+    const [linkMargin, setLinkMargin] = React.useState(true);
+    const [linkPadding, setLinkPadding] = React.useState(true);
+
+    const applyMargin = (v: string) => {
+        if (linkMargin) {
+            patch({ margin: coerceLen(v) });
+        } else {
+            // 개별 입력 중 "전체" 필드 편집은 4방향 동시 갱신
+            patch({
+                marginTop: coerceLen(v),
+                marginRight: coerceLen(v),
+                marginBottom: coerceLen(v),
+                marginLeft: coerceLen(v),
+            });
         }
-        return null;
     };
+
+    const applyPadding = (v: string) => {
+        if (linkPadding) {
+            patch({ padding: coerceLen(v) });
+        } else {
+            patch({
+                paddingTop: coerceLen(v),
+                paddingRight: coerceLen(v),
+                paddingBottom: coerceLen(v),
+                paddingLeft: coerceLen(v),
+            });
+        }
+    };
+
+    const presets = ['0', '4', '8', '12', '16', '24'];
 
     return (
         <section className="mt-3">
-            <div className="flex items-center justify-between text-xs font-semibold text-neutral-700 cursor-pointer select-none" onClick={onToggle}>
-                <span>{open ? '▾' : '▸'} Margin &amp; Padding</span>
+            <div
+                className="flex items-center justify-between text-xs font-semibold text-neutral-700 cursor-pointer select-none"
+                onClick={onToggle}
+            >
+                <span>{open ? '▾' : '▸'} Spacing</span>
             </div>
 
             {open && (
-                <div className="mt-1 space-y-2">
-                    <div className="flex items-center gap-2">
-                        <Label>margin</Label>
-                        {!allowSimple.has('margin') && <DisabledHint reason={dis('margin')!} />}
-                        {allowSimple.has('margin') ? (
-                            <MiniInput
-                                value={el['margin'] as string | number | undefined}
-                                onChange={(v) => patch({ margin: coerceLen(v) })}
-                                placeholder="0 | 8 | 8px 16px"
-                            />
-                        ) : <span className="text-[11px] text-neutral-400">제한됨</span>}
-                    </div>
+                <div className="mt-1 space-y-3">
 
-                    <div className="flex items-center gap-2">
-                        <Label>padding</Label>
-                        {!allowSimple.has('padding') && <DisabledHint reason={dis('padding')!} />}
-                        {allowSimple.has('padding') ? (
-                            <MiniInput
-                                value={el['padding'] as string | number | undefined}
-                                onChange={(v) => patch({ padding: coerceLen(v) })}
-                                placeholder="0 | 8 | 4px 8px"
-                            />
-                        ) : <span className="text-[11px] text-neutral-400">제한됨</span>}
-                    </div>
+                    {/* ─ margin ─ */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <Label>margin</Label>
 
-                    {expert && (
-                        <>
-                            <div className="text-[10px] text-neutral-500 pt-1">Advanced</div>
+                            {/* 링크 토글 */}
+                            <IconBtn
+                                title={linkMargin ? 'unlink' : 'link all'}
+                                onClick={() => setLinkMargin(!linkMargin)}
+                            >
+                                {linkMargin ? <LinkIcon size={16} /> : <UnlinkIcon size={16} />}
+                            </IconBtn>
 
-                            <div className="flex items-center gap-2">
-                                <Label>margin(T/R/B/L)</Label>
-                                {(['marginTop','marginRight','marginBottom','marginLeft'] as const).map((k) => (
-                                    <MiniInput
-                                        key={k}
-                                        value={el[k] as string | number | undefined}
-                                        onChange={(v) => patch({ [k]: coerceLen(v) } as CSSDict)}
-                                        placeholder={k}
-                                        disabled={!allowAdvanced.has(k)}
-                                    />
+                            {!allow.has('margin') && !allow.has('marginTop') && <DisabledHint reason={dis('margin')!} />}
+
+                            {/* 전체 입력 */}
+                            {(linkMargin ? allow.has('margin') : (allow.has('marginTop') && allow.has('marginRight') && allow.has('marginBottom') && allow.has('marginLeft'))) ? (
+                                <MiniInput
+                                    value={(el as any).margin ?? ''}
+                                    onChange={applyMargin}
+                                    placeholder={linkMargin ? 'e.g. 8 | 1rem | 8px 16px' : 'apply all sides'}
+                                    className="w-40"
+                                />
+                            ) : (
+                                <span className="text-[11px] text-neutral-400">제한됨</span>
+                            )}
+
+                            {/* 프리셋 */}
+                            <div className="ml-2 flex gap-1">
+                                {presets.map((p) => (
+                                    <ChipBtn
+                                        key={`m-${p}`}
+                                        title={`margin ${p}`}
+                                        onClick={() => applyMargin(p)}
+                                    >
+                                        {p}
+                                    </ChipBtn>
                                 ))}
                             </div>
+                        </div>
 
-                            <div className="flex items-center gap-2">
-                                <Label>padding(T/R/B/L)</Label>
-                                {(['paddingTop','paddingRight','paddingBottom','paddingLeft'] as const).map((k) => (
-                                    <MiniInput
-                                        key={k}
-                                        value={el[k] as string | number | undefined}
-                                        onChange={(v) => patch({ [k]: coerceLen(v) } as CSSDict)}
-                                        placeholder={k}
-                                        disabled={!allowAdvanced.has(k)}
-                                    />
+                        {/* 개별(고급) */}
+                        {!linkMargin && (
+                            <div className="pl-24 space-y-1">
+                                {([
+                                    ['marginTop', 'Top'],
+                                    ['marginRight', 'Right'],
+                                    ['marginBottom', 'Bottom'],
+                                    ['marginLeft', 'Left'],
+                                ] as [string, string][]).map(([k, label]) => (
+                                    <div key={k} className="flex items-center gap-2">
+                                        <Label>{label}</Label>
+                                        {!allow.has(k) && <DisabledHint reason={dis(k)!} />}
+                                        {allow.has(k) ? (
+                                            <MiniInput
+                                                value={(el as any)[k]}
+                                                onChange={(v) => patch({ [k]: coerceLen(v) })}
+                                                placeholder={k}
+                                            />
+                                        ) : (
+                                            <span className="text-[11px] text-neutral-400">제한</span>
+                                        )}
+                                    </div>
                                 ))}
                             </div>
+                        )}
+                    </div>
 
-                            <div className="flex items-center gap-2">
-                                <Label>m-Inline / m-Block</Label>
-                                <MiniInput
-                                    value={el['marginInline'] as string | number | undefined}
-                                    onChange={(v) => patch({ marginInline: coerceLen(v) })}
-                                    placeholder="marginInline"
-                                    disabled={!allowAdvanced.has('marginInline')}
-                                />
-                                <MiniInput
-                                    value={el['marginBlock'] as string | number | undefined}
-                                    onChange={(v) => patch({ marginBlock: coerceLen(v) })}
-                                    placeholder="marginBlock"
-                                    disabled={!allowAdvanced.has('marginBlock')}
-                                />
-                            </div>
+                    {/* ─ padding ─ */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <Label>padding</Label>
 
-                            <div className="flex items-center gap-2">
-                                <Label>p-Inline / p-Block</Label>
+                            <IconBtn
+                                title={linkPadding ? 'unlink' : 'link all'}
+                                onClick={() => setLinkPadding(!linkPadding)}
+                            >
+                                {linkPadding ? <LinkIcon size={16} /> : <UnlinkIcon size={16} />}
+                            </IconBtn>
+
+                            {!allow.has('padding') && !allow.has('paddingTop') && <DisabledHint reason={dis('padding')!} />}
+
+                            {(linkPadding ? allow.has('padding') : (allow.has('paddingTop') && allow.has('paddingRight') && allow.has('paddingBottom') && allow.has('paddingLeft'))) ? (
                                 <MiniInput
-                                    value={el['paddingInline'] as string | number | undefined}
-                                    onChange={(v) => patch({ paddingInline: coerceLen(v) })}
-                                    placeholder="paddingInline"
-                                    disabled={!allowAdvanced.has('paddingInline')}
+                                    value={(el as any).padding ?? ''}
+                                    onChange={applyPadding}
+                                    placeholder={linkPadding ? 'e.g. 8 | 1rem | 8px 16px' : 'apply all sides'}
+                                    className="w-40"
                                 />
-                                <MiniInput
-                                    value={el['paddingBlock'] as string | number | undefined}
-                                    onChange={(v) => patch({ paddingBlock: coerceLen(v) })}
-                                    placeholder="paddingBlock"
-                                    disabled={!allowAdvanced.has('paddingBlock')}
-                                />
+                            ) : (
+                                <span className="text-[11px] text-neutral-400">제한됨</span>
+                            )}
+
+                            <div className="ml-2 flex gap-1">
+                                {presets.map((p) => (
+                                    <ChipBtn
+                                        key={`p-${p}`}
+                                        title={`padding ${p}`}
+                                        onClick={() => applyPadding(p)}
+                                    >
+                                        {p}
+                                    </ChipBtn>
+                                ))}
                             </div>
-                        </>
-                    )}
+                        </div>
+
+                        {!linkPadding && (
+                            <div className="pl-24 space-y-1">
+                                {([
+                                    ['paddingTop', 'Top'],
+                                    ['paddingRight', 'Right'],
+                                    ['paddingBottom', 'Bottom'],
+                                    ['paddingLeft', 'Left'],
+                                ] as [string, string][]).map(([k, label]) => (
+                                    <div key={k} className="flex items-center gap-2">
+                                        <Label>{label}</Label>
+                                        {!allow.has(k) && <DisabledHint reason={dis(k)!} />}
+                                        {allow.has(k) ? (
+                                            <MiniInput
+                                                value={(el as any)[k]}
+                                                onChange={(v) => patch({ [k]: coerceLen(v) })}
+                                                placeholder={k}
+                                            />
+                                        ) : (
+                                            <span className="text-[11px] text-neutral-400">제한</span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                 </div>
             )}
         </section>

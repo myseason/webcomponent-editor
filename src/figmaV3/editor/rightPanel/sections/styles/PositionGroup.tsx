@@ -1,8 +1,28 @@
 'use client';
-import React from 'react';
-import type { CSSDict, InspectorFilter, TagPolicy, TagPolicyMap } from '../../../../core/types';
-import { useAllowed, Label, MiniInput, MiniSelect, DisabledHint, type DisallowReason } from './common';
+/**
+ * PositionGroup v2
+ * - position(static/relative/absolute/fixed/sticky)
+ * - offset(top/right/bottom/left) / zIndex
+ * - overflow-x / overflow-y (기존 설계에 따라 Position 그룹에서 제공)
+ * - 허용 키 필터(useAllowed), 제한 배지(DisabledHint)
+ */
 
+import React from 'react';
+import type {
+    CSSDict,
+    InspectorFilter,
+    TagPolicy,
+    TagPolicyMap,
+} from '../../../../core/types';
+import {
+    Label,
+    MiniInput,
+    MiniSelect,
+    DisabledHint,
+    useAllowed,
+    reasonForKey,
+    type DisallowReason,
+} from './common';
 import { coerceLen } from '../../../../runtime/styleUtils';
 
 export function PositionGroup(props: {
@@ -16,32 +36,33 @@ export function PositionGroup(props: {
     open: boolean;
     onToggle: () => void;
 }) {
-    const { el, patch, tag, tf, map, expert, tagPolicy, open, onToggle } = props;
+    const { el, patch, tag, tagPolicy, tf, map, expert, open, onToggle } = props;
 
-    const allow = useAllowed(['position','top','left','right','bottom','zIndex'], tf, tag, map, expert);
+    const KEYS = [
+        'position', 'top', 'right', 'bottom', 'left', 'zIndex',
+        'overflowX', 'overflowY',
+    ] as string[];
+    const allow = useAllowed(KEYS, tf, tag, map, expert);
+    const dis = (k: string): DisallowReason => reasonForKey(k, tagPolicy, tf, expert);
 
-    const dis = (k: string): DisallowReason => {
-        if (tagPolicy?.styles?.allow && !tagPolicy.styles.allow.includes(k)) return 'tag';
-        if (tagPolicy?.styles?.deny && tagPolicy.styles.deny.includes(k)) return 'tag';
-        if (!expert && tf?.styles) {
-            if (tf.styles.allow && !tf.styles.allow.includes(k)) return 'template';
-            if (tf.styles.deny && tf.styles.deny.includes(k)) return 'template';
-        }
-        return null;
-    };
+    const pos = ((el as any).position as string) ?? 'static';
+    const isOffsetEnabled = pos !== 'static';
 
-    const pos = (el['position'] as string) ?? 'static';
-    const isStatic = pos === 'static';
+    const overflowOptions = ['visible', 'hidden', 'scroll', 'auto', 'clip'];
 
     return (
         <section className="mt-3">
-            <div className="flex items-center justify-between text-xs font-semibold text-neutral-700 cursor-pointer select-none" onClick={onToggle}>
+            <div
+                className="flex items-center justify-between text-xs font-semibold text-neutral-700 cursor-pointer select-none"
+                onClick={onToggle}
+            >
                 <span>{open ? '▾' : '▸'} Position</span>
             </div>
 
             {open && (
-                <>
-                    <div className="flex items-center gap-2 mt-1">
+                <div className="mt-1 space-y-3">
+                    {/* position */}
+                    <div className="flex items-center gap-2">
                         <Label>position</Label>
                         {!allow.has('position') && <DisabledHint reason={dis('position')!} />}
                         {allow.has('position') ? (
@@ -50,41 +71,71 @@ export function PositionGroup(props: {
                                 options={['static', 'relative', 'absolute', 'fixed', 'sticky']}
                                 onChange={(v) => patch({ position: v })}
                             />
-                        ) : <span className="text-[11px] text-neutral-400">제한됨</span>}
+                        ) : (
+                            <span className="text-[11px] text-neutral-400">제한됨</span>
+                        )}
+                    </div>
 
+                    {/* offsets */}
+                    <div className="flex items-center gap-2">
+                        <Label>offset</Label>
+                        {(['top', 'right', 'bottom', 'left'] as const).map((k) => {
+                            const disabled = !isOffsetEnabled || !allow.has(k);
+                            return (
+                                <div key={k} className="flex items-center gap-1">
+                                    {!allow.has(k) && <DisabledHint reason={dis(k)!} />}
+                                    <MiniInput
+                                        value={(el as any)[k]}
+                                        onChange={(v) => patch({ [k]: coerceLen(v) })}
+                                        placeholder={k}
+                                        disabled={disabled}
+                                        title={isOffsetEnabled ? k : 'position이 static일 때는 사용 불가'}
+                                    />
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* zIndex */}
+                    <div className="flex items-center gap-2">
                         <Label>zIndex</Label>
                         {!allow.has('zIndex') && <DisabledHint reason={dis('zIndex')!} />}
                         {allow.has('zIndex') ? (
                             <MiniInput
-                                value={el['zIndex'] as string | number | undefined}
+                                value={(el as any).zIndex}
                                 onChange={(v) => {
-                                    const n = typeof v === 'number' ? v : Number(String(v));
-                                    patch({ zIndex: Number.isFinite(n) ? n : undefined });
+                                    const n = Number(v);
+                                    patch({ zIndex: Number.isFinite(n) ? n : v });
                                 }}
-                                placeholder="0"
+                                placeholder="auto | 10"
                             />
-                        ) : <span className="text-[11px] text-neutral-400">제한됨</span>}
+                        ) : (
+                            <span className="text-[11px] text-neutral-400">제한됨</span>
+                        )}
                     </div>
 
-                    <div className="flex items-center gap-2 mt-1">
-                        <Label>offset</Label>
-                        {(['top','right','bottom','left'] as const).map((k) => (
-                            <div key={k} className="flex items-center gap-1">
-                                {!allow.has(k) && <DisabledHint reason={dis(k)!} />}
-                                {allow.has(k) ? (
-                                    <MiniInput
-                                        value={el[k] as string | number | undefined}
-                                        onChange={(v) => patch({ [k]: isStatic ? undefined : coerceLen(v) })}
-                                        placeholder={k}
-                                        disabled={isStatic}
-                                    />
-                                ) : <span className="text-[11px] text-neutral-400">제한</span>}
-                            </div>
-                        ))}
-                    </div>
+                    {/* overflow axis */}
+                    <div className="flex items-center gap-2">
+                        <Label>overflow-x / y</Label>
+                        {!allow.has('overflowX') && <DisabledHint reason={dis('overflowX')!} />}
+                        {allow.has('overflowX') ? (
+                            <MiniSelect
+                                value={(el as any).overflowX as string | undefined}
+                                options={overflowOptions}
+                                onChange={(v) => patch({ overflowX: v })}
+                            />
+                        ) : <span className="text-[11px] text-neutral-400">제한</span>}
 
-                    {isStatic && <div className="text-[11px] text-neutral-500 mt-1">position:static에서는 offset을 설정할 수 없습니다.</div>}
-                </>
+                        {!allow.has('overflowY') && <DisabledHint reason={dis('overflowY')!} />}
+                        {allow.has('overflowY') ? (
+                            <MiniSelect
+                                value={(el as any).overflowY as string | undefined}
+                                options={overflowOptions}
+                                onChange={(v) => patch({ overflowY: v })}
+                            />
+                        ) : <span className="text-[11px] text-neutral-400">제한</span>}
+                    </div>
+                </div>
             )}
         </section>
     );
