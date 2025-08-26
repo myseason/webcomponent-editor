@@ -1,8 +1,29 @@
 'use client';
 
+/**
+ * TypographyGroup
+ * - 레포 표준 인터페이스(el/patch/tag/tagPolicy/tf/map/expert/open/onToggle)
+ * - 허용 키 필터: useAllowed
+ * - 제한 시 배지: DisabledHint
+ * - lucide 아이콘은(원본 기준) 본 그룹에서는 사용하지 않음 — LayoutGroup에서 아이콘 사용
+ */
+
 import React from 'react';
-import type { CSSDict, InspectorFilter, TagPolicy, TagPolicyMap } from '../../../../core/types';
-import { ColorField, Label, MiniInput, ChipBtn, DisabledHint, useAllowed, DisallowReason } from './common';
+import type {
+    CSSDict,
+    InspectorFilter,
+    TagPolicy,
+    TagPolicyMap,
+} from '../../../../core/types';
+import {
+    ColorField,
+    Label,
+    MiniInput,
+    ChipBtn,
+    DisabledHint,
+    useAllowed,
+    type DisallowReason,
+} from './common';
 
 export function TypographyGroup(props: {
     el: Record<string, unknown>;
@@ -16,8 +37,17 @@ export function TypographyGroup(props: {
     onToggle: () => void;
 }) {
     const { el, patch, tag, tf, map, expert, tagPolicy, open, onToggle } = props;
-    const allow = useAllowed(['color', 'fontSize', 'fontWeight', 'textAlign'], tf, tag, map, expert);
 
+    // 허용 키(원본과 동일)
+    const allow = useAllowed(
+        ['color', 'fontSize', 'fontWeight', 'textAlign'],
+        tf,
+        tag,
+        map,
+        expert
+    );
+
+    // 제한 사유 계산(원본과 동일한 로직)
     const dis = (k: string): DisallowReason => {
         if (tagPolicy?.styles?.allow && !tagPolicy.styles.allow.includes(k)) return 'tag';
         if (tagPolicy?.styles?.deny && tagPolicy.styles.deny.includes(k)) return 'tag';
@@ -28,56 +58,94 @@ export function TypographyGroup(props: {
         return null;
     };
 
-    const fw = String(el.fontWeight ?? '');
-    const ta = String(el.textAlign ?? '');
+    const fw = String((el as any).fontWeight ?? '');
+    const ta = String((el as any).textAlign ?? '');
 
     return (
-        <div className="border-t border-neutral-200 pt-3 mt-3">
-            <button type="button" className="w-full text-left text-[12px] uppercase tracking-wide text-neutral-500 mb-2 flex items-center gap-2" onClick={onToggle}>
-                <span className="inline-block w-3">{open ? '▾' : '▸'}</span><span>Typography</span>
-            </button>
+        <section className="mt-3">
+            <div
+                className="flex items-center justify-between text-xs font-semibold text-neutral-700 cursor-pointer select-none"
+                onClick={onToggle}
+            >
+                <span>{open ? '▾' : '▸'} Typography</span>
+            </div>
 
             {open && (
-                <div className="grid grid-cols-2 gap-2">
-                    <div className="col-span-2">
-                        <Label>color {!allow.has('color') && <DisabledHint reason={dis('color')!} />}</Label>
+                <div className="mt-1 space-y-2">
+                    {/* color */}
+                    <div className="flex items-center gap-2">
+                        <Label>color</Label>
+                        {!allow.has('color') && <DisabledHint reason={dis('color')!} />}
                         {allow.has('color') ? (
-                            <ColorField value={el.color as string | undefined} onChange={(v) => patch({ color: v })} />
-                        ) : <div className="text-[12px] text-neutral-400">제한됨</div>}
+                            <ColorField
+                                value={(el as any)['color'] as string | undefined}
+                                onChange={(v) => patch({ color: v })}
+                            />
+                        ) : (
+                            <span className="text-[11px] text-neutral-400">제한됨</span>
+                        )}
                     </div>
 
-                    <div>
-                        <Label>fontSize {!allow.has('fontSize') && <DisabledHint reason={dis('fontSize')!} />}</Label>
+                    {/* fontSize */}
+                    <div className="flex items-center gap-2">
+                        <Label>fontSize</Label>
+                        {!allow.has('fontSize') && <DisabledHint reason={dis('fontSize')!} />}
                         {allow.has('fontSize') ? (
-                            <MiniInput value={el.fontSize as string | number | undefined} onChange={(v) => patch({ fontSize: v })} />
-                        ) : <div className="text-[12px] text-neutral-400">제한됨</div>}
+                            <MiniInput
+                                value={(el as any)['fontSize'] as string | number | undefined}
+                                onChange={(v) => patch({ fontSize: v })}
+                                placeholder="14 | 14px | 1rem"
+                            />
+                        ) : (
+                            <span className="text-[11px] text-neutral-400">제한됨</span>
+                        )}
                     </div>
 
-                    <div>
-                        <Label>fontWeight {!allow.has('fontWeight') && <DisabledHint reason={dis('fontWeight')!} />}</Label>
+                    {/* fontWeight(레포 그대로: Regular/Bold Chip) */}
+                    <div className="flex items-center gap-2">
+                        <Label>fontWeight</Label>
+                        {!allow.has('fontWeight') && <DisabledHint reason={dis('fontWeight')!} />}
                         {allow.has('fontWeight') ? (
-                            <div className="grid grid-cols-2 gap-1">
-                                {['400','700'].map((w) => (
-                                    <ChipBtn key={w} title={w} onClick={() => patch({ fontWeight: w })} active={fw === w}>
+                            <div className="flex gap-1">
+                                {(['400', '700'] as const).map((w) => (
+                                    <ChipBtn
+                                        key={w}
+                                        title={w === '400' ? 'Regular' : 'Bold'}
+                                        onClick={() => patch({ fontWeight: w })}
+                                        active={fw === w}
+                                    >
                                         {w === '400' ? 'Regular' : 'Bold'}
                                     </ChipBtn>
                                 ))}
                             </div>
-                        ) : <div className="text-[12px] text-neutral-400">제한됨</div>}
+                        ) : (
+                            <span className="text-[11px] text-neutral-400">제한됨</span>
+                        )}
                     </div>
 
-                    <div>
-                        <Label>textAlign {!allow.has('textAlign') && <DisabledHint reason={dis('textAlign')!} />}</Label>
+                    {/* textAlign(레포 그대로: left/center/right Chip) */}
+                    <div className="flex items-center gap-2">
+                        <Label>textAlign</Label>
+                        {!allow.has('textAlign') && <DisabledHint reason={dis('textAlign')!} />}
                         {allow.has('textAlign') ? (
-                            <div className="grid grid-cols-3 gap-1">
-                                {['left','center','right'].map((a) => (
-                                    <ChipBtn key={a} title={a} onClick={() => patch({ textAlign: a })} active={ta === a}>{a}</ChipBtn>
+                            <div className="flex gap-1">
+                                {(['left', 'center', 'right'] as const).map((a) => (
+                                    <ChipBtn
+                                        key={a}
+                                        title={a}
+                                        onClick={() => patch({ textAlign: a })}
+                                        active={ta === a}
+                                    >
+                                        {a}
+                                    </ChipBtn>
                                 ))}
                             </div>
-                        ) : <div className="text-[12px] text-neutral-400">제한됨</div>}
+                        ) : (
+                            <span className="text-[11px] text-neutral-400">제한됨</span>
+                        )}
                     </div>
                 </div>
             )}
-        </div>
+        </section>
     );
 }

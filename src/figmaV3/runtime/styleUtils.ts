@@ -2,9 +2,8 @@ import type { CSSDict } from '../core/types';
 import type { CSSProperties } from 'react';
 
 /** 숫자 형태로 다뤄도 안전한 속성 세트(문자열 단위도 허용은 그대로 유지) */
-const NUMERIC_PROPS = new Set<string>([
-    'opacity', 'zIndex', 'fontWeight', 'lineHeight',
-    'flexGrow', 'flexShrink', 'order',
+const NUMERIC_PROPS = new Set([
+    'opacity', 'zIndex', 'fontWeight', 'lineHeight', 'flexGrow', 'flexShrink', 'order',
     'gap', 'rowGap', 'columnGap',
     'width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight',
     'top', 'left', 'right', 'bottom',
@@ -22,6 +21,23 @@ export function isNumericString(s: string): boolean {
     return /^-?\d+(\.\d+)?$/.test(s.trim());
 }
 
+/**
+ * ✅ 공용 길이 보정 유틸
+ * - 단위 없는 단일 토큰: number 로 캐스팅(px로 해석)
+ * - 단위 포함/다중 토큰(shorthand): string 유지
+ * - 빈 문자열/undefined: undefined 반환(스타일 제거 용도)
+ */
+export function coerceLen(raw: string | number | undefined): string | number | undefined {
+    if (raw === '' || raw === undefined) return undefined;
+    if (typeof raw === 'number') return raw;
+    const s = String(raw).trim();
+    if (!s) return undefined;
+    if (/\s/.test(s)) return s;          // "8px 16px"
+    if (/[a-z%]+$/i.test(s)) return s;   // "8px", "1rem", "50%"
+    const n = Number(s);
+    return Number.isFinite(n) ? n : s;   // "8" -> 8 (number)
+}
+
 /** 렌더 직전에 CSSDict → React 인라인 스타일로 정규화 */
 export function toReactStyle(src?: CSSDict): CSSProperties {
     const out: Record<string, unknown> = {};
@@ -29,7 +45,6 @@ export function toReactStyle(src?: CSSDict): CSSProperties {
 
     for (const [k, v] of Object.entries(src)) {
         if (v === undefined || v === null) continue;
-
         const camel = kebabToCamel(k);
         let val: unknown = v;
 
@@ -42,7 +57,6 @@ export function toReactStyle(src?: CSSDict): CSSProperties {
                 val = s;
             }
         }
-
         out[camel] = val;
     }
     return out as CSSProperties;
@@ -54,7 +68,6 @@ export function normalizeStylePatch(patch?: CSSDict): CSSDict {
     const out: CSSDict = {};
     for (const [k, v] of Object.entries(patch)) {
         if (v === undefined || v === null) continue;
-
         const camel = kebabToCamel(k);
         if (typeof v === 'string') {
             const s = v.trim();

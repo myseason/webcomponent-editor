@@ -1,37 +1,74 @@
 'use client';
 
 import React from 'react';
-import type { InspectorFilter, TagPolicy, TagPolicyMap, CSSDict } from '../../../../core/types';
-import { filterStyleKeysByTemplateAndTag } from '../../../../runtime/capabilities';
+import type {
+    InspectorFilter,
+    TagPolicy,
+    TagPolicyMap,
+    CSSDict,
+} from '../../../../core/types';
+import {
+    filterStyleKeysByTemplateAndTag,
+} from '../../../../runtime/capabilities';
+
+/* ────────────────────────────────────────────────────
+ * 공통 레이아웃 컴포넌트
+ * ──────────────────────────────────────────────────── */
 
 export const Section: React.FC<{
-    title: string; open: boolean; onToggle: () => void; children: React.ReactNode;
+    title: string;
+    open: boolean;
+    onToggle: () => void;
+    children: React.ReactNode;
 }> = ({ title, open, onToggle, children }) => (
-    <div className="border-t border-neutral-200 pt-3 mt-3">
-        <button type="button" className="w-full text-left text-[12px] uppercase tracking-wide text-neutral-500 mb-2 flex items-center gap-2" onClick={onToggle}>
-            <span className="inline-block w-3">{open ? '▾' : '▸'}</span><span>{title}</span>
-        </button>
-        {open && <div className="space-y-2">{children}</div>}
-    </div>
+    <section className="mt-3">
+        <div
+            className="flex items-center justify-between text-xs font-semibold text-neutral-700 cursor-pointer select-none"
+            onClick={onToggle}
+        >
+            <span>{open ? '▾' : '▸'} {title}</span>
+        </div>
+        {open && <div className="mt-1">{children}</div>}
+    </section>
 );
 
 export const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="text-[12px] text-neutral-600">{children}</div>
+    <span className="text-xs text-neutral-600 w-24 select-none">{children}</span>
 );
 
 export const DisabledHint: React.FC<{ reason: 'template' | 'tag' }> = ({ reason }) => (
-    <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-neutral-500">
+    <span
+        className="text-[10px] px-1 py-0.5 rounded border border-neutral-200 text-neutral-500"
+        title={reason === 'tag' ? 'TagPolicy에 의해 제한' : 'Template 필터에 의해 제한'}
+    >
     {reason === 'tag' ? '⛔ TagPolicy' : '▣ Template'}
   </span>
 );
 
+/* ────────────────────────────────────────────────────
+ * 폼 위젯
+ * ──────────────────────────────────────────────────── */
+
 export const MiniInput: React.FC<{
-    value: string | number | undefined; onChange: (v: string) => void; placeholder?: string;
-}> = ({ value, onChange, placeholder }) => (
-    <input className="w-full px-2 py-1 border rounded text-[12px]"
-           value={value === undefined ? '' : String(value)}
-           onChange={(e) => onChange(e.target.value)}
-           placeholder={placeholder} />
+    value: string | number | undefined;
+    onChange: (v: string) => void;  // 입력 원문을 부모가 적절히 파싱/보정(coerceLen 등)
+    placeholder?: string;
+    disabled?: boolean;
+    title?: string;
+    className?: string;
+}> = ({ value, onChange, placeholder, disabled, title, className }) => (
+    <input
+        type="text"
+        value={value === undefined ? '' : String(value)}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        title={title}
+        className={
+            `border rounded px-2 py-1 text-sm w-28 ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ` +
+            (className ?? '')
+        }
+    />
 );
 
 export const NumberInput: React.FC<{
@@ -40,16 +77,14 @@ export const NumberInput: React.FC<{
     step?: number;
     min?: number;
     max?: number;
-    className?: string; // ➕ 추가
-}> = ({ value, onChange, step = 1, min, max, className }) => (
+    className?: string; // 확장
+    disabled?: boolean;
+    title?: string;
+}> = ({ value, onChange, step = 1, min, max, className, disabled, title }) => (
     <input
         type="number"
         step={step}
-        min={min}
-        max={max}
-        // grid col-span을 직접 줄 수 있게 className 전달 가능
-        className={['w-full px-2 py-1 border rounded text-[12px]', className].filter(Boolean).join(' ')}
-        value={typeof value === 'number' && Number.isFinite(value) ? value : ''}
+        value={Number.isFinite(value ?? NaN) ? (value as number) : 0}
         onChange={(e) => {
             const n = Number(e.target.value);
             if (Number.isNaN(n)) return onChange(NaN);
@@ -58,61 +93,124 @@ export const NumberInput: React.FC<{
             if (typeof max === 'number') v = Math.min(max, v);
             onChange(v);
         }}
+        disabled={disabled}
+        title={title}
+        className={`border rounded px-2 py-1 text-sm w-24 ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className ?? ''}`}
     />
 );
 
 export const MiniSelect: React.FC<{
-    value: string | undefined; options: string[]; onChange: (v: string) => void;
-}> = ({ value, options, onChange }) => (
-    <select className="w-full px-2 py-1 border rounded text-[12px]"
-            value={value === undefined ? '' : value}
-            onChange={(e) => onChange(e.target.value)}>
-        {value === undefined && <option value="">(unset)</option>}
-        {options.map((op) => <option key={op} value={op}>{op}</option>)}
+    value: string | undefined;
+    options: string[];
+    onChange: (v: string) => void;
+    disabled?: boolean;
+    title?: string;
+    className?: string;
+}> = ({ value, options, onChange, disabled, title, className }) => (
+    <select
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        title={title}
+        className={`border rounded px-2 py-1 text-sm ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className ?? ''}`}
+    >
+        {value === undefined && <option value="">{'(unset)'}</option>}
+        {options.map((op) => (
+            <option key={op} value={op}>
+                {op}
+            </option>
+        ))}
     </select>
 );
 
 export const ChipBtn: React.FC<{
-    active?: boolean; disabled?: boolean; title: string; onClick: () => void; children: React.ReactNode;
+    active?: boolean;
+    disabled?: boolean;
+    title: string;
+    onClick: () => void;
+    children: React.ReactNode;
 }> = ({ active, disabled, title, onClick, children }) => (
-    <button type="button" title={title} onClick={onClick} disabled={disabled}
-            className={[
-                'text-[11px] px-2 py-1 rounded border',
-                active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50',
-                disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
-            ].join(' ')}>
+    <button
+        type="button"
+        title={title}
+        onClick={onClick}
+        disabled={disabled}
+        className={[
+            'px-2 py-0.5 text-xs rounded border',
+            active ? 'bg-neutral-800 text-white border-neutral-900' : 'hover:bg-neutral-50 border-neutral-200',
+            disabled ? 'opacity-50 cursor-not-allowed' : '',
+        ].join(' ')}
+    >
         {children}
     </button>
 );
 
 /** 아이콘 버튼(아이콘 자리에 children) */
 export const IconBtn: React.FC<{
-    active?: boolean; title: string; onClick: () => void; children: React.ReactNode; disabled?: boolean;
+    active?: boolean;
+    title: string;
+    onClick: () => void;
+    children: React.ReactNode;
+    disabled?: boolean;
 }> = ({ active, title, onClick, children, disabled }) => (
-    <button type="button" title={title} onClick={onClick} disabled={disabled}
-            className={[
-                'p-1.5 rounded border',
-                active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50',
-                disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
-            ].join(' ')}>
+    <button
+        type="button"
+        title={title}
+        onClick={onClick}
+        disabled={disabled}
+        className={[
+            'h-7 w-7 inline-flex items-center justify-center rounded border',
+            active ? 'bg-neutral-800 text-white border-neutral-900' : 'hover:bg-neutral-50 border-neutral-200',
+            disabled ? 'opacity-50 cursor-not-allowed' : '',
+        ].join(' ')}
+    >
         {children}
     </button>
 );
 
 /** 컬러 피커 + 텍스트 동기화 */
-export const ColorField: React.FC<{ value: string | undefined; onChange: (v: string) => void; }> = ({ value, onChange }) => {
-    const isHex = typeof value === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
+export const ColorField: React.FC<{
+    value: string | undefined;
+    onChange: (v: string) => void;
+    disabled?: boolean;
+    title?: string;
+}> = ({ value, onChange, disabled, title }) => {
+    const isHex =
+        typeof value === 'string' &&
+        /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
     const safeHex = isHex ? (value as string) : '#000000';
     return (
         <div className="flex items-center gap-2">
-            <input type="color" className="w-8 h-8 border rounded" value={safeHex} onChange={(e) => onChange(e.target.value)} />
-            <MiniInput value={value} onChange={onChange} placeholder="#ffffff or rgba(...)" />
+            <input
+                type="color"
+                value={safeHex}
+                onChange={(e) => onChange(e.target.value)}
+                disabled={disabled}
+                title={title}
+            />
+            <input
+                type="text"
+                value={value ?? ''}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder="#000000"
+                disabled={disabled}
+                title={title}
+                className={`border rounded px-2 py-1 text-sm w-28 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            />
         </div>
     );
 };
 
+/* ────────────────────────────────────────────────────
+ * 허용/제한 판단 유틸
+ * ──────────────────────────────────────────────────── */
+
 export type DisallowReason = 'template' | 'tag' | null;
 
+/**
+ * 템플릿(Filter) → 태그 정책 순으로 keys 필터링하여 허용 set 반환
+ * - 전문가 모드(expert=true)면 템플릿 필터는 무시(표시 UX 전용)
+ */
 export function useAllowed(
     keys: string[],
     tf: InspectorFilter | undefined,
@@ -127,6 +225,7 @@ export function useAllowed(
     );
 }
 
+/** 단일 키에 대해 제한 사유 계산(배지용) */
 export function reasonForKey(
     key: string,
     tagPolicy: TagPolicy | undefined,

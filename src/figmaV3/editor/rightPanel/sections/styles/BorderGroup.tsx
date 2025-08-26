@@ -1,8 +1,9 @@
 'use client';
-
 import React from 'react';
 import type { CSSDict, InspectorFilter, TagPolicy, TagPolicyMap } from '../../../../core/types';
-import { useAllowed, Label, MiniInput, DisabledHint, DisallowReason } from './common';
+import { useAllowed, Label, MiniInput, DisabledHint, type DisallowReason } from './common';
+
+import { coerceLen } from '../../../../runtime/styleUtils';
 
 export function BorderGroup(props: {
     el: Record<string, unknown>;
@@ -29,32 +30,38 @@ export function BorderGroup(props: {
     };
 
     return (
-        <div className="border-t border-neutral-200 pt-3 mt-3">
-            <button type="button" className="w-full text-left text-[12px] uppercase tracking-wide text-neutral-500 mb-2 flex items-center gap-2" onClick={onToggle}>
-                <span className="inline-block w-3">{open ? '▾' : '▸'}</span>
-                <span>Border</span>
-            </button>
+        <section className="mt-3">
+            <div className="flex items-center justify-between text-xs font-semibold text-neutral-700 cursor-pointer select-none" onClick={onToggle}>
+                <span>{open ? '▾' : '▸'} Border</span>
+            </div>
 
             {open && (
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <Label>border {!allow.has('border') && <DisabledHint reason={dis('border')!} />}</Label>
+                <div className="mt-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                        <Label>border</Label>
+                        {!allow.has('border') && <DisabledHint reason={dis('border')!} />}
                         {allow.has('border') ? (
-                            <MiniInput value={el.border as string | number | undefined} onChange={(v) => patch({ border: v })} />
-                        ) : (
-                            <div className="text-[12px] text-neutral-400">제한됨</div>
-                        )}
+                            <MiniInput
+                                value={el['border'] as string | number | undefined}
+                                onChange={(v) => patch({ border: v })}   // border는 문자열(shorthand) 사용
+                                placeholder="1px solid #000"
+                            />
+                        ) : <span className="text-[11px] text-neutral-400">제한됨</span>}
                     </div>
-                    <div>
-                        <Label>borderRadius {!allow.has('borderRadius') && <DisabledHint reason={dis('borderRadius')!} />}</Label>
+
+                    <div className="flex items-center gap-2">
+                        <Label>borderRadius</Label>
+                        {!allow.has('borderRadius') && <DisabledHint reason={dis('borderRadius')!} />}
                         {allow.has('borderRadius') ? (
-                            <MiniInput value={el.borderRadius as string | number | undefined} onChange={(v) => patch({ borderRadius: v })} />
-                        ) : (
-                            <div className="text-[12px] text-neutral-400">제한됨</div>
-                        )}
+                            <MiniInput
+                                value={el['borderRadius'] as string | number | undefined}
+                                onChange={(v) => patch({ borderRadius: coerceLen(v) })}  // ← 숫자 보정
+                                placeholder="8 | 8px"
+                            />
+                        ) : <span className="text-[11px] text-neutral-400">제한됨</span>}
                     </div>
                 </div>
             )}
-        </div>
+        </section>
     );
 }
