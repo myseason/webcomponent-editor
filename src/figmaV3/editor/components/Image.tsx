@@ -1,8 +1,9 @@
 'use client';
+
 /**
  * Image
- * - src가 빈 문자열("")이면 <img src=""> 경고를 피하기 위해 undefined로 치환
- * - 기존 레지스트리 등록/스키마 패턴을 유지
+ * - src가 빈 문자열("")이면 undefined로 치환하여 브라우저의 재요청 경고 방지
+ * - 스타일은 node.styles.element를 그대로 host(img)에 적용
  */
 
 import React from 'react';
@@ -20,12 +21,7 @@ export const ImageDef: ComponentDefinition<ImageProps> = {
     defaults: {
         props: { src: '', alt: '' },
         styles: {
-            element: {
-                display: 'block',
-                width: 200,
-                height: 120,
-                objectFit: 'cover',
-            },
+            element: { display: 'block', width: 200, height: 120, objectFit: 'cover' },
         },
     },
     propsSchema: [
@@ -36,17 +32,14 @@ export const ImageDef: ComponentDefinition<ImageProps> = {
 
 export function ImageRender({ node }: { node: Node<ImageProps> }) {
     const style = (node.styles?.element ?? {}) as React.CSSProperties;
-
-    // 안전 추출
     const rawSrc = (node.props as Record<string, unknown>).src;
     const rawAlt = (node.props as Record<string, unknown>).alt;
 
-    // "" → undefined 로 치환하여 브라우저 재요청 경고 방지
+    // "" → undefined 로 치환
     const src = typeof rawSrc === 'string' && rawSrc.trim().length > 0 ? rawSrc : undefined;
-    const alt = typeof rawAlt === 'string' ? rawAlt : '';
+    const alt = typeof rawAlt === 'string' ? rawAlt : undefined;
 
     return <img style={style} src={src} alt={alt} />;
 }
 
-// 등록
-register(ImageDef, ImageRender as any);
+register(ImageDef, ImageRender);

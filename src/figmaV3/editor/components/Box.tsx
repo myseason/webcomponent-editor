@@ -1,28 +1,48 @@
 'use client';
+
 /**
- * Box: 기본 컨테이너 컴포넌트
- * - display:flex, flexDirection:column 의 기본 스타일을 defaults에 반영
- * - children 렌더는 Canvas 쪽에서 처리(재귀 렌더)
+ * Box: 컨테이너 컴포넌트
+ * - host 요소(Tag)에 스타일 적용
+ * - 원하는 위치에서 renderChildren(slot?) 호출하여 자식 배치
  */
-import React from 'react';
-import type { ComponentDefinition, Node } from '../../core/types';
+
+import React, {JSX} from 'react';
+import type { ComponentDefinition, Node, NodePropsWithMeta } from '../../core/types';
 import { register } from '../../core/registry';
 
 type BoxProps = Record<string, unknown>;
+
 export const BoxDef: ComponentDefinition<BoxProps> = {
     id: 'box',
     title: 'Box',
     defaults: {
         props: {},
-        styles: { element: { display: 'flex', flexDirection: 'column', width: 320, height: 40 }, },
+        styles: {
+            element: { display: 'flex', flexDirection: 'column', width: 320, minHeight: 40 },
+        },
     },
     propsSchema: [],
 };
 
-export function BoxRender({ node }: { node: Node }) {
+export function BoxRender({
+                              node,
+                              renderChildren,
+                          }: {
+    node: Node<BoxProps>;
+    renderChildren?: (slotId?: string) => React.ReactNode;
+}) {
     const style = (node.styles?.element ?? {}) as React.CSSProperties;
-    return <div style={style} data-node={node.id} />;
+
+    // Common meta: __tag 지원 (허용 태그는 TagPolicy에서 관리)
+    const p = (node.props as NodePropsWithMeta) ?? {};
+    const Tag = (p.__tag as keyof JSX.IntrinsicElements) ?? 'div';
+
+    return (
+        <Tag style={style}>
+            {/* 기본 단일 슬롯: 모든 직계 자식 */}
+            {renderChildren?.()}
+        </Tag>
+    );
 }
 
-// 등록
-register(BoxDef, BoxRender as any);
+register(BoxDef, BoxRender);

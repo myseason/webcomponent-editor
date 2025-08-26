@@ -1,19 +1,27 @@
 /**
- * 컴포넌트 정의(Definition) 레지스트리와
- * 에디터 렌더러(Renderer) 레지스트리를 관리합니다.
+ * 컴포넌트 정의(Definition) / 에디터 렌더러(Renderer) 레지스트리
+ * - Definition: defaults/propsSchema 등 "데이터"
+ * - Renderer: 에디터에서 실제 React 렌더 (UI 레이어)
  *
- * - 정의(Definition): defaults/propsSchema 등 "데이터"
- * - 렌더러(Renderer): 실제 React 렌더 함수(에디터 UI 레이어 소속)
- *
- * SSOT 타입은 core/types.ts만을 사용합니다.
+ * ✅ SSOT: 타입은 반드시 core/types.ts 만 import
  */
-import type { ComponentDefinition } from './types';
-import {JSX} from "react";
+
+import React from 'react';
+import type { ComponentDefinition, Node, SupportedEvent } from './types';
+
+/**
+ * 에디터용 렌더러 시그니처
+ * - fire(evt): Actions/Flows 트리거
+ * - renderChildren(slotId?): 컴포넌트가 자식이 들어갈 위치(슬롯)를 스스로 결정
+ *   (slotId 미사용 컴포넌트는 renderChildren?.() 호출)
+ */
+export type Renderer = (args: {
+    node: Node<Record<string, unknown>>;
+    fire?: (evt: SupportedEvent) => void;
+    renderChildren?: (slotId?: string) => React.ReactNode;
+}) => React.ReactNode;
 
 type DefinitionMap = Record<string, ComponentDefinition>;
-// 렌더러는 UI 레이어에 있으나, 타입 의존을 최소화하기 위해 함수 시그니처만 명시
-// (핵심: SSOT 타입만 import)
-type Renderer = (args: { node: import('./types').Node; fire?: (evt: import('./types').SupportedEvent) => void }) => JSX.Element | null;
 type RendererMap = Record<string, Renderer>;
 
 const definitions: DefinitionMap = Object.create(null);
