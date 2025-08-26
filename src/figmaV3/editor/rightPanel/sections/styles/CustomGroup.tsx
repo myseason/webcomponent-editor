@@ -104,12 +104,12 @@ export function CustomGroup(props: {
                     </div>
 
                     {/* key/value 추가 입력 */}
-                    <div className="mt-2 grid grid-cols-5 gap-2 items-center">
+                    <div className="mt-2 grid grid-cols-8 gap-2 items-center">
                         <Label>key</Label>
-                        <input className="col-span-1 px-2 py-1 border rounded text-[12px]" value={k} onChange={(e) => setK(e.target.value)} placeholder="css-key" />
+                        <input className="col-span-2 px-2 py-1 border rounded text-[12px]" value={k} onChange={(e) => setK(e.target.value)} placeholder="css-key" />
                         <Label>value</Label>
                         <input className="col-span-2 px-2 py-1 border rounded text-[12px]" value={v} onChange={(e) => setV(e.target.value)} placeholder="value" />
-                        <button type="button" className="px-2 py-1 border rounded text-[12px]" onClick={onAdd}>
+                        <button type="button" className="col-span-2 px-2 py-1 border rounded text-[12px]" onClick={onAdd}>
                             Add
                         </button>
                     </div>
