@@ -1,13 +1,7 @@
 'use client';
 
-/**
- * Text
- * - host 요소(SPAN)를 반드시 반환
- * - content는 머스태시 바인딩 지원
- */
-
-import React from 'react';
-import type { ComponentDefinition, Node } from '../../core/types';
+import React, {JSX} from 'react';
+import type { ComponentDefinition, Node, NodePropsWithMeta } from '../../core/types';
 import { register } from '../../core/registry';
 import { getBoundProps } from '../../runtime/binding';
 
@@ -15,22 +9,45 @@ interface TextProps extends Record<string, unknown> {
     content?: string;
 }
 
-export const TextDef: ComponentDefinition<TextProps> = {
+export const TextDef: ComponentDefinition = {
     id: 'text',
     title: 'Text',
     defaults: {
-        props: { content: '텍스트' },
-        styles: { element: { fontSize: 14 } },
+        props: { content: 'Enter text here' },
+        styles: {
+            // ✅ [수정] 기본 스타일을 'base' 뷰포트 객체로 감쌌습니다.
+            element: {
+                base: {
+                    fontSize: 14
+                }
+            }
+        }
     },
-    propsSchema: [{ key: 'content', type: 'text', label: 'Text', placeholder: '내용을 입력' }],
+    propsSchema: [{ key: 'content', type: 'text', label: 'Text', placeholder: 'Enter content' }],
 };
 
-export function TextRender({ node }: { node: Node<TextProps> }) {
-    const p = getBoundProps(node.props, { data: {}, node, project: null }) as TextProps;
-    const content = String(p.content ?? '');
-    // ✅ SPAN 반환
-    return <span>{content}</span>;
+function toReactDomAttrs(raw?: Record<string, unknown>): Record<string, unknown> {
+    if (!raw) return {};
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(raw)) {
+        if (k === 'class') out.className = v;
+        else if (k === 'for') out.htmlFor = v;
+        else if (k === 'readonly') out.readOnly = v;
+        else if (k === 'tabindex') out.tabIndex = v as number;
+        else out[k] = v;
+    }
+    return out;
 }
 
-// 등록
+export function TextRender({ node }: { node: Node }) {
+    const pMeta = (node.props as NodePropsWithMeta) ?? {};
+    const Tag = ((pMeta.__tag as string) || 'span') as keyof JSX.IntrinsicElements;
+
+    const p = getBoundProps(node.props, { data: {}, node, project: null }) as TextProps;
+    const content = String(p.content ?? '');
+
+    const attrs = toReactDomAttrs(pMeta.__tagAttrs as Record<string, unknown> | undefined);
+    return React.createElement(Tag, attrs, content);
+}
+
 register(TextDef, TextRender as any);

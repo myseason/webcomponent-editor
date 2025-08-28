@@ -8,15 +8,12 @@ import type {
     FlowEdge,
     CSSDict,
     StyleBase,
+    Viewport,
+    EditorUI,
 } from '../core/types';
 import { filterStyleKeysByTag } from '../runtime/capabilities';
 
-/**
- * 초기 상태(빈 프로젝트)
- * - Home 페이지 1개
- * - 루트 노드(box)
- */
-const initialProject: EditorState['project'] = {
+const initialProject: Project = {
     pages: [{ id: 'page_home', name: 'Home', rootId: 'node_root_home', slug: '/' }],
     fragments: [],
     nodes: {
@@ -24,8 +21,10 @@ const initialProject: EditorState['project'] = {
             id: 'node_root_home',
             componentId: 'box',
             props: {},
-            styles: { element: {} },
+            styles: { element: { base: { minHeight: '100vh' } } },
             children: [],
+            isVisible: true,
+            locked: false,
         },
     },
     rootId: 'node_root_home',
@@ -34,505 +33,308 @@ const initialProject: EditorState['project'] = {
 const initialState: EditorState = {
     project: initialProject,
     ui: {
+        // Global
         selectedId: null,
-        canvasWidth: 640,
-        overlays: [], // 프래그먼트 오버레이 스택
-        // bottomRight는 optional. Inspector/BottomDock에서 필요 시 update로 생성해 씁니다.
-        // bottomRight: { open: false, kind: 'None', widthPct: 36 },
+        mode: 'Page',
+        expertMode: false,
+        overlays: [],
+        // Canvas
+        canvas: {
+            width: 1280,
+            activeViewport: 'base',
+        },
+        // Panels
+        panels: {
+            left: {
+                tab: 'Composer',
+                widthPx: 320,
+                splitPct: 60,
+                explorerPreview: null,
+            },
+            right: {
+                widthPx: 420,
+            },
+            bottom: {
+                heightPx: 240,
+                right: 240,
+                advanced: null,
+                isCollapsed: false,
+            },
+        },
     },
     data: {},
     settings: {},
     flowEdges: {},
 };
 
-/** 액션 타입(빌더/UI에서 사용) */
 type EditorActions = {
-    /** 얕은 복사 기반 상태 갱신 (Immer 미사용) */
     update: (fn: (draft: EditorState) => void) => void;
-
-    /** 선택 노드 변경 */
     select: (id: NodeId | null) => void;
-
-    /** 부모 노드 조회 */
     getParentOf: (id: NodeId) => NodeId | null;
-
-    /** 노드 추가(부모 끝에) */
     addByDef: (defId: string, parentId?: string) => NodeId;
-
-    /** 노드 추가(부모의 index 위치) */
     addByDefAt: (defId: string, parentId: string, index: number) => NodeId;
-
-    /** 노드 얕은 패치(표준 시그니처) */
-    patchNode: (
-        id: NodeId,
-        patch: Partial<Node<Record<string, unknown>, StyleBase>>
-    ) => void;
-
-    /** props 병합 업데이트(표준 시그니처) */
+    patchNode: (id: NodeId, patch: Partial<Node>) => void;
     updateNodeProps: (id: NodeId, props: Record<string, unknown>) => void;
-
-    /** styles.element 병합 업데이트(표준 시그니처) */
-    updateNodeStyles: (id: NodeId, styles: { element?: CSSDict }) => void;
-
-    /** 페이지 전환(현재 rootId 변경) */
+    updateNodeStyles: (id: NodeId, styles: CSSDict, viewport: Viewport) => void;
     selectPage: (pageId: string) => void;
-
-    /** 페이지 추가/삭제 */
     addPage: (name?: string) => string;
     removePage: (pageId: string) => void;
-
-    /** 프래그먼트 추가/삭제 */
     addFragment: (name?: string) => string;
     removeFragment: (fragmentId: string) => void;
-
-    /** 플로우 엣지 관리 */
     addFlowEdge: (edge: FlowEdge) => string;
     updateFlowEdge: (edgeId: string, patch: Partial<FlowEdge>) => void;
     removeFlowEdge: (edgeId: string) => void;
-
-    /** 데이터/설정 */
     setData: (path: string, value: unknown) => void;
     setSetting: (path: string, value: unknown) => void;
-
-    /** 오버레이(프래그먼트) 스택 제어 */
     openFragment: (fragmentId: string) => void;
     closeFragment: (fragmentId?: string) => void;
-
-    /** 레지스트리 defaults를 현재 노드들에 주입(없는 키만 보강) */
     hydrateDefaults: () => void;
+    setActiveViewport: (viewport: Viewport) => void;
+    moveNode: (nodeId: NodeId, newParentId: NodeId, newIndex: number) => void;
+    toggleNodeVisibility: (nodeId: NodeId) => void;
+    toggleNodeLock: (nodeId: NodeId) => void;
+    toggleBottomDock: () => void; // ✅ [추가] 새로운 액션 타입
+
 };
 
-/** 스토어가 내보내는 상태 + 액션 (useEditor의 반환 타입) */
 export type EditorStoreState = EditorState & EditorActions;
 
-/** 간단 키 생성기(SSR 렌더 중 호출 금지) */
 let _seq = 0;
-const genId = (prefix: string): string => `${prefix}_${++_seq}`;
+const genId = (prefix: string): string => `${prefix}_${Date.now().toString(36)}_${++_seq}`;
 
-/** 레지스트리 defaults를 반영해 새 노드를 구성 */
 function buildNodeWithDefaults(defId: string, id: string): Node {
     const def = getDefinition(defId);
     const defProps = (def?.defaults?.props ?? {}) as Record<string, unknown>;
-
-    // styles 기본은 element 안/밖 어느 형태든 허용적으로 병합
-    const defStylesRaw = (def?.defaults?.styles ?? {}) as Record<string, unknown>;
-    const defElem =
-        ((defStylesRaw as any).element as CSSDict | undefined) ??
-        (defStylesRaw as CSSDict);
+    const defStylesRaw = (def?.defaults?.styles?.element ?? {}) as Partial<Record<Viewport, CSSDict>>;
 
     return {
         id,
         componentId: defId,
         props: { ...defProps },
-        styles: { element: { ...(defElem ?? {}) } },
+        styles: { element: { base: { ...(defStylesRaw.base ?? {}) } } },
         children: [],
+        isVisible: true,
+        locked: false,
     };
 }
 
-// 부모 찾기(빠름/간단): project.nodes를 순회해서 childId를 포함한 노드 검색
 function findParentId(p: Project, childId: NodeId): NodeId | null {
-    for (const nid of Object.keys(p.nodes)) {
-        const n = p.nodes[nid]!;
-        if (n.children && n.children.includes(childId)) return nid;
+    for (const nid in p.nodes) {
+        if (p.nodes[nid]?.children?.includes(childId)) return nid;
     }
     return null;
 }
 
-/** 해당 defId가 컨테이너인지 판정 (Box는 강제 컨테이너 허용) */
 function isContainerDef(defId: string): boolean {
     const def = getDefinition(defId);
     return def?.capabilities?.canHaveChildren === true || defId === 'box';
 }
 
-/**
- * 현재 위치(desiredParent)에서 가장 가까운 "컨테이너(Box) 조상"을 선택.
- * - desiredParent가 비어있으면 root부터 시작
- * - 컨테이너를 못 찾으면 root 반환
- */
-function chooseValidParentId(
-    p: Project,
-    desiredParent: NodeId | null | undefined,
-    fallbackRoot: NodeId
-): NodeId {
-    let cur: NodeId =
-        desiredParent && p.nodes[desiredParent] ? desiredParent : fallbackRoot;
+function chooseValidParentId(p: Project, desiredParent: NodeId | null | undefined, fallbackRoot: NodeId): NodeId {
+    let curId: NodeId = desiredParent && p.nodes[desiredParent] ? desiredParent : fallbackRoot;
+    let current = p.nodes[curId];
+    if (!current) return fallbackRoot;
 
-    // cur가 컨테이너면 즉시 OK
-    if (isContainerDef(p.nodes[cur]!.componentId)) return cur;
+    if (isContainerDef(current.componentId)) return curId;
 
-    // 위로 타고 올라가며 컨테이너를 찾는다
     let guard = 0;
     while (guard++ < 1024) {
-        const parent = findParentId(p, cur);
-        if (!parent) break;
-        if (isContainerDef(p.nodes[parent]!.componentId)) return parent;
-        cur = parent;
+        const parentId = findParentId(p, curId);
+        if (!parentId) break;
+        const parent = p.nodes[parentId];
+        if (parent && isContainerDef(parent.componentId)) return parentId;
+        curId = parentId;
     }
-    // 그래도 못 찾으면 root 보장
-    return fallbackRoot;
+    return isContainerDef(p.nodes[curId]!.componentId) ? curId : fallbackRoot;
 }
 
-/**
- * editorStore
- * - Zustand vanilla store
- */
 export const editorStore: StoreApi<EditorStoreState> = createStore(
     (set, get) => {
-        /** 내부 헬퍼: 상태 필드만 교체(액션은 유지) */
-        const replaceState = (next: EditorState) =>
-            set((prev: EditorStoreState) => ({ ...prev, ...next }));
-
         const update: EditorActions['update'] = (fn) => {
             const cur = get();
-
-            // draft는 EditorState만 얕은 복사 (배열/객체 수준)
-            const draft: EditorState = {
-                project: {
-                    ...cur.project,
-                    pages: [...cur.project.pages],
-                    fragments: [...cur.project.fragments],
-                    nodes: { ...cur.project.nodes },
-                    rootId: cur.project.rootId,
-                },
-                ui: {
-                    ...cur.ui,
-                    overlays: [...(cur.ui.overlays ?? [])],
-                    // bottomRight는 optional일 수 있으므로 얕은 복사 시 존재하면 펼침
-                    bottomRight: (cur.ui as EditorState['ui']).bottomRight
-                        ? { ...(cur.ui as EditorState['ui']).bottomRight }
-                        : undefined,
-                } as EditorState['ui'],
-                data: { ...cur.data },
-                settings: { ...cur.settings },
-                flowEdges: { ...cur.flowEdges },
-            };
-
+            // Use a safe deep copy for state manipulation to avoid mutation issues.
+            const draft: EditorState = JSON.parse(JSON.stringify(cur));
             fn(draft);
-            replaceState(draft);
+            set(draft);
         };
 
-        const getParentOf: EditorActions['getParentOf'] = (id) => {
-            const nodes = get().project.nodes;
-            for (const node of Object.values(nodes) as Node[]) {
-                if ((node.children ?? []).includes(id)) return node.id;
-            }
-            return null;
-        };
+        const select: EditorActions['select'] = (id) => update(s => { s.ui.selectedId = id; });
+
+        const getParentOf: EditorActions['getParentOf'] = (id) => findParentId(get().project, id);
 
         const addByDef: EditorActions['addByDef'] = (defId, parentId) => {
             const newId = genId(`node_${defId}`);
-            update((s: EditorState) => {
-                const p = s.project;
-
-                // 노드 맵 얕은 복사 + 새 노드 생성
-                const nodes = { ...p.nodes };
-                nodes[newId] = buildNodeWithDefaults(defId, newId);
-
-                // ✅ parent 선택 로직: 지정 → 선택된 노드 → root
-                const desired = parentId ?? s.ui.selectedId ?? p.rootId;
-                // ✅ 컨테이너 보정(가장 가까운 Box 조상)
-                const parentKey = chooseValidParentId(p, desired, p.rootId);
-                const parent = nodes[parentKey]!;
-
-                // ✅ 부모 노드 객체 자체를 교체(참조 변경 보장)
-                const nextChildren = [...(parent.children ?? []), newId];
-                nodes[parentKey] = { ...parent, children: nextChildren };
-
-                s.project = { ...p, nodes };
-                // UX: 방금 추가한 노드 선택
-                s.ui = { ...s.ui, selectedId: newId };
+            update(s => {
+                const desired = parentId ?? s.ui.selectedId ?? s.project.rootId;
+                const parentKey = chooseValidParentId(s.project, desired, s.project.rootId);
+                const parent = s.project.nodes[parentKey];
+                if(parent) {
+                    const newNode = buildNodeWithDefaults(defId, newId);
+                    s.project.nodes[newId] = newNode;
+                    parent.children = [...(parent.children ?? []), newId];
+                    s.ui.selectedId = newId;
+                }
             });
             return newId;
         };
 
         const addByDefAt: EditorActions['addByDefAt'] = (defId, parentId, index) => {
             const newId = genId(`node_${defId}`);
-            update((s: EditorState) => {
-                const p = s.project;
-
-                const nodes = { ...p.nodes };
-                nodes[newId] = buildNodeWithDefaults(defId, newId);
-
-                // ✅ 인자로 온 parentId가 컨테이너가 아닐 수 있으므로 보정
-                const desired = parentId ?? s.ui.selectedId ?? p.rootId;
-                const parentKey = chooseValidParentId(p, desired, p.rootId);
-                const parent = nodes[parentKey]!;
-
-                const children = [...(parent.children ?? [])];
-                const clamped = Math.max(0, Math.min(index, children.length));
-                children.splice(clamped, 0, newId);
-
-                nodes[parentKey] = { ...parent, children };
-                s.project = { ...p, nodes };
-                s.ui = { ...s.ui, selectedId: newId };
+            update(s => {
+                const parentKey = chooseValidParentId(s.project, parentId, s.project.rootId);
+                const parent = s.project.nodes[parentKey];
+                if(parent) {
+                    const newNode = buildNodeWithDefaults(defId, newId);
+                    s.project.nodes[newId] = newNode;
+                    const children = [...(parent.children ?? [])];
+                    children.splice(index, 0, newId);
+                    parent.children = children;
+                    s.ui.selectedId = newId;
+                }
             });
             return newId;
         };
 
-        const patchNode: EditorActions['patchNode'] = (id, patch) => {
-            update((s: EditorState) => {
-                const node = s.project.nodes[id];
-                if (!node) return;
+        const patchNode: EditorActions['patchNode'] = (id, patch) => update(s => {
+            if (s.project.nodes[id]) {
+                Object.assign(s.project.nodes[id]!, patch);
+            }
+        });
 
-                if (
-                    id === s.project.rootId &&
-                    (patch as { id?: NodeId }).id &&
-                    (patch as { id?: NodeId }).id !== id
-                ) {
-                    throw new Error('루트 노드 id 변경 금지');
-                }
+        const updateNodeProps: EditorActions['updateNodeProps'] = (id, props) => update(s => {
+            const node = s.project.nodes[id];
+            if (node) {
+                node.props = { ...node.props, ...props };
+            }
+        });
 
-                s.project.nodes = {
-                    ...s.project.nodes,
-                    [id]: { ...node, ...patch },
-                };
-            });
-        };
+        const updateNodeStyles: EditorActions['updateNodeStyles'] = (id, styles, viewport) => update(s => {
+            const node = s.project.nodes[id];
+            if (!node) return;
 
-        const updateNodeProps: EditorActions['updateNodeProps'] = (id, props) => {
-            update((s: EditorState) => {
-                const node = s.project.nodes[id];
-                if (!node) return;
+            const tag = (node.props as any).__tag ?? 'div';
+            const allowed = filterStyleKeysByTag(tag, Object.keys(styles), s.project.tagPolicies);
+            const picked = Object.fromEntries(Object.entries(styles).filter(([k]) => allowed.includes(k)));
 
-                s.project.nodes = {
-                    ...s.project.nodes,
-                    [id]: { ...node, props: { ...(node.props as Record<string, unknown>), ...props } },
-                };
-            });
-        };
+            if (!node.styles.element) node.styles.element = {};
+            node.styles.element[viewport] = { ...(node.styles.element[viewport] ?? {}), ...picked };
+        });
 
-        const updateNodeStyles: EditorActions['updateNodeStyles'] = (id, styles) => {
-            update((s) => {
-                const node = s.project.nodes[id];
-                if (!node) return;
+        const selectPage: EditorActions['selectPage'] = (pageId) => update(s => {
+            const page = s.project.pages.find(p => p.id === pageId);
+            if (page) s.project.rootId = page.rootId;
+        });
 
-                // 태그 결정: Common meta __tag 없으면 'div'
-                const tag = ((node.props as Record<string, unknown>).__tag as string | undefined) ?? 'div';
-
-                // 들어온 element 스타일 키/값 추출
-                const incoming = Object.entries(styles.element ?? {}) as [
-                    string,
-                        string | number | undefined
-                ][];
-
-                // 태그 정책으로 키 필터
-                const allowedKeys = filterStyleKeysByTag(
-                    tag,
-                    incoming.map(([k]) => k),
-                    s.project.tagPolicies
-                );
-
-                const picked: CSSDict = {};
-                for (const [k, v] of incoming) {
-                    if (allowedKeys.includes(k)) picked[k] = v;
-                }
-
-                const prev = node.styles ?? { element: {} };
-                s.project.nodes = {
-                    ...s.project.nodes,
-                    [id]: {
-                        ...node,
-                        styles: { ...prev, element: { ...(prev.element ?? {}), ...picked } },
-                    },
-                };
-            });
-        };
-
-        const selectPage: EditorActions['selectPage'] = (pageId) => {
-            update((s: EditorState) => {
-                const page = s.project.pages.find((p) => p.id === pageId);
-                if (!page) throw new Error(`페이지 없음: ${pageId}`);
-                s.project = { ...s.project, rootId: page.rootId };
-            });
-        };
-
-        // addPage (루트 박스도 기본값으로)
         const addPage: EditorActions['addPage'] = (name) => {
-            const id = genId('page');
+            const pageId = genId('page');
             const rootId = genId('node_root');
-            const root = buildNodeWithDefaults('box', rootId);
-            (root.styles.element as Record<string, unknown>) = {
-                ...(root.styles.element ?? {}),
-                width: '100%',
-                minHeight: 600,
-            };
-
-            update((s: EditorState) => {
-                s.project = {
-                    ...s.project,
-                    pages: [...s.project.pages, { id, name: name ?? 'Page', rootId, slug: undefined }],
-                    nodes: {
-                        ...s.project.nodes,
-                        // ✅ box 기본값 적용
-                        [rootId]: root,
-                    },
-                };
+            update((s) => {
+                const rootNode = buildNodeWithDefaults('box', rootId);
+                s.project.nodes[rootId] = rootNode;
+                s.project.pages.push({ id: pageId, name: name ?? `Page ${s.project.pages.length + 1}`, rootId, slug: `/${name?.toLowerCase().replace(/\s+/g, '-') ?? `page-${s.project.pages.length + 1}`}` });
             });
-            return id;
+            return pageId;
         };
 
-        const removePage: EditorActions['removePage'] = (pageId) => {
-            update((s: EditorState) => {
-                const idx = s.project.pages.findIndex((p) => p.id === pageId);
-                if (idx < 0) return;
-                const page = s.project.pages[idx]!;
-                if (s.project.rootId === page.rootId)
-                    throw new Error('현재 표시 중인 페이지는 삭제할 수 없습니다');
+        const removePage: EditorActions['removePage'] = (pageId) => update(s => {
+            if (s.project.pages.length <= 1) return;
+            s.project.pages = s.project.pages.filter(p => p.id !== pageId);
+        });
 
-                s.project = {
-                    ...s.project,
-                    pages: s.project.pages.filter((p) => p.id !== pageId),
-                };
-                // NOTE: 필요 시 nodes GC
-            });
-        };
-
-        // addFragment (루트 박스도 기본값으로)
         const addFragment: EditorActions['addFragment'] = (name) => {
-            const id = genId('fragment');
+            const fragId = genId('fragment');
             const rootId = genId('frag_root');
-            const root = buildNodeWithDefaults('box', rootId);
-            (root.styles.element as Record<string, unknown>) = {
-                ...(root.styles.element ?? {}),
-                width: '100%',
-                minHeight: 600,
-            };
-
-            update((s: EditorState) => {
-                s.project = {
-                    ...s.project,
-                    fragments: [...s.project.fragments, { id, name: name ?? 'Fragment', rootId }],
-                    nodes: {
-                        ...s.project.nodes,
-                        // ✅ box 기본값 적용
-                        [rootId]: root,
-                    },
-                };
+            update((s) => {
+                const rootNode = buildNodeWithDefaults('box', rootId);
+                s.project.nodes[rootId] = rootNode;
+                s.project.fragments.push({ id: fragId, name: name ?? `Fragment ${s.project.fragments.length + 1}`, rootId });
             });
-            return id;
+            return fragId;
         };
 
-        const removeFragment: EditorActions['removeFragment'] = (fragmentId) => {
-            update((s: EditorState) => {
-                s.project = {
-                    ...s.project,
-                    fragments: s.project.fragments.filter((f) => f.id !== fragmentId),
-                };
-            });
-        };
+        const removeFragment: EditorActions['removeFragment'] = (fragmentId) => update(s => {
+            s.project.fragments = s.project.fragments.filter(f => f.id !== fragmentId);
+        });
 
         const addFlowEdge: EditorActions['addFlowEdge'] = (edge) => {
             const id = genId('flow');
-            update((s: EditorState) => {
-                s.flowEdges = { ...s.flowEdges, [id]: { ...edge, id } };
-            });
+            update(s => { s.flowEdges[id] = { ...edge, id }; });
             return id;
         };
 
-        const updateFlowEdge: EditorActions['updateFlowEdge'] = (edgeId, patch) => {
-            update((s: EditorState) => {
-                const prev = s.flowEdges[edgeId];
-                if (!prev) return;
-                s.flowEdges = { ...s.flowEdges, [edgeId]: { ...prev, ...patch } };
-            });
-        };
+        const updateFlowEdge: EditorActions['updateFlowEdge'] = (edgeId, patch) => update(s => {
+            if (s.flowEdges[edgeId]) {
+                Object.assign(s.flowEdges[edgeId]!, patch);
+            }
+        });
 
-        const removeFlowEdge: EditorActions['removeFlowEdge'] = (edgeId) => {
-            update((s: EditorState) => {
-                const next = { ...s.flowEdges };
-                delete next[edgeId];
-                s.flowEdges = next;
-            });
-        };
+        const removeFlowEdge: EditorActions['removeFlowEdge'] = (edgeId) => update(s => {
+            delete s.flowEdges[edgeId];
+        });
 
-        const setData: EditorActions['setData'] = (path, value) => {
-            // NOTE: 현재는 단순 키 기반. 필요시 dot-path 지원로 확장 가능.
-            update((s: EditorState) => {
-                s.data = { ...s.data, [path]: value };
-            });
-        };
+        const setData: EditorActions['setData'] = (path, value) => update(s => { s.data[path] = value; });
 
-        const setSetting: EditorActions['setSetting'] = (path, value) => {
-            update((s: EditorState) => {
-                s.settings = { ...s.settings, [path]: value };
-            });
-        };
+        const setSetting: EditorActions['setSetting'] = (path, value) => update(s => { s.settings[path] = value; });
 
-        const select: EditorActions['select'] = (id) => {
-            update((s: EditorState) => {
-                s.ui = { ...s.ui, selectedId: id };
-            });
-        };
+        const openFragment: EditorActions['openFragment'] = (fragmentId) => update(s => { s.ui.overlays.push(fragmentId); });
 
-        /** 오버레이 스택 조작 */
-        const openFragment: EditorActions['openFragment'] = (fragmentId) => {
-            update((s: EditorState) => {
-                s.ui = { ...s.ui, overlays: [...(s.ui.overlays ?? []), fragmentId] };
-            });
-        };
+        const closeFragment: EditorActions['closeFragment'] = (fragmentId) => update(s => {
+            if (fragmentId) {
+                s.ui.overlays = s.ui.overlays.filter(id => id !== fragmentId);
+            } else {
+                s.ui.overlays.pop();
+            }
+        });
 
-        const closeFragment: EditorActions['closeFragment'] = (fragmentId) => {
-            update((s: EditorState) => {
-                const overlays = [...(s.ui.overlays ?? [])];
-                if (!fragmentId) {
-                    overlays.pop();
-                } else {
-                    const idx = overlays.lastIndexOf(fragmentId);
-                    if (idx >= 0) overlays.splice(idx, 1);
+        const hydrateDefaults: EditorActions['hydrateDefaults'] = () => update(s => {
+            Object.values(s.project.nodes).forEach(node => {
+                const def = getDefinition(node.componentId);
+                if (def) {
+                    node.props = { ...def.defaults.props, ...node.props };
+                    const baseStyles = def.defaults.styles?.element?.base ?? {};
+                    if (node.styles.element) {
+                        node.styles.element.base = { ...baseStyles, ...node.styles.element.base };
+                    } else {
+                        node.styles.element = { base: baseStyles };
+                    }
                 }
-                s.ui = { ...s.ui, overlays };
+            });
+        });
+
+        const setActiveViewport: EditorActions['setActiveViewport'] = (viewport) => update(s => { s.ui.canvas.activeViewport = viewport; });
+
+        const moveNode: EditorActions['moveNode'] = (nodeId, newParentId, newIndex) => update(s => {
+            const oldParentId = findParentId(s.project, nodeId);
+            if (!oldParentId) return;
+
+            const oldParent = s.project.nodes[oldParentId]!;
+            oldParent.children = (oldParent.children ?? []).filter(id => id !== nodeId);
+
+            const newParent = s.project.nodes[newParentId]!;
+            const newChildren = [...(newParent.children ?? [])];
+            newChildren.splice(newIndex, 0, nodeId);
+            newParent.children = newChildren;
+        });
+
+        const toggleNodeVisibility: EditorActions['toggleNodeVisibility'] = (nodeId) => patchNode(nodeId, { isVisible: !(get().project.nodes[nodeId]?.isVisible ?? true) });
+
+        const toggleNodeLock: EditorActions['toggleNodeLock'] = (nodeId) => patchNode(nodeId, { locked: !get().project.nodes[nodeId]?.locked });
+
+        // ✅ [추가] 하단 패널 접힘 상태를 토글하는 액션 구현
+        const toggleBottomDock: EditorActions['toggleBottomDock'] = () => {
+            update(s => {
+                s.ui.panels.bottom.isCollapsed = !s.ui.panels.bottom.isCollapsed;
             });
         };
 
-        /** 레지스트리 defaults를 현재 노드들에 주입(없는 키만 보강) */
-        const hydrateDefaults: EditorActions['hydrateDefaults'] = () => {
-            update((s: EditorState) => {
-                const nodes = { ...s.project.nodes };
-                for (const id of Object.keys(nodes)) {
-                    const n = nodes[id] as Node;
-                    const def = getDefinition(n.componentId);
-                    if (!def) continue;
 
-                    const defProps = (def.defaults?.props ?? {}) as Record<string, unknown>;
-                    const defStylesRaw = (def.defaults?.styles ?? {}) as Record<string, unknown>;
-                    const defElem =
-                        ((defStylesRaw as any).element as CSSDict | undefined) ??
-                        (defStylesRaw as CSSDict);
-                    const curElem = (n.styles?.element ?? {}) as CSSDict;
-
-                    const mergedProps = { ...defProps, ...(n.props as Record<string, unknown>) };
-                    const mergedStyles = { element: { ...(defElem ?? {}), ...curElem } };
-
-                    nodes[id] = { ...n, props: mergedProps, styles: mergedStyles };
-                }
-                s.project = { ...s.project, nodes };
-            });
-        };
-
-        // 반환: 상태 + 액션
         return {
             ...initialState,
-            update,
-            select,
-            getParentOf,
-            addByDef,
-            addByDefAt,
-            patchNode,
-            updateNodeProps,
-            updateNodeStyles,
-            selectPage,
-            addPage,
-            removePage,
-            addFragment,
-            removeFragment,
-            addFlowEdge,
-            updateFlowEdge,
-            removeFlowEdge,
-            setData,
-            setSetting,
-            openFragment,
-            closeFragment,
-            hydrateDefaults,
+            update, select, getParentOf, addByDef, addByDefAt, patchNode,
+            updateNodeProps, updateNodeStyles, selectPage, addPage, removePage,
+            addFragment, removeFragment, addFlowEdge, updateFlowEdge, removeFlowEdge,
+            setData, setSetting, openFragment, closeFragment, hydrateDefaults,
+            setActiveViewport, moveNode, toggleNodeVisibility, toggleNodeLock,toggleBottomDock,
         };
     }
 );

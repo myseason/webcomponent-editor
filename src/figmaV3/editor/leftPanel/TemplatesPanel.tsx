@@ -5,15 +5,15 @@
  * - query로 id/title/defId 매칭 필터링
  *
  * 규칙
- *  - any 금지
- *  - 훅 최상위
- *  - 얕은 복사 update()
+ * - any 금지
+ * - 훅 최상위
+ * - 얕은 복사 update()
  */
 
 import React from 'react';
 import { listDefinitions, getDefinition } from '../../core/registry';
 import { useEditor } from '../useEditor';
-import type { CSSDict } from '../../core/types';
+import type { CSSDict, EditorState } from '../../core/types';
 
 type TemplateLite = {
     id: string;
@@ -38,10 +38,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 export function TemplatesPanel({ query = '' }: { query?: string }) {
     const state = useEditor();
 
-    // Base component 목록(신규 템플릿 작성용)
     const defs = listDefinitions();
 
-    // Project Templates (우선) → 없으면 settings.templates
     const projectTemplates = state.project.templates
         ? Object.values(state.project.templates).map((t) => ({
             id: t.id,
@@ -69,7 +67,6 @@ export function TemplatesPanel({ query = '' }: { query?: string }) {
         );
     });
 
-    // 삽입: Template(props/styles 병합)
     const insertTemplate = (tpl: TemplateLite) => {
         const parent = state.ui.selectedId ?? state.project.rootId;
         const nodeId = state.addByDef(tpl.defId, parent);
@@ -77,11 +74,11 @@ export function TemplatesPanel({ query = '' }: { query?: string }) {
             state.updateNodeProps(nodeId, { ...tpl.props });
         }
         if (tpl.styles?.element && Object.keys(tpl.styles.element).length) {
-            state.updateNodeStyles(nodeId, { element: { ...tpl.styles.element } });
+            // ✅ [수정] updateNodeStyles 호출 시 세 번째 인자로 'base' 뷰포트를 전달합니다.
+            state.updateNodeStyles(nodeId, { ...tpl.styles.element }, 'base');
         }
     };
 
-    // 신규 작성 폼
     const [openNew, setOpenNew] = React.useState(false);
     const [baseDef, setBaseDef] = React.useState('');
     const [title, setTitle] = React.useState('');
@@ -94,9 +91,10 @@ export function TemplatesPanel({ query = '' }: { query?: string }) {
         const node = state.project.nodes[nid];
         if (!node) return {};
         if (node.componentId !== baseDef) return {};
+        // ✅ [수정] 반응형 구조에 맞게 'base' 뷰포트의 스타일을 캡처합니다.
         return {
             props: { ...node.props },
-            styles: node.styles?.element ? { element: { ...(node.styles.element as CSSDict) } } : undefined,
+            styles: node.styles?.element?.base ? { element: { ...(node.styles.element.base as CSSDict) } } : undefined,
         };
     };
 
@@ -110,19 +108,16 @@ export function TemplatesPanel({ query = '' }: { query?: string }) {
         const id = `tpl_${baseDef}_${Date.now().toString(36)}`;
         const snap = captureSnapshot();
 
-        state.update((s) => {
+        state.update((s: EditorState) => {
             const prev = (s.settings['templates'] as Record<string, TemplateLite> | undefined) ?? {};
-            s.settings = {
-                ...s.settings,
-                templates: {
-                    ...prev,
-                    [id]: {
-                        id,
-                        defId: baseDef,
-                        title: name,
-                        ...(snap.props ? { props: snap.props } : {}),
-                        ...(snap.styles ? { styles: snap.styles } : {}),
-                    },
+            s.settings['templates'] = {
+                ...prev,
+                [id]: {
+                    id,
+                    defId: baseDef,
+                    title: name,
+                    ...(snap.props ? { props: snap.props } : {}),
+                    ...(snap.styles ? { styles: snap.styles } : {}),
                 },
             };
         });
@@ -133,29 +128,28 @@ export function TemplatesPanel({ query = '' }: { query?: string }) {
     };
 
     const removeTemplate = (tplId: string) => {
-        state.update((s) => {
+        state.update((s: EditorState) => {
             const prev = (s.settings['templates'] as Record<string, TemplateLite> | undefined) ?? {};
             const next = { ...prev };
             delete next[tplId];
-            s.settings = { ...s.settings, templates: next };
+            s.settings['templates'] = next;
         });
     };
 
     const renameTemplate = (tplId: string, nextTitle: string) => {
-        state.update((s) => {
+        state.update((s: EditorState) => {
             const prev = (s.settings['templates'] as Record<string, TemplateLite> | undefined) ?? {};
             const cur = prev[tplId];
             if (!cur) return;
-            s.settings = {
-                ...s.settings,
-                templates: { ...prev, [tplId]: { ...cur, title: nextTitle } },
+            s.settings['templates'] = {
+                ...prev,
+                [tplId]: { ...cur, title: nextTitle },
             };
         });
     };
 
     return (
         <div className="space-y-3">
-            {/* 신규 템플릿 작성 토글 */}
             <div className="flex items-center justify-between">
                 <SectionTitle>Templates</SectionTitle>
                 <button
@@ -176,7 +170,7 @@ export function TemplatesPanel({ query = '' }: { query?: string }) {
                             value={baseDef}
                             onChange={(e) => setBaseDef(e.target.value)}
                         >
-                            <option value="">선택...</option>
+                            <option value="">Select...</option>
                             {defs.map((d) => (
                                 <option key={d.id} value={d.id}>
                                     {d.title} ({d.id})
@@ -201,7 +195,7 @@ export function TemplatesPanel({ query = '' }: { query?: string }) {
                             checked={captureFromNode}
                             onChange={(e) => setCaptureFromNode(e.target.checked)}
                         />
-                        현재 선택 노드의 props/styles를 캡처(동일 컴포넌트일 때만)
+                        Capture props/styles from selected node
                     </label>
 
                     <div>
@@ -212,7 +206,6 @@ export function TemplatesPanel({ query = '' }: { query?: string }) {
                 </div>
             )}
 
-            {/* 템플릿 목록 */}
             <div className="space-y-2">
                 <SectionTitle>Project Templates</SectionTitle>
                 {templates.length === 0 ? (
@@ -239,7 +232,7 @@ export function TemplatesPanel({ query = '' }: { query?: string }) {
                                         </button>
                                         <button
                                             type="button"
-                                            className="text-[12px] px-2 py-1 border rounded"
+                                            className="text-[12px] px-2 py-1 border rounded text-red-600"
                                             onClick={() => removeTemplate(t.id)}
                                             title="Delete template"
                                         >

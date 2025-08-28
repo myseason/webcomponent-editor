@@ -1,13 +1,7 @@
 'use client';
 
-/**
- * Button: host 요소를 반드시 반환해야 한다.
- * - props: as(button|a|div|span), content, href(when as='a')
- * - onClick → fire('onClick')
- */
-
 import React, {JSX} from 'react';
-import type { ComponentDefinition, Node, SupportedEvent } from '../../core/types';
+import type { ComponentDefinition, Node, SupportedEvent, NodePropsWithMeta } from '../../core/types';
 import { register } from '../../core/registry';
 import { getBoundProps } from '../../runtime/binding';
 
@@ -17,13 +11,20 @@ interface ButtonProps extends Record<string, unknown> {
     href?: string;
 }
 
-export const ButtonDef: ComponentDefinition<ButtonProps> = {
+export const ButtonDef: ComponentDefinition = {
     id: 'button',
     title: 'Button',
     defaults: {
         props: { as: 'button', content: 'Button' },
         styles: {
-            element: { padding: '8px 12px', borderRadius: 6, border: '1px solid #e5e7eb' },
+            // ✅ [수정] 기본 스타일을 'base' 뷰포트 객체로 감쌌습니다.
+            element: {
+                base: {
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #e5e7eb'
+                }
+            }
         },
     },
     propsSchema: [
@@ -44,27 +45,40 @@ export const ButtonDef: ComponentDefinition<ButtonProps> = {
     ],
 };
 
+function toReactDomAttrs(raw?: Record<string, unknown>): Record<string, unknown> {
+    if (!raw) return {};
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(raw)) {
+        if (k === 'class') out.className = v;
+        else if (k === 'for') out.htmlFor = v;
+        else if (k === 'readonly') out.readOnly = v;
+        else if (k === 'tabindex') out.tabIndex = v as number;
+        else out[k] = v;
+    }
+    return out;
+}
+
 export function ButtonRender({
                                  node,
                                  fire,
                              }: {
-    node: Node<ButtonProps>;
+    node: Node;
     fire?: (evt: SupportedEvent) => void;
 }) {
+    const meta = (node.props as NodePropsWithMeta) ?? {};
     const p = getBoundProps(node.props, { data: {}, node, project: null }) as ButtonProps;
-
-    const Tag = (p.as ?? 'button') as keyof JSX.IntrinsicElements;
+    const Tag = ((meta.__tag as string) || p.as || 'button') as keyof JSX.IntrinsicElements;
     const onClick = fire ? () => fire('onClick') : undefined;
     const content = String(p.content ?? '');
-    const href = p.as === 'a' ? (String(p.href ?? '') || undefined) : undefined;
+    const attrs = toReactDomAttrs(meta.__tagAttrs as Record<string, unknown> | undefined);
 
-    // ✅ 반드시 실제 DOM 요소 반환
-    return (
-        <Tag onClick={onClick} href={href}>
-            {content}
-        </Tag>
-    );
+    const domProps: Record<string, unknown> = { ...attrs, onClick };
+
+    if (Tag === 'a' && typeof p.href === 'string' && p.href.trim()) {
+        domProps.href = p.href.trim();
+    }
+
+    return React.createElement(Tag, domProps, content);
 }
 
-// 등록
 register(ButtonDef, ButtonRender as any);

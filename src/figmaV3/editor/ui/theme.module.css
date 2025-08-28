@@ -1,0 +1,151 @@
+/*
+ * =======================================================================
+ * │                                                                     │
+ * │   Web Component Editor - UI Theme System (theme.module.css)         │
+ * │                                                                     │
+ * =======================================================================
+ *
+ * - CSS 변수를 사용한 다중 테마 지원 (Dark / Light)
+ * - 에디터 UI 컴포넌트에 일관된 디자인 토큰(Token) 제공
+ * - 클래스명은 'mdt_v1_' 접두사를 사용하여 전역 충돌 방지
+ */
+
+/* =======================================================================
+ * 1. Dark Theme (Default)
+ * ======================================================================= */
+.mdt_v1_dark_theme {
+    /* Color Palette */
+    --mdt-color-background: #111316;       /* 앱 전체 배경 */
+    --mdt-color-panel-primary: #1a1d21;   /* 기본 패널 배경 (좌/우) */
+    --mdt-color-panel-secondary: #24282e; /* 보조 패널 배경 (입력필드, 버튼) */
+    --mdt-color-border: #323842;          /* 구분선, 테두리 */
+    --mdt-color-border-hover: #454c59;    /* 호버 시 테두리 */
+
+    /* Text Colors */
+    --mdt-color-text-primary: #e5e7eb;    /* 주 텍스트 (제목, 본문) */
+    --mdt-color-text-secondary: #9aa3af;   /* 보조 텍스트 (라벨, 설명) */
+    --mdt-color-text-placeholder: #6b7280;/* 플레이스홀더 */
+
+    /* Accent & Semantic Colors */
+    --mdt-color-accent: #3b82f6;          /* 주요 액션, 선택 상태 */
+    --mdt-color-accent-foreground: #ffffff; /* Accent 색상 위의 텍스트 */
+    --mdt-color-success: #10b981;         /* 성공 상태 */
+    --mdt-color-warning: #f59e0b;         /* 경고 상태 */
+    --mdt-color-danger: #ef4444;          /* 위험/삭제 상태 */
+
+    /* Sizing & Spacing */
+    --mdt-size-radius: 6px;               /* 컴포넌트 둥글기 */
+    --mdt-space-xs: 4px;
+    --mdt-space-sm: 8px;
+    --mdt-space-md: 12px;
+    --mdt-space-lg: 16px;
+
+    /* Typography */
+    --mdt-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mdt-font-size-xs: 11px;
+    --mdt-font-size-sm: 12px;
+    --mdt-font-size-base: 13px;
+    --mdt-font-weight-regular: 400;
+    --mdt-font-weight-medium: 500;
+    --mdt-font-weight-semibold: 600;
+}
+
+/* =======================================================================
+ * 2. Light Theme
+ * ======================================================================= */
+.mdt_v1_light_theme {
+    /* Color Palette */
+    --mdt-color-background: #f9fafb;
+    --mdt-color-panel-primary: #ffffff;
+    --mdt-color-panel-secondary: #f3f4f6;
+    --mdt-color-border: #e5e7eb;
+    --mdt-color-border-hover: #d1d5db;
+
+    /* Text Colors */
+    --mdt-color-text-primary: #111827;
+    --mdt-color-text-secondary: #6b7280;
+    --mdt-color-text-placeholder: #9ca3af;
+
+    /* Accent & Semantic Colors */
+    --mdt-color-accent: #2563eb;
+    --mdt-color-accent-foreground: #ffffff;
+    --mdt-color-success: #059669;
+    --mdt-color-warning: #d97706;
+    --mdt-color-danger: #dc2626;
+
+    /* Sizing & Spacing (Dark와 동일, 필요시 재정의) */
+    --mdt-size-radius: 6px;
+    --mdt-space-xs: 4px;
+    --mdt-space-sm: 8px;
+    --mdt-space-md: 12px;
+    --mdt-space-lg: 16px;
+
+    /* Typography (Dark와 동일, 필요시 재정의) */
+    --mdt-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mdt-font-size-xs: 11px;
+    --mdt-font-size-sm: 12px;
+    --mdt-font-size-base: 13px;
+    --mdt-font-weight-regular: 400;
+    --mdt-font-weight-medium: 500;
+    --mdt-font-weight-semibold: 600;
+}
+
+
+/* =======================================================================
+ * 3. Common Utility Classes (Prefix 'mdt_v1_')
+ * - 컴포넌트에서 재사용 가능한 유틸리티 클래스
+ * ======================================================================= */
+
+.mdt_v1_panel_primary {
+    background-color: var(--mdt-color-panel-primary);
+    color: var(--mdt-color-text-primary);
+    border: 1px solid var(--mdt-color-border);
+}
+
+.mdt_v1_input {
+    background-color: var(--mdt-color-panel-secondary);
+    border: 1px solid var(--mdt-color-border);
+    color: var(--mdt-color-text-primary);
+    border-radius: var(--mdt-size-radius);
+    padding: var(--mdt-space-sm) var(--mdt-space-md);
+    font-size: var(--mdt-font-size-base);
+}
+
+.mdt_v1_input:focus {
+    outline: 2px solid var(--mdt-color-accent);
+    outline-offset: -1px;
+    border-color: var(--mdt-color-accent);
+}
+
+.mdt_v1_button {
+    background-color: var(--mdt-color-panel-secondary);
+    border: 1px solid var(--mdt-color-border);
+    color: var(--mdt-color-text-secondary);
+    border-radius: var(--mdt-size-radius);
+    padding: var(--mdt-space-xs) var(--mdt-space-md);
+    font-size: var(--mdt-font-size-sm);
+    font-weight: var(--mdt-font-weight-medium);
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.mdt_v1_button:hover {
+    border-color: var(--mdt-color-border-hover);
+    color: var(--mdt-color-text-primary);
+}
+
+.mdt_v1_button_accent {
+    background-color: var(--mdt-color-accent);
+    color: var(--mdt-color-accent-foreground);
+    border-color: var(--mdt-color-accent);
+}
+
+.mdt_v1_button_accent:hover {
+    opacity: 0.9;
+    border-color: var(--mdt-color-accent);
+    color: var(--mdt-color-accent-foreground);
+}
+
+.mdt_v1_divider {
+    border-top: 1px solid var(--mdt-color-border);
+}
