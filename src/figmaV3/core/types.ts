@@ -218,6 +218,9 @@ export interface EditorUI {
     // --- Center Panel (Canvas) ---
     canvas: {
         width: number;
+        height: number; // ✅ [추가] 캔버스 세로 높이
+        zoom: number;
+        orientation: 'portrait' | 'landscape'; // ✅ [추가] 가로/세로 모드
         activeViewport: Viewport;
     };
 
@@ -251,6 +254,10 @@ export interface EditorState {
     data: Record<string, unknown>;
     settings: Record<string, unknown>;
     flowEdges: Record<string, FlowEdge>;
+    history: {
+        past: Project[];
+        future: Project[];
+    };
 }
 
 // =======================================================================

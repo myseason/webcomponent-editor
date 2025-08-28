@@ -42,7 +42,6 @@ function getResponsiveStyles(node: Node, activeViewport: Viewport): React.CSSPro
     if (activeViewport === 'tablet') {
         merged = { ...merged, ...tabletStyle };
     } else if (activeViewport === 'mobile') {
-        // Mobile inherits tablet styles, which inherit base styles
         merged = { ...merged, ...tabletStyle, ...mobileStyle };
     }
 
@@ -51,8 +50,8 @@ function getResponsiveStyles(node: Node, activeViewport: Viewport): React.CSSPro
 
 function RenderNode({ id, state }: { id: NodeId; state: EditorStoreState }) {
     const node = state.project.nodes[id];
-    if (!node || (node.isVisible === false)) {
-        return null; // Do not render if not visible
+    if (!node || node.isVisible === false) {
+        return null;
     }
 
     const renderer = getRenderer(node.componentId);
@@ -64,7 +63,6 @@ function RenderNode({ id, state }: { id: NodeId; state: EditorStoreState }) {
         if (whenExpr && !evalWhenExpr(whenExpr, { data: state.data, node, project: state.project })) {
             return;
         }
-
         const steps = (bag?.[evt]?.steps ?? []) as ActionStep[];
         void runActions(steps, {
             alert: (msg) => alert(msg),
@@ -79,7 +77,6 @@ function RenderNode({ id, state }: { id: NodeId; state: EditorStoreState }) {
             },
             emit: () => {},
         });
-
         findEdges(state, node.id, evt).forEach((edge) => {
             if (checkWhen(edge, state)) {
                 applyEdge(edge, {
@@ -113,7 +110,6 @@ function RenderNode({ id, state }: { id: NodeId; state: EditorStoreState }) {
         const isVoid = hostName ? VOID_ELEMENTS.has(hostName) : false;
         const isNonContainer = hostName ? NON_CONTAINER_HOSTS.has(hostName) : false;
         const isContainer = node.componentId === 'box';
-
         let outlineClass = '';
         if (selected) outlineClass = ' outline outline-2 outline-blue-500 outline-offset-[-1px]';
         if (node.locked) outlineClass += ' ring-2 ring-red-500 ring-inset';
@@ -121,63 +117,58 @@ function RenderNode({ id, state }: { id: NodeId; state: EditorStoreState }) {
         const nextStyle: React.CSSProperties = { ...(prev.style ?? {}), ...styleFromNode };
         const nextClass = (prev.className ?? '') + outlineClass;
         const nextOnClick = chainClick(prev.onClick, onSelect);
-
         const finalProps = { ...prev, style: nextStyle, className: nextClass, onClick: nextOnClick, 'data-node-id': id };
 
         if (!isContainer || isVoid || isNonContainer) {
             return <>{React.cloneElement(el, finalProps)}{childrenFromTree}</>;
         }
-
         return React.cloneElement(el, finalProps, <>{prev.children}{childrenFromTree}</>);
     }
 
     return (
-        <div data-node-id={id} onClick={onSelect} style={styleFromNode}>
+        <div data-node-id={id} onClick={onSelect} className={selected ? 'outline outline-2 outline-sky-500/60' : ''} style={styleFromNode}>
             {hostNode}
             {childrenFromTree}
         </div>
     );
 }
 
+
 export function Canvas() {
     const state = useEditor();
-    const rootId = state.project.rootId;
-    const { activeViewport } = state.ui.canvas;
-
-    const boardWidth = activeViewport === 'mobile' ? 375 : activeViewport === 'tablet' ? 768 : state.ui.canvas.width;
-    const boardMinHeight = 800;
+    const { rootId } = state.project;
+    const { width: canvasWidth, height: canvasHeight, zoom } = state.ui.canvas;
 
     const hostRef = React.useRef<HTMLDivElement | null>(null);
     const shadowRef = React.useRef<ShadowRoot | null>(null);
     const rootElRef = React.useRef<HTMLElement | null>(null);
+    const [, setForceUpdate] = React.useState({});
 
     React.useLayoutEffect(() => {
-        if (!hostRef.current || shadowRef.current) return;
+        if (hostRef.current && !shadowRef.current) {
+            const sr = hostRef.current.attachShadow({ mode: 'open' });
+            shadowRef.current = sr;
 
-        const sr = hostRef.current.attachShadow({ mode: 'open' });
-        shadowRef.current = sr;
+            const baseStyle = document.createElement('style');
+            baseStyle.textContent = `
+                :host, .wcd-canvas-root { all: initial; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+                .wcd-canvas-root { display: block; width: 100%; height: 100%; }
+                * { box-sizing: border-box; }
+            `;
+            sr.appendChild(baseStyle);
 
-        const baseStyle = document.createElement('style');
-        baseStyle.textContent = `
-            :host, .wcd-canvas-root { all: initial; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-            .wcd-canvas-root { display: block; min-height: 100%; }
-            * { box-sizing: border-box; }
-        `;
-        sr.appendChild(baseStyle);
+            const root = document.createElement('div');
+            root.className = 'wcd-canvas-root';
+            sr.appendChild(root);
+            rootElRef.current = root;
 
-        const root = document.createElement('div');
-        root.className = 'wcd-canvas-root';
-        sr.appendChild(root);
-        rootElRef.current = root;
-
-        // This is a workaround to ensure re-renders happen inside the portal target
-        set((s) => ({ ...s }));
+            setForceUpdate({});
+        }
     }, []);
 
     React.useEffect(() => {
         const sr = shadowRef.current;
         if (!sr) return;
-
         Array.from(sr.querySelectorAll('link[data-wcd], style[data-wcd]')).forEach(el => el.remove());
 
         const sheets = state.project.stylesheets?.filter(s => s.enabled) ?? [];
@@ -197,21 +188,32 @@ export function Canvas() {
         }
     }, [state.project.stylesheets]);
 
-    // Dummy state to force re-render after shadow root is created
-    const [, set] = React.useState({});
-
     return (
-        <div className="w-full h-full overflow-auto bg-neutral-200 p-8">
+        <div className="w-full h-full overflow-auto bg-neutral-200 p-8 flex items-start justify-center">
             <div
-                className="min-h-full mx-auto my-8 bg-white shadow-lg relative transition-all duration-300"
-                style={{ width: boardWidth, minHeight: boardMinHeight }}
-                onClick={() => state.select(null)}
+                className="transition-transform duration-100"
+                style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
             >
-                <div ref={hostRef} className="absolute inset-0" />
-                {rootElRef.current && createPortal(
-                    <RenderNode id={rootId} state={state} />,
-                    rootElRef.current
-                )}
+                <div
+                    className="bg-white shadow-lg relative"
+                    style={{ width: canvasWidth, height: canvasHeight }}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            state.select(null);
+                        }
+                    }}
+                >
+                    {/* ✅ [수정] pointer-events-none 클래스를 추가하여 클릭 이벤트를 통과시킵니다. */}
+                    <div ref={hostRef} className="absolute inset-0 pointer-events-none" />
+                    {rootElRef.current && createPortal(
+                        // ✅ [수정] Portal 내부 렌더링 컨텐츠에 pointer-events-auto를 적용하여
+                        // 상위의 none 설정을 무시하고 다시 이벤트를 받을 수 있게 합니다.
+                        <div className="pointer-events-auto w-full h-full">
+                            <RenderNode id={rootId} state={state} />
+                        </div>,
+                        rootElRef.current
+                    )}
+                </div>
             </div>
         </div>
     );

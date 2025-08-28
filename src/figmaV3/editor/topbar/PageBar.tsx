@@ -1,76 +1,166 @@
 'use client';
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useEditor } from '../useEditor';
-import type { EditorMode, EditorState, Viewport } from '../../core/types';
-import { Monitor, Tablet, Smartphone } from 'lucide-react';
+import type { Viewport, Page } from '../../core/types';
+import { Monitor, Tablet, Smartphone, RotateCw, Plus, Minus, Undo, Redo } from 'lucide-react';
+
+const VIEWPORT_WIDTHS: Record<Viewport, { w: number, h: number }> = {
+    base: { w: 1280, h: 800 },
+    tablet: { w: 768, h: 1024 },
+    mobile: { w: 375, h: 667 },
+};
+
+const ZOOM_MIN = 0.25; // 25%
+const ZOOM_MAX = 4.0;  // 400%
+const ZOOM_STEP = 0.25; // 25%
 
 export default function PageBar() {
-    const state = useEditor();
-    const currentPage = state.project.pages.find((p) => p.rootId === state.project.rootId);
+    const {
+        project, ui, undo, redo, history,
+        setActiveViewport, setCanvasSize, setCanvasZoom, selectPage,
+        toggleCanvasOrientation
+    } = useEditor();
 
-    // ✅ [수정] 새로운 UI 구조 경로 사용
-    const { mode, expertMode } = state.ui;
-    const { activeViewport } = state.ui.canvas;
+    const currentPage = project.pages.find((p: Page) => p.rootId === project.rootId);
+    const { activeViewport, width: canvasWidth, height: canvasHeight, zoom } = ui.canvas;
 
-    const setMode = (m: EditorMode) =>
-        state.update((s: EditorState) => { s.ui.mode = m; });
+    const [localWidth, setLocalWidth] = useState(canvasWidth.toString());
+    const [localHeight, setLocalHeight] = useState(canvasHeight.toString());
+    const [localZoom, setLocalZoom] = useState(Math.round(zoom * 100).toString());
 
-    const toggleExpert = () =>
-        state.update((s: EditorState) => { s.ui.expertMode = !s.ui.expertMode; });
+    useEffect(() => { setLocalWidth(canvasWidth.toString()); }, [canvasWidth]);
+    useEffect(() => { setLocalHeight(canvasHeight.toString()); }, [canvasHeight]);
+    useEffect(() => { setLocalZoom(Math.round(zoom * 100).toString()); }, [zoom]);
 
     const setViewport = (viewport: Viewport) => {
-        state.setActiveViewport(viewport);
+        setActiveViewport(viewport);
+        setCanvasSize({ width: VIEWPORT_WIDTHS[viewport].w, height: VIEWPORT_WIDTHS[viewport].h });
+    };
+
+    const applyCanvasSize = () => {
+        const newWidth = parseInt(localWidth, 10);
+        const newHeight = parseInt(localHeight, 10);
+        if (!isNaN(newWidth) && newWidth > 0 && !isNaN(newHeight) && newHeight > 0) {
+            setCanvasSize({ width: newWidth, height: newHeight });
+        } else {
+            setLocalWidth(canvasWidth.toString());
+            setLocalHeight(canvasHeight.toString());
+        }
+    };
+
+    const handleZoom = (newZoom: number) => {
+        const clampedZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
+        setCanvasZoom(clampedZoom);
+    };
+
+    const applyZoom = () => {
+        const newZoom = parseInt(localZoom, 10);
+        if (!isNaN(newZoom)) {
+            handleZoom(newZoom / 100);
+        } else {
+            setLocalZoom(Math.round(zoom * 100).toString());
+        }
     };
 
     return (
-        <div className="h-10 px-3 flex items-center gap-3 text-sm border-b bg-white">
-            <div className="flex items-center gap-1">
-                <button
-                    className={`px-2 py-1 border rounded ${mode === 'Page' ? 'bg-gray-100 font-semibold' : ''}`}
-                    onClick={() => setMode('Page')}
-                >
-                    Page
-                </button>
-                <button
-                    className={`px-2 py-1 border rounded ${mode === 'Component' ? 'bg-gray-100 font-semibold' : ''}`}
-                    onClick={() => setMode('Component')}
-                >
-                    Component
-                </button>
-            </div>
-
-            <div className="ml-2">
-                <span className="text-gray-500">Page:</span>{' '}
+        <div className="h-10 px-4 flex items-center justify-between text-sm border-b bg-white shrink-0 text-gray-800">
+            {/* Left Section */}
+            <div className="flex items-center gap-4 flex-1">
                 <select
-                    className="border rounded px-2 py-1 bg-white"
+                    className="border rounded px-2 py-1 bg-white text-sm font-semibold"
                     value={currentPage?.id ?? ''}
-                    onChange={(e) => state.selectPage(e.target.value)}
+                    onChange={(e) => selectPage(e.target.value)}
                 >
-                    {state.project.pages.map((p) => (
+                    {project.pages.map((p: Page) => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                 </select>
+                <div className="flex items-center border-l pl-2">
+                    <button
+                        title="Undo (Ctrl+Z)"
+                        onClick={undo}
+                        disabled={history.past.length === 0}
+                        className="p-1.5 hover:bg-gray-100 rounded disabled:text-gray-300 disabled:cursor-not-allowed"
+                    >
+                        <Undo size={16} />
+                    </button>
+                    <button
+                        title="Redo (Ctrl+Y)"
+                        onClick={redo}
+                        disabled={history.future.length === 0}
+                        className="p-1.5 hover:bg-gray-100 rounded disabled:text-gray-300 disabled:cursor-not-allowed"
+                    >
+                        <Redo size={16} />
+                    </button>
+                </div>
             </div>
 
-            <div className="flex items-center gap-1 mx-auto">
-                <button title="Desktop" onClick={() => setViewport('base')} className={`p-2 rounded ${activeViewport === 'base' ? 'bg-gray-200' : 'hover:bg-gray-100'}`}>
-                    <Monitor size={16} />
-                </button>
-                <button title="Tablet" onClick={() => setViewport('tablet')} className={`p-2 rounded ${activeViewport === 'tablet' ? 'bg-gray-200' : 'hover:bg-gray-100'}`}>
-                    <Tablet size={16} />
-                </button>
-                <button title="Mobile" onClick={() => setViewport('mobile')} className={`p-2 rounded ${activeViewport === 'mobile' ? 'bg-gray-200' : 'hover:bg-gray-100'}`}>
-                    <Smartphone size={16} />
-                </button>
+            {/* Center Section */}
+            <div className="flex items-center gap-6">
+                <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded">
+                    <button title="Desktop" onClick={() => setViewport('base')} className={`p-1.5 rounded ${activeViewport === 'base' ? 'bg-white shadow-sm' : 'hover:bg-gray-200 text-gray-500'}`}>
+                        <Monitor size={16} />
+                    </button>
+                    <button title="Tablet" onClick={() => setViewport('tablet')} className={`p-1.5 rounded ${activeViewport === 'tablet' ? 'bg-white shadow-sm' : 'hover:bg-gray-200 text-gray-500'}`}>
+                        <Tablet size={16} />
+                    </button>
+                    <button title="Mobile" onClick={() => setViewport('mobile')} className={`p-1.5 rounded ${activeViewport === 'mobile' ? 'bg-white shadow-sm' : 'hover:bg-gray-200 text-gray-500'}`}>
+                        <Smartphone size={16} />
+                    </button>
+                </div>
+                <div className="flex items-center gap-1">
+                    <input
+                        type="number" className="w-14 text-center border rounded-sm px-1 py-0.5 text-xs"
+                        value={localWidth} onChange={e => setLocalWidth(e.target.value)}
+                        onBlur={applyCanvasSize} onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                    />
+                    <span className="text-gray-400 text-xs">×</span>
+                    <input
+                        type="number" className="w-14 text-center border rounded-sm px-1 py-0.5 text-xs"
+                        value={localHeight} onChange={e => setLocalHeight(e.target.value)}
+                        onBlur={applyCanvasSize} onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                    />
+                    <button className="p-1 hover:bg-gray-100 rounded" title="Rotate Canvas" onClick={toggleCanvasOrientation}>
+                        <RotateCw size={14} className="text-gray-500" />
+                    </button>
+                </div>
+                <div className="flex items-center gap-2 border-l pl-4">
+                    <button
+                        className="p-1 hover:bg-gray-100 rounded disabled:text-gray-300 disabled:cursor-not-allowed"
+                        onClick={() => handleZoom(zoom - ZOOM_STEP)}
+                        disabled={zoom <= ZOOM_MIN}
+                    >
+                        <Minus size={14} />
+                    </button>
+                    <div className="w-16 text-center text-xs">
+                        <input
+                            type="text"
+                            className="w-full text-center bg-transparent"
+                            value={`${localZoom}%`}
+                            onChange={e => setLocalZoom(e.target.value.replace('%', ''))}
+                            onBlur={applyZoom}
+                            onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                        />
+                    </div>
+                    <button
+                        className="p-1 hover:bg-gray-100 rounded disabled:text-gray-300 disabled:cursor-not-allowed"
+                        onClick={() => handleZoom(zoom + ZOOM_STEP)}
+                        disabled={zoom >= ZOOM_MAX}
+                    >
+                        <Plus size={14} />
+                    </button>
+                </div>
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
-                <label className="text-xs text-gray-600">Expert</label>
-                <button
-                    className={`px-2 py-1 border rounded ${expertMode ? 'bg-emerald-50 text-emerald-700' : ''}`}
-                    onClick={toggleExpert}
-                >
-                    {expertMode ? 'ON' : 'OFF'}
+            {/* Right Section */}
+            <div className="flex items-center gap-3 flex-1 justify-end">
+                <span className="text-xs text-gray-400">Saved</span>
+                <button className="text-xs px-3 py-1 border rounded hover:bg-gray-50">
+                    Preview
+                </button>
+                <button className="text-xs px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">
+                    Publish
                 </button>
             </div>
         </div>
