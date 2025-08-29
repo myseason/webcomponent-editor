@@ -237,7 +237,7 @@ export interface EditorUI {
         };
         bottom: {
             heightPx: number;
-            right: number,
+            right?: number,
             isCollapsed?: boolean; // ✅ [추가] 하단 패널 접힘 상태
             advanced: {
                 open: boolean;
