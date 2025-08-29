@@ -247,11 +247,66 @@ export const useV4Store = create<Store>((set, get) => ({
     return { base, tablet, mobile, current };
   },
 
-  /** Undo/Redo — to be fully implemented later */
+  
+  /** Undo/Redo — basic inversion for style ops */
   undo: () => {
-    console.warn('undo() not implemented yet (op inversion TBD)');
+    const state = get();
+    const past = [...state.opsPast];
+    if (!past.length) return;
+    const op = past.pop()!;
+    // apply inverse
+    if (op.t === 'setDecl') {
+      // cannot reconstruct previous values without a history of before; noop for now
+      console.warn('undo setDecl not reversible without before-value log');
+    } else if (op.t === 'addRule') {
+      // remove that rule
+      const sheets = state.project.stylesheets || [];
+      for (const s of sheets) {
+        const before = s.rules.length;
+        s.rules = s.rules.filter(r => r.id !== op.rule.id);
+        if (s.rules.length !== before) break;
+      }
+      set({ project: { ...state.project, stylesheets: [...(state.project.stylesheets||[])] }, opsPast: past, opsFuture: [op, ...state.opsFuture] });
+      return;
+    } else if (op.t === 'removeRule') {
+      // cannot restore without the rule payload; noop
+      console.warn('undo removeRule not possible without saved rule payload');
+    } else if (op.t === 'assignClass') {
+      const n = state.project.nodes[op.nodeId];
+      if (n?.classList) {
+        state.project.nodes[op.nodeId] = { ...n, classList: n.classList.filter(c => c !== op.className) };
+        set({ project: { ...state.project }, opsPast: past, opsFuture: [op, ...state.opsFuture] });
+        return;
+      }
+    } else if (op.t === 'setActiveVariant' || op.t === 'setActiveEnv' || op.t === 'setSelection' || op.t === 'setEnvVar') {
+      // UI/env ops skip for now
+      console.warn('undo for this op is not implemented');
+    }
+    // default move op to future
+    set({ opsPast: past, opsFuture: [op, ...state.opsFuture] });
   },
   redo: () => {
-    console.warn('redo() not implemented yet (op replay TBD)');
+    const state = get();
+    const fut = [...state.opsFuture];
+    if (!fut.length) return;
+    const op = fut.shift()!;
+    // reapply op (limited)
+    if (op.t === 'addRule') {
+      const sheets = state.project.stylesheets || [];
+      const sheet = sheets.find(s => s.id === op.sheetId) || sheets[0];
+      if (sheet) sheet.rules = [...sheet.rules, op.rule];
+      set({ project: { ...state.project, stylesheets: [...(state.project.stylesheets||[])] }, opsPast: [...state.opsPast, op], opsFuture: fut });
+      return;
+    } else if (op.t === 'assignClass') {
+      const n = state.project.nodes[op.nodeId];
+      if (n) {
+        const setCls = new Set([...(n.classList || [])]); setCls.add(op.className);
+        state.project.nodes[op.nodeId] = { ...n, classList: Array.from(setCls) };
+        set({ project: { ...state.project }, opsPast: [...state.opsPast, op], opsFuture: fut });
+        return;
+      }
+    }
+    set({ opsPast: [...state.opsPast, op], opsFuture: fut });
   },
+
 }));

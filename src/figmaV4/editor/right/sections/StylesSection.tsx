@@ -12,6 +12,25 @@ function parseValue(input: string): any {
   return input;
 }
 
+// Simple Token Picker
+const TokenPicker: React.FC<{ label:string; value:any; onPick:(tokenId:string)=>void; filter?:(t:any)=>boolean }> = ({ label, value, onPick, filter }) => {
+  const tokens = useV4Store(s => s.project.tokens || []);
+  const list = (filter ? tokens.filter(filter) : tokens);
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:8, alignItems:'center' }}>
+      <div style={{ color:'#6b7280' }}>{label}</div>
+      <div style={{ display:'flex', gap:8 }}>
+        <select value={(value && value.token) ? value.token : ''} onChange={e => onPick(e.target.value)}>
+          <option value="">(none)</option>
+          {list.map((t:any) => <option key={t.id} value={t.id}>{t.id}</option>)}
+        </select>
+        <span style={{ color:'#9ca3af' }}>{(value && value.token) ? `token:${value.token}` : ''}</span>
+      </div>
+    </div>
+  );
+};
+
+
 const Row: React.FC<{ label:string, value:any, onChange:(v:string)=>void, placeholder?:string }> = ({ label, value, onChange, placeholder }) => {
   return (
     <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:8, alignItems:'center' }}>
@@ -49,12 +68,12 @@ export const StylesSection: React.FC = () => {
       <Row label="height" value={(decl as any).height} onChange={(v)=>patch({ height: parseValue(v) })} />
       <Row label="paddingX" value={(decl as any).paddingX} onChange={(v)=>patch({ paddingX: parseValue(v) })} />
       <Row label="paddingY" value={(decl as any).paddingY} onChange={(v)=>patch({ paddingY: parseValue(v) })} />
-      <Row label="bg" value={(decl as any).bg} onChange={(v)=>patch({ bg: parseValue(v) })} placeholder="e.g., token:color.surface or #fff" />
-      <Row label="color" value={(decl as any).color} onChange={(v)=>patch({ color: parseValue(v) })} placeholder="e.g., token:color.text or #111827" />
-      <Row label="radius" value={(decl as any).radius} onChange={(v)=>patch({ radius: parseValue(v) })} />
+      <TokenPicker label="bg" value={(decl as any).bg} onPick={(id)=>patch({ bg: id ? { token:id } : undefined })} filter={(t:any)=>t.type==='color'} />
+      <TokenPicker label="color" value={(decl as any).color} onPick={(id)=>patch({ color: id ? { token:id } : undefined })} filter={(t:any)=>t.type==='color'} />
+      <TokenPicker label="radius" value={(decl as any).radius} onPick={(id)=>patch({ radius: id ? { token:id } : undefined })} filter={(t:any)=>t.type==='radius'} />
       <Row label="borderWidth" value={(decl as any).borderWidth} onChange={(v)=>patch({ borderWidth: parseValue(v) })} />
       <Row label="borderColor" value={(decl as any).borderColor} onChange={(v)=>patch({ borderColor: parseValue(v) })} />
-      <Row label="shadow" value={(decl as any).shadow} onChange={(v)=>patch({ shadow: parseValue(v) })} placeholder="e.g., token:shadow.sm or CSS box-shadow" />
+      <TokenPicker label="shadow" value={(decl as any).shadow} onPick={(id)=>patch({ shadow: id ? { token:id } : undefined })} filter={(t:any)=>t.type==='shadow'} />
     </div>
   );
 };

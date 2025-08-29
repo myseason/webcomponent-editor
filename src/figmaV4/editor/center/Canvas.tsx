@@ -16,19 +16,14 @@ export const Canvas: React.FC = () => {
   const ui = useV4Store(s => s.ui);
 
   // Setup shadow root
-    useEffect(() => {
-        if (!rootRef.current) return;
-
-        const host = rootRef.current as HTMLElement & { shadowRoot?: ShadowRoot };
-        // StrictMode에서도 안전: 이미 있으면 재사용
-        const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
-        setShadow(shadowRoot);
-
-        // 언마운트 시 내용만 정리(ShadowRoot 자체는 유지)
-        return () => {
-            while (shadowRoot.firstChild) shadowRoot.removeChild(shadowRoot.firstChild);
-        };
-    }, []);
+  useEffect(() => {
+    if (!rootRef.current) return;
+    const root = rootRef.current;
+    const host: any = root as any;
+    const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
+    setShadow(shadowRoot);
+    return () => { while (shadowRoot.firstChild) shadowRoot.removeChild(shadowRoot.firstChild); };
+  }, []);
 
   // Build CSS (tokens + sheets)
   const css = useMemo(() => compileToCSS(project.stylesheets, ui.variants, project.tokens || []), [project.stylesheets, ui.variants, project.tokens]);
@@ -39,6 +34,8 @@ export const Canvas: React.FC = () => {
     injectCSS(shadow, css, 'v4-style');
     // also apply theme attr to host
     (shadow.host as HTMLElement).setAttribute('data-theme', String(ui.variants.theme || 'light'));
+    const st = ui.variants.state ? String(ui.variants.state) : '';
+    if (st) (shadow.host as HTMLElement).setAttribute('data-state', st); else (shadow.host as HTMLElement).removeAttribute('data-state');
   }, [shadow, css, ui.variants.theme]);
 
   const page = project.routing.pages.find(p => p.id === project.routing.entryPageId);

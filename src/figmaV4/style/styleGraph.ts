@@ -90,12 +90,18 @@ export function ruleToCSS(rule: StyleRule, theme?: string, state?: string): stri
     parts.push(sel);
   }
 
-  // state as element attribute (preview/editing)
+  // state handling:
+  // - If rule defines a state (e.g., hover), we match it.
+  // - For preview, we scope by host attribute: :host([data-state~="hover"]) sel{...}
   if (rule.conditions.state) {
+    // element-level state selector (authoring-time explicit)
     parts[parts.length-1] += `[data-state~="${rule.conditions.state}"]`;
+    if (state && rule.conditions.state === state) {
+      // also allow host-scoped preview without element attrs
+      parts[parts.length-1] = `:host([data-state~=\"${state}\"]) ${sel}`;
+    }
   } else if (state) {
-    // lock preview state
-    parts[parts.length-1] += `[data-state~="${state}"]`;
+    // no-op for rules without state; keep them unaffected by preview
   }
 
   const declPairs = declarationToCSSPairs(rule.declarations);
