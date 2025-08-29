@@ -12,6 +12,7 @@ import type {
     Fragment,
 } from '../core/types';
 
+// --- 초기 상태 정의 ---
 const initialProject: Project = {
     pages: [{ id: 'page_home', name: 'Home', rootId: 'node_root_home', slug: '/' }],
     fragments: [],
@@ -33,7 +34,7 @@ const initialState: EditorState = {
         panels: {
             left: { tab: 'Composer', widthPx: 320, splitPct: 60, explorerPreview: null },
             right: { widthPx: 420 },
-            bottom: { heightPx: 240, right: 160, isCollapsed: false, advanced: null },
+            bottom: { heightPx: 240, isCollapsed: false, advanced: null },
         },
     },
     data: {},
@@ -45,6 +46,7 @@ const initialState: EditorState = {
     },
 };
 
+// --- 타입 정의 ---
 type EditorActions = {
     update: (fn: (draft: EditorState) => void, recordHistory?: boolean) => void;
     select: (id: NodeId | null) => void;
@@ -81,9 +83,9 @@ type EditorActions = {
 
 export type EditorStoreState = EditorState & EditorActions;
 
+// --- 유틸리티 함수 ---
 let _seq = 0;
 const genId = (prefix: string): string => `${prefix}_${Date.now().toString(36)}_${++_seq}`;
-
 function buildNodeWithDefaults(defId: string, id: string): Node {
     const def = getDefinition(defId);
     const defProps = def?.defaults.props ?? {};
@@ -94,19 +96,16 @@ function buildNodeWithDefaults(defId: string, id: string): Node {
         children: [], isVisible: true, locked: false,
     };
 }
-
 function findParentId(p: Project, childId: NodeId): NodeId | null {
     for (const nid in p.nodes) {
         if (p.nodes[nid]?.children?.includes(childId)) return nid;
     }
     return null;
 }
-
 function isContainerDef(defId: string): boolean {
     const def = getDefinition(defId);
     return def?.capabilities?.canHaveChildren === true || defId === 'box';
 }
-
 function chooseValidParentId(p: Project, desiredParent: NodeId | null | undefined, fallbackRoot: NodeId): NodeId {
     if (!desiredParent) return fallbackRoot;
     let currentId: NodeId = desiredParent;
@@ -121,7 +120,6 @@ function chooseValidParentId(p: Project, desiredParent: NodeId | null | undefine
     }
     return fallbackRoot;
 }
-
 function collectSubtreeIds(nodes: Record<NodeId, Node>, rootId: NodeId): Set<NodeId> {
     const ids = new Set<NodeId>();
     const queue: NodeId[] = [rootId];
@@ -136,175 +134,189 @@ function collectSubtreeIds(nodes: Record<NodeId, Node>, rootId: NodeId): Set<Nod
 }
 
 
-export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreState>((set, get) => {
-
-    const update = (fn: (draft: EditorState) => void, recordHistory = false) => {
+export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreState>((set, get) => ({
+    ...initialState,
+    update: (fn, recordHistory = false) => {
+        const currentState = get();
         if (recordHistory) {
-            const currentProject = get().project;
-            set(state => ({
+            const currentProject = currentState.project;
+            set({
                 history: {
-                    past: [...state.history.past, JSON.parse(JSON.stringify(currentProject))],
+                    ...currentState.history,
+                    past: [...currentState.history.past, currentProject],
                     future: [],
                 }
-            }));
+            });
         }
-        set(state => Object.assign({}, state, fn(state)));
-    };
 
-    const createUndoableAction = <T extends (...args: any[]) => any>(action: T): T => {
-        return ((...args: Parameters<T>) => {
-            update(() => {}, true);
-            return action(...args);
-        }) as T;
-    };
-
-    const patchNode = createUndoableAction((id: NodeId, patch: Partial<Node>) => {
+        const draft = {
+            ...currentState,
+            project: { ...currentState.project },
+            ui: { ...currentState.ui },
+            data: { ...currentState.data },
+            settings: { ...currentState.settings },
+            flowEdges: { ...currentState.flowEdges },
+        };
+        fn(draft);
+        set(draft);
+    },
+    undo: () => {
+        const { history } = get();
+        if (history.past.length === 0) return;
+        const previousProject = history.past[history.past.length - 1];
         set(state => ({
-            project: { ...state.project, nodes: { ...state.project.nodes, [id]: { ...state.project.nodes[id]!, ...patch } } }
+            ...state,
+            project: previousProject,
+            history: {
+                past: state.history.past.slice(0, -1),
+                future: [state.project, ...state.history.future],
+            },
         }));
-    });
+    },
+    redo: () => {
+        const { history } = get();
+        if (history.future.length === 0) return;
+        const nextProject = history.future[0];
+        set(state => ({
+            ...state,
+            project: nextProject,
+            history: {
+                past: [...state.history.past, state.project],
+                future: state.history.future.slice(1),
+            },
+        }));
+    },
+    select: (id) => get().update(s => { s.ui = { ...s.ui, selectedId: id }; }),
+    patchNode: (id, patch) => get().update(s => {
+        s.project.nodes = { ...s.project.nodes, [id]: { ...s.project.nodes[id]!, ...patch } };
+    }, true),
+    updateNodeProps: (id, props) => get().update(s => {
+        const node = s.project.nodes[id]!;
+        s.project.nodes = { ...s.project.nodes, [id]: { ...node, props: { ...node.props, ...props } } };
+    }, true),
+    updateNodeStyles: (id, styles, viewport) => get().update(s => {
+        const node = s.project.nodes[id]!;
+        const element = node.styles.element ?? {};
+        const newStyles = { ...element, [viewport]: { ...(element[viewport] ?? {}), ...styles } };
+        s.project.nodes = { ...s.project.nodes, [id]: { ...node, styles: { ...node.styles, element: newStyles } } };
+    }, true),
+    addByDef: (defId, parentId) => {
+        const newId = genId(defId);
+        get().update(s => {
+            const parentKey = chooseValidParentId(s.project, parentId ?? s.ui.selectedId, s.project.rootId);
+            const parent = s.project.nodes[parentKey]!;
+            s.project.nodes = { ...s.project.nodes, [newId]: buildNodeWithDefaults(defId, newId) };
+            s.project.nodes[parentKey] = { ...parent, children: [...(parent.children ?? []), newId] };
+            s.ui.selectedId = newId;
+        }, true);
+        return newId;
+    },
+    moveNode: (nodeId, newParentId, newIndex) => {
+        get().update(s => {
+            const oldParentId = findParentId(s.project, nodeId);
+            if (!oldParentId) return;
 
-    return {
-        ...initialState,
-        update,
-        undo: () => {
-            const { history } = get();
-            if (history.past.length === 0) return;
-            const previousProject = history.past[history.past.length - 1];
-            set({
-                project: previousProject,
-                history: {
-                    past: history.past.slice(0, -1),
-                    future: [get().project, ...history.future],
-                },
-            });
-        },
-        redo: () => {
-            const { history } = get();
-            if (history.future.length === 0) return;
-            const nextProject = history.future[0];
-            set({
-                project: nextProject,
-                history: {
-                    past: [...history.past, get().project],
-                    future: history.future.slice(1),
-                },
-            });
-        },
-        select: (id) => set(state => ({ ui: { ...state.ui, selectedId: id } })),
-        setActiveViewport: (viewport) => set(state => ({ ui: { ...state.ui, canvas: { ...state.ui.canvas, activeViewport: viewport } } })),
-        toggleBottomDock: () => set(state => ({ ui: { ...state.ui, panels: { ...state.ui.panels, bottom: { ...state.ui.panels.bottom, isCollapsed: !state.ui.panels.bottom.isCollapsed }}}})),
-        setCanvasZoom: (zoom) => set(state => ({ ui: { ...state.ui, canvas: { ...state.ui.canvas, zoom } } })),
-        setCanvasSize: (size) => set(state => ({ ui: { ...state.ui, canvas: { ...state.ui.canvas, ...size } } })),
-        toggleCanvasOrientation: () => set(state => {
-            const { width, height, orientation } = state.ui.canvas;
-            return { ui: { ...state.ui, canvas: { ...state.ui.canvas, width: height, height: width, orientation: orientation === 'landscape' ? 'portrait' : 'landscape' }}};
-        }),
-        patchNode,
-        updateNodeProps: createUndoableAction((id, props) => {
-            set(state => ({
-                project: { ...state.project, nodes: { ...state.project.nodes, [id]: { ...state.project.nodes[id]!, props: { ...state.project.nodes[id]!.props, ...props } } } }
-            }));
-        }),
-        updateNodeStyles: createUndoableAction((id, styles, viewport) => {
-            set(state => {
-                const node = state.project.nodes[id]!;
-                const element = node.styles.element ?? {};
-                const newStyles = { ...element, [viewport]: { ...(element[viewport] ?? {}), ...styles } };
-                return { project: { ...state.project, nodes: { ...state.project.nodes, [id]: { ...node, styles: { ...node.styles, element: newStyles } } } } };
-            });
-        }),
-        addByDef: createUndoableAction((defId, parentId) => {
-            const newId = genId(defId);
-            set(state => {
-                const parentKey = chooseValidParentId(state.project, parentId ?? state.ui.selectedId, state.project.rootId);
-                const parent = state.project.nodes[parentKey]!;
-                const newNode = buildNodeWithDefaults(defId, newId);
-                return {
-                    project: { ...state.project, nodes: { ...state.project.nodes, [newId]: newNode, [parentKey]: { ...parent, children: [...(parent.children ?? []), newId] } } },
-                    ui: { ...state.ui, selectedId: newId }
-                };
-            });
-            return newId;
-        }),
-        addByDefAt: createUndoableAction((defId, parentId, index) => {
-            const newId = genId(defId);
-            set(state => {
-                const parentKey = chooseValidParentId(state.project, parentId, state.project.rootId);
-                const parent = state.project.nodes[parentKey]!;
-                const newNode = buildNodeWithDefaults(defId, newId);
-                const newChildren = [...(parent.children ?? [])];
-                newChildren.splice(index, 0, newId);
-                return { project: { ...state.project, nodes: { ...state.project.nodes, [newId]: newNode, [parentKey]: { ...parent, children: newChildren } } } };
-            });
-        }),
-        moveNode: createUndoableAction((nodeId, newParentId, newIndex) => {
-            set(state => {
-                const oldParentId = findParentId(state.project, nodeId);
-                if (!oldParentId) return state;
+            const nodes = { ...s.project.nodes };
 
-                const nodes = { ...state.project.nodes };
-                const oldParent = { ...nodes[oldParentId]! };
-                oldParent.children = (oldParent.children ?? []).filter(id => id !== nodeId);
-                nodes[oldParentId] = oldParent;
+            const oldParent = { ...nodes[oldParentId]! };
+            oldParent.children = (oldParent.children ?? []).filter(id => id !== nodeId);
+            nodes[oldParentId] = oldParent;
 
-                const newParent = { ...nodes[newParentId]! };
-                const newChildren = [...(newParent.children ?? [])];
-                newChildren.splice(newIndex, 0, nodeId);
-                newParent.children = newChildren;
-                nodes[newParentId] = newParent;
+            const newParent = { ...nodes[newParentId]! };
+            const newChildren = [...(newParent.children ?? [])];
+            newChildren.splice(newIndex, 0, nodeId);
+            newParent.children = newChildren;
+            nodes[newParentId] = newParent;
 
-                return { project: { ...state.project, nodes } };
-            });
-        }),
-        getParentOf: (id) => findParentId(get().project, id),
-        selectPage: (pageId) => set(state => ({ project: { ...state.project, rootId: state.project.pages.find(p => p.id === pageId)!.rootId } })),
-        addPage: createUndoableAction((name) => {
-            const newId = genId('page');
-            const rootId = genId('node_root');
-            set(state => {
-                const rootNode = buildNodeWithDefaults('box', rootId);
-                const newPage: Page = { id: newId, name: name ?? `Page ${state.project.pages.length + 1}`, rootId, slug: `/page-${state.project.pages.length + 1}` };
-                return {
-                    project: { ...state.project, pages: [...state.project.pages, newPage], nodes: { ...state.project.nodes, [rootId]: rootNode } },
-                    ui: { ...state.ui, panels: { ...state.ui.panels, left: { ...state.ui.panels.left, explorerPreview: { kind: 'page', id: newId }}}}
-                };
-            });
-            return newId;
-        }),
-        removePage: createUndoableAction((pageId) => {
-            set(state => {
-                if (state.project.pages.length <= 1) return state;
-                const pageToRemove = state.project.pages.find(p => p.id === pageId)!;
-                const nodesToRemove = collectSubtreeIds(state.project.nodes, pageToRemove.rootId);
-                const newNodes = { ...state.project.nodes };
-                nodesToRemove.forEach(id => delete newNodes[id]);
-                return {
-                    project: { ...state.project, pages: state.project.pages.filter(p => p.id !== pageId), nodes: newNodes },
-                    ui: { ...state.ui, selectedId: state.ui.selectedId === pageToRemove.rootId ? null : state.ui.selectedId }
-                };
-            });
-        }),
-        addFragment: createUndoableAction((name) => {
-            const newId = genId('fragment');
-            const rootId = genId('frag_root');
-            set(state => {
-                const rootNode = buildNodeWithDefaults('box', rootId);
-                const newFragment: Fragment = { id: newId, name: name ?? `Fragment ${state.project.fragments.length + 1}`, rootId };
-                return { project: { ...state.project, fragments: [...state.project.fragments, newFragment], nodes: { ...state.project.nodes, [rootId]: rootNode } } };
-            });
-            return newId;
-        }),
-        removeFragment: createUndoableAction((fragmentId) => set(state => ({ project: { ...state.project, fragments: state.project.fragments.filter(f => f.id !== fragmentId) } }))),
-        addFlowEdge: createUndoableAction((edge) => { const newId = genId('flow'); set(state => ({ flowEdges: { ...state.flowEdges, [newId]: { ...edge, id: newId } } })); return newId; }),
-        updateFlowEdge: createUndoableAction((edgeId, patch) => set(state => ({ flowEdges: { ...state.flowEdges, [edgeId]: { ...state.flowEdges[edgeId]!, ...patch } } }))),
-        removeFlowEdge: createUndoableAction((edgeId) => set(state => { const newFlows = { ...state.flowEdges }; delete newFlows[edgeId]; return { flowEdges: newFlows }; })),
-        setData: createUndoableAction((path, value) => set(state => ({ data: { ...state.data, [path]: value } }))),
-        setSetting: (path, value) => set(state => ({ settings: { ...state.settings, [path]: value } })),
-        openFragment: (fragmentId) => set(state => ({ ui: { ...state.ui, overlays: [...state.ui.overlays, fragmentId] } })),
-        closeFragment: (fragmentId) => set(state => ({ ui: { ...state.ui, overlays: fragmentId ? state.ui.overlays.filter(id => id !== fragmentId) : state.ui.overlays.slice(0, -1) } })),
-        toggleNodeVisibility: (nodeId) => patchNode(nodeId, { isVisible: !(get().project.nodes[nodeId]?.isVisible ?? true) }),
-        toggleNodeLock: (nodeId) => patchNode(nodeId, { locked: !get().project.nodes[nodeId]?.locked }),
-        hydrateDefaults: createUndoableAction(() => { /* ... */ }),
-    };
-});
+            s.project.nodes = nodes;
+        }, true);
+    },
+    removePage: (pageId) => {
+        get().update(s => {
+            if (s.project.pages.length <= 1) return;
+            const pageToRemove = s.project.pages.find(p => p.id === pageId)!;
+            const nodesToDelete = collectSubtreeIds(s.project.nodes, pageToRemove.rootId);
+            const newNodes = { ...s.project.nodes };
+            nodesToDelete.forEach(id => delete newNodes[id]);
+            s.project.pages = s.project.pages.filter(p => p.id !== pageId);
+            if (s.project.rootId === pageToRemove.rootId) {
+                s.project.rootId = s.project.pages[0]?.rootId ?? '';
+            }
+            s.project.nodes = newNodes;
+        }, true);
+    },
+    getParentOf: (id) => findParentId(get().project, id),
+    addByDefAt: (defId, parentId, index) => get().update(s => {
+        const newId = genId(defId);
+        const parentKey = chooseValidParentId(s.project, parentId, s.project.rootId);
+        const parent = s.project.nodes[parentKey]!;
+        const newNodes = { ...s.project.nodes, [newId]: buildNodeWithDefaults(defId, newId) };
+        const newChildren = [...(parent.children ?? [])];
+        newChildren.splice(index, 0, newId);
+        newNodes[parentKey] = { ...parent, children: newChildren };
+        s.project.nodes = newNodes;
+    }, true),
+    selectPage: (pageId) => get().update(s => { s.project.rootId = s.project.pages.find(p => p.id === pageId)!.rootId; }),
+    addPage: (name) => {
+        const newId = genId('page');
+        const rootId = genId('node_root');
+        get().update(s => {
+            s.project.nodes = { ...s.project.nodes, [rootId]: buildNodeWithDefaults('box', rootId) };
+            s.project.pages = [...s.project.pages, { id: newId, name: name ?? `Page ${s.project.pages.length + 1}`, rootId, slug: `/page-${s.project.pages.length + 1}` }];
+            s.ui.panels.left.explorerPreview = { kind: 'page', id: newId };
+        }, true);
+        return newId;
+    },
+    addFragment: (name) => {
+        const newId = genId('fragment');
+        const rootId = genId('frag_root');
+        get().update(s => {
+            s.project.nodes = { ...s.project.nodes, [rootId]: buildNodeWithDefaults('box', rootId) };
+            s.project.fragments = [...s.project.fragments, { id: newId, name: name ?? `Fragment ${s.project.fragments.length + 1}`, rootId }];
+        }, true);
+        return newId;
+    },
+    removeFragment: (fragmentId) => get().update(s => {
+        const fragToRemove = s.project.fragments.find(f => f.id === fragmentId);
+        if (!fragToRemove) return;
+        const nodesToDelete = collectSubtreeIds(s.project.nodes, fragToRemove.rootId);
+        const newNodes = { ...s.project.nodes };
+        nodesToDelete.forEach(id => delete newNodes[id]);
+        s.project.fragments = s.project.fragments.filter(f => f.id !== fragmentId);
+        s.project.nodes = newNodes;
+    }, true),
+    addFlowEdge: (edge) => {
+        const newId = genId('flow');
+        get().update(s => { s.flowEdges = { ...s.flowEdges, [newId]: { ...edge, id: newId } }; }, true);
+        return newId;
+    },
+    updateFlowEdge: (edgeId, patch) => get().update(s => { s.flowEdges = { ...s.flowEdges, [edgeId]: { ...s.flowEdges[edgeId]!, ...patch } }; }, true),
+    removeFlowEdge: (edgeId) => get().update(s => { const newFlows = { ...s.flowEdges }; delete newFlows[edgeId]; s.flowEdges = newFlows; }, true),
+    setData: (path, value) => get().update(s => { s.data = { ...s.data, [path]: value }; }, true),
+    setSetting: (path, value) => get().update(s => { s.settings = { ...s.settings, [path]: value }; }),
+    openFragment: (fragmentId) => get().update(s => { s.ui.overlays = [...s.ui.overlays, fragmentId]; }),
+    closeFragment: (fragmentId) => get().update(s => { s.ui.overlays = fragmentId ? s.ui.overlays.filter(id => id !== fragmentId) : s.ui.overlays.slice(0, -1); }),
+    toggleNodeVisibility: (nodeId) => get().patchNode(nodeId, { isVisible: !(get().project.nodes[nodeId]?.isVisible ?? true) }),
+    toggleNodeLock: (nodeId) => get().patchNode(nodeId, { locked: !get().project.nodes[nodeId]?.locked }),
+    setActiveViewport: (viewport) => get().update(s => { s.ui.canvas = { ...s.ui.canvas, activeViewport: viewport }; }),
+    toggleBottomDock: () => get().update(s => { s.ui.panels.bottom = { ...s.ui.panels.bottom, isCollapsed: !s.ui.panels.bottom.isCollapsed }; }),
+    setCanvasZoom: (zoom) => get().update(s => { s.ui.canvas = { ...s.ui.canvas, zoom }; }),
+    setCanvasSize: (size) => get().update(s => { s.ui.canvas = { ...s.ui.canvas, ...size }; }),
+    toggleCanvasOrientation: () => get().update(s => {
+        const { width, height, orientation } = s.ui.canvas;
+        s.ui.canvas = { ...s.ui.canvas, width: height, height: width, orientation: orientation === 'landscape' ? 'portrait' : 'landscape' };
+    }),
+    hydrateDefaults: () => get().update(s => {
+        const newNodes = { ...s.project.nodes };
+        Object.values(newNodes).forEach((node: Node) => {
+            const def = getDefinition(node.componentId);
+            if (def) {
+                const baseStyles = def.defaults.styles?.element?.base ?? {};
+                const currentBase = node.styles.element?.base ?? {};
+                node.props = { ...def.defaults.props, ...node.props };
+                node.styles.element = { ...node.styles.element, base: { ...baseStyles, ...currentBase } };
+            }
+        });
+        s.project.nodes = newNodes;
+    }, true),
+}));
