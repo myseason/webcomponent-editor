@@ -16,13 +16,19 @@ export const Canvas: React.FC = () => {
   const ui = useV4Store(s => s.ui);
 
   // Setup shadow root
-  useEffect(() => {
-    if (!rootRef.current) return;
-    const root = rootRef.current;
-    const shadowRoot = root.attachShadow({ mode: 'open' });
-    setShadow(shadowRoot);
-    return () => { while (shadowRoot.firstChild) shadowRoot.removeChild(shadowRoot.firstChild); };
-  }, []);
+    useEffect(() => {
+        if (!rootRef.current) return;
+
+        const host = rootRef.current as HTMLElement & { shadowRoot?: ShadowRoot };
+        // StrictMode에서도 안전: 이미 있으면 재사용
+        const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
+        setShadow(shadowRoot);
+
+        // 언마운트 시 내용만 정리(ShadowRoot 자체는 유지)
+        return () => {
+            while (shadowRoot.firstChild) shadowRoot.removeChild(shadowRoot.firstChild);
+        };
+    }, []);
 
   // Build CSS (tokens + sheets)
   const css = useMemo(() => compileToCSS(project.stylesheets, ui.variants, project.tokens || []), [project.stylesheets, ui.variants, project.tokens]);

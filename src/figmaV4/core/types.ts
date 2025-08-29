@@ -54,6 +54,21 @@ export type Token = {
 export type Page = { id: string; name: string; path: string; rootId: CNodeId; layout?: string };
 export type Fragment = { id: string; name: string; rootId: CNodeId };
 
+/** Project management: environments & data sources */
+export type DataSourceRef = {
+  id: string;
+  type: 'rest' | 'graphql' | 'sql' | string;
+  name: string;
+  config: Record<string, unknown>;
+};
+
+export type EnvironmentConfig = {
+  variables: Record<string, string>;
+  secretsRef?: string;
+  dataSources?: DataSourceRef[];
+  publish?: { target: 'static'|'next'|'cloud'; url?: string };
+};
+
 export type Project = {
   id: string;
   name: string;
@@ -75,6 +90,9 @@ export type Project = {
   data?: Record<string, unknown>;
   assets?: { id: string; kind: 'image'|'font'|'icon'; url: string; meta?: any }[];
 
+  /** environments keyed by name (dev/staging/prod...) */
+  environments?: Record<string, EnvironmentConfig>;
+
   branches?: { id: string; name: string; base?: string }[];
   snapshots?: { id: string; title?: string; at: string; note?: string }[];
   reviews?: { id: string; url: string; branchId: string; expiresAt?: string }[];
@@ -84,6 +102,7 @@ export type EditorUI = {
   canvas: { width: number; height: number; zoom: number; orientation: 'portrait'|'landscape' };
   variants: VariantMap;   // { screen:'base', theme:'light', state?:'hover' ... }
   selection: CNodeId | null;
+  activeEnv: string;      // 'dev' | 'staging' | 'prod' | custom
 };
 
 export type EditorState = {

@@ -6,7 +6,7 @@
 
 export const nowISO = () => new Date().toISOString();
 
-import type { Project, CNode, CNodeId, Page } from './types';
+import type { Project, CNode, CNodeId, Page, EnvironmentConfig } from './types';
 
 export function createEmptyProject(): Project {
   const rootId: CNodeId = 'root';
@@ -17,6 +17,19 @@ export function createEmptyProject(): Project {
     children: [],
   };
   const page: Page = { id: 'page-home', name: 'Home', path: '/', rootId };
+
+  const dev: EnvironmentConfig = {
+    variables: { PUBLIC_API_URL: 'https://api.dev.local', FEATURE_FLAG_EXAMPLE: 'false' },
+    dataSources: [],
+  };
+  const staging: EnvironmentConfig = {
+    variables: { PUBLIC_API_URL: 'https://api.staging.local', FEATURE_FLAG_EXAMPLE: 'false' },
+    dataSources: [],
+  };
+  const prod: EnvironmentConfig = {
+    variables: { PUBLIC_API_URL: 'https://api.example.com', FEATURE_FLAG_EXAMPLE: 'true' },
+    dataSources: [],
+  };
 
   return {
     id: 'proj-1',
@@ -31,6 +44,7 @@ export function createEmptyProject(): Project {
     flows: {},
     data: {},
     assets: [],
+    environments: { dev, staging, prod },
     branches: [],
     snapshots: [],
     reviews: [],
