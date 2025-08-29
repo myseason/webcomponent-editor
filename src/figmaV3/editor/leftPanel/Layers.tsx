@@ -18,13 +18,19 @@ function NodeRow({ id, depth }: { id: NodeId; depth: number }) {
     const onSelect = () => editorStore.getState().select(id);
 
     const onRemove = () => {
-        if (isRoot) return alert('루트 노드는 삭제할 수 없습니다.');
+        /*
+        if (isRoot)
+            return alert('루트 노드는 삭제할 수 없습니다.');
         const parentId = editorStore.getState().getParentOf(id);
         if (!parentId) return;
         editorStore.getState().update((s) => {
             const parent = s.project.nodes[parentId];
             parent.children = (parent.children ?? []).filter((cid: NodeId) => cid !== id);
         });
+        */
+        if (isRoot)
+            return alert('루트 노드는 삭제할 수 없습니다.');
+        editorStore.getState().removeNodeCascade(id);
     };
 
     return (
