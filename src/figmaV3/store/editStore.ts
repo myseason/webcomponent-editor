@@ -71,6 +71,7 @@ type EditorActions = {
     hydrateDefaults: () => void;
     setActiveViewport: (viewport: Viewport) => void;
     moveNode: (nodeId: NodeId, newParentId: NodeId, newIndex: number) => void;
+    removeNodeCascade: (nodeId: NodeId) => void;
     toggleNodeVisibility: (nodeId: NodeId) => void;
     toggleNodeLock: (nodeId: NodeId) => void;
     toggleBottomDock: () => void;
@@ -136,29 +137,28 @@ function collectSubtreeIds(nodes: Record<NodeId, Node>, rootId: NodeId): Set<Nod
 
 export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreState>((set, get) => ({
     ...initialState,
+    // ✅ editStore.ts - update만 이대로 바꿔 주세요.
     update: (fn, recordHistory = false) => {
-        const currentState = get();
-        if (recordHistory) {
-            const currentProject = currentState.project;
-            set({
-                history: {
-                    ...currentState.history,
-                    past: [...currentState.history.past, currentProject],
-                    future: [],
-                }
-            });
-        }
+        const current = get();
 
-        const draft = {
-            ...currentState,
-            project: { ...currentState.project },
-            ui: { ...currentState.ui },
-            data: { ...currentState.data },
-            settings: { ...currentState.settings },
-            flowEdges: { ...currentState.flowEdges },
+        // 1) push할 history를 먼저 계산
+        const nextHistory = recordHistory
+            ? { past: [...current.history.past, current.project], future: [] as Project[] }
+            : current.history;
+
+        // 2) draft는 얕은 복제 + history는 위에서 계산한 값으로 직접 주입
+        const draft: EditorState = {
+            ...current,
+            history: nextHistory,                // ← 핵심
+            project: { ...current.project },
+            ui: { ...current.ui },
+            data: { ...current.data },
+            settings: { ...current.settings },
+            flowEdges: { ...current.flowEdges },
         };
+
         fn(draft);
-        set(draft);
+        set(draft);                            // ← set은 한 번만
     },
     undo: () => {
         const { history } = get();
@@ -195,10 +195,29 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         s.project.nodes = { ...s.project.nodes, [id]: { ...node, props: { ...node.props, ...props } } };
     }, true),
     updateNodeStyles: (id, styles, viewport) => get().update(s => {
+        // 1) 빈 패치면 무시
+        if (!styles || (typeof styles === 'object' && Object.keys(styles).length === 0)) return;
+
+        // 2) flat CSSDict만 허용 (element/base/tablet/mobile 키가 들어오면 무시)
+        const isFlat =
+            typeof styles === 'object' &&
+            !('element' in (styles as any)) &&
+            !('base' in (styles as any)) &&
+            !('tablet' in (styles as any)) &&
+            !('mobile' in (styles as any));
+        if (!isFlat) return;
+
         const node = s.project.nodes[id]!;
         const element = node.styles.element ?? {};
-        const newStyles = { ...element, [viewport]: { ...(element[viewport] ?? {}), ...styles } };
-        s.project.nodes = { ...s.project.nodes, [id]: { ...node, styles: { ...node.styles, element: newStyles } } };
+        const prevVp = (element[viewport] ?? {}) as CSSDict;
+
+        const nextVp = { ...prevVp, ...styles };     // 얕은 병합
+        const newElement = { ...element, [viewport]: nextVp };
+
+        s.project.nodes = {
+            ...s.project.nodes,
+            [id]: { ...node, styles: { ...node.styles, element: newElement } }
+        };
     }, true),
     addByDef: (defId, parentId) => {
         const newId = genId(defId);
@@ -231,6 +250,38 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
             s.project.nodes = nodes;
         }, true);
     },
+    // ✅ subtree 삭제 + 선택 보정 + 이력 기록 포함
+    removeNodeCascade: (nodeId: NodeId) => get().update((s) => {
+        // 부모 찾기
+        let parentId: NodeId | null = null;
+        for (const nid in s.project.nodes) {
+            if (s.project.nodes[nid]?.children?.includes(nodeId)) { parentId = nid as NodeId; break; }
+        }
+        // 서브트리 수집
+        const collect = (id: NodeId, acc: Set<NodeId>) => {
+            if (acc.has(id)) return;
+            acc.add(id);
+            const n = s.project.nodes[id];
+            (n?.children ?? []).forEach((cid) => collect(cid as NodeId, acc));
+        };
+        const toDelete = new Set<NodeId>(); collect(nodeId, toDelete);
+
+        // 부모에서 분리
+        if (parentId) {
+            const p = s.project.nodes[parentId]!;
+            s.project.nodes[parentId] = { ...p, children: (p.children ?? []).filter((cid) => cid !== nodeId) };
+        }
+
+        // 실제 삭제
+        const newNodes = { ...s.project.nodes };
+        toDelete.forEach((id) => delete newNodes[id]);
+        s.project.nodes = newNodes;
+
+        // 선택 보정
+        if (s.ui.selectedId && toDelete.has(s.ui.selectedId)) {
+            s.ui.selectedId = parentId ?? s.project.rootId;
+        }
+    }, true),
     removePage: (pageId) => {
         get().update(s => {
             if (s.project.pages.length <= 1) return;
