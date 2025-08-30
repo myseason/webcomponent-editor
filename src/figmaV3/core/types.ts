@@ -306,3 +306,8 @@ export interface DndDropTarget {
 
 /** 편의: StylesSection 등에서 사용하는 병합 결과 타입 */
 export type CSSDecl = Record<string, unknown>;
+
+// HTML void elements 목록 (children 불가)
+export const VOID_TAGS: ReadonlySet<string> = new Set([
+    'area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'
+]);
