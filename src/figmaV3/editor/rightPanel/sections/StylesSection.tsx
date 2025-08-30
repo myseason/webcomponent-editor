@@ -1,13 +1,10 @@
 'use client';
-
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { useEditor } from '../../useEditor';
-import type {
-    CSSDict,
-    NodeId,
-    NodePropsWithMeta,
-} from '../../../core/types';
+import type { CSSDict, NodeId, NodePropsWithMeta, Viewport } from '../../../core/types';
 import { getTagPolicy } from '../../../runtime/capabilities';
+
+// V3 그룹 UI (레포 경로 그대로 유지)
 import { LayoutGroup } from './styles/LayoutGroup';
 import { TypographyGroup } from './styles/TypographyGroup';
 import { PositionGroup } from './styles/PositionGroup';
@@ -17,9 +14,19 @@ import { BackgroundGroup } from './styles/BackgroundGroup';
 import { EffectsGroup } from './styles/EffectsGroup';
 import { CustomGroup } from './styles/CustomGroup';
 
+type OpenState = {
+    layout: boolean;
+    typo: boolean;
+    position: boolean;
+    spacing: boolean;
+    border: boolean;
+    background: boolean;
+    effects: boolean;
+    custom: boolean;
+};
+
 export function StylesSection() {
     const state = useEditor();
-
     const nodeId: NodeId = state.ui.selectedId ?? state.project.rootId;
     const node = state.project.nodes[nodeId];
 
@@ -27,41 +34,73 @@ export function StylesSection() {
     const tag = (props.__tag as string) ?? 'div';
     const expert = state.ui.expertMode;
 
-    // ✅ [수정] 현재 활성화된 뷰포트를 참조합니다.
-    const activeViewport = state.ui.canvas.activeViewport;
-
+    const activeViewport: Viewport = state.ui.canvas.activeViewport;
+    const mode = state.ui.canvas.vpMode[activeViewport]; // 'Unified' | 'Independent'
     const tf = state.project.inspectorFilters?.[node.componentId];
     const tagPolicy = getTagPolicy(tag, state.project.tagPolicies);
 
-    // ✅ [수정] 현재 뷰포트의 스타일을 가져오도록 수정합니다.
-    const el = (node.styles?.element?.[activeViewport] ?? {}) as CSSDict;
+    // ✅ 렌더 선언: Unified면 base만, Independent면 base + activeViewport 오버라이드 머지
+    const el = useMemo(() => {
+        return (state.getEffectiveDecl(nodeId) ?? {}) as CSSDict;
+    }, [state, nodeId, activeViewport, mode]);
 
-    // ✅ [수정] patch 함수가 세 번째 인자로 activeViewport를 전달하도록 수정합니다.
-    const patch = (kv: CSSDict) => state.updateNodeStyles(nodeId, kv, activeViewport);
+    // ✅ 쓰기: Unified면 base에 기록, Independent면 activeViewport override에 기록
+    const patch = (kv: CSSDict) =>
+        state.updateNodeStyles(nodeId, kv, mode === 'Independent' ? activeViewport : undefined);
 
-    const [open, setOpen] = React.useState({
-        layout: true, typo: false, position: false, spacing: false,
-        border: false, background: false, effects: false, custom: false,
+    const [open, setOpen] = useState<OpenState>({
+        layout: true,
+        typo: false,
+        position: false,
+        spacing: true,
+        border: false,
+        background: false,
+        effects: false,
+        custom: false,
     });
-
-    const toggle = (key: keyof typeof open) => setOpen(prev => ({...prev, [key]: !prev[key]}));
+    const toggle = (k: keyof OpenState) => setOpen(prev => ({ ...prev, [k]: !prev[k] }));
 
     return (
-        <div className="flex flex-col gap-2">
+        <div className="p-3">
+            {/* 템플릿 정책 안내 (기존) */}
             {!expert && tf?.styles && (
-                <div className="rounded border border-amber-300 bg-amber-50 text-[11px] text-amber-800 px-2 py-1">
+                <div className="mb-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
                     Template policies are hiding some styles. (Ignored in Expert Mode)
                 </div>
             )}
 
-            <LayoutGroup el={el} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} patch={patch} open={open.layout} onToggle={() => toggle('layout')} />
-            <TypographyGroup el={el} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.typo} onToggle={() => toggle('typo')} />
-            <PositionGroup el={el} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.position} onToggle={() => toggle('position')} />
-            <SpacingGroup el={el} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.spacing} onToggle={() => toggle('spacing')} />
-            <BorderGroup el={el} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.border} onToggle={() => toggle('border')} />
-            <BackgroundGroup el={el} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.background} onToggle={() => toggle('background')} />
-            <EffectsGroup el={el} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.effects} onToggle={() => toggle('effects')} />
-            <CustomGroup el={el} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.custom} onToggle={() => toggle('custom')} />
+            {/* Independent 안내 배너 + 패널 하이라이트 */}
+            {mode === 'Independent' && (
+                <div
+                    className="mb-2 rounded border text-xs"
+                    style={{
+                        borderColor: '#fde047',
+                        background: '#fffbeb',
+                        color: '#92400e',
+                        padding: '8px 10px',
+                    }}
+                >
+                    Independent mode for <b>{activeViewport}</b>. Changes here override Base for this viewport only.
+                </div>
+            )}
+
+            <div
+                className="rounded"
+                style={{
+                    border: mode === 'Independent' ? '1px dashed #f59e0b' : '1px solid transparent',
+                    padding: 8,
+                }}
+            >
+                {/* V3 그룹 UI - prop 시그니처/경로는 레포 그대로 유지 */}
+                <LayoutGroup el={el} tag={tag} tagPolicy={tagPolicy} tf={tf} map={(state.project as any).tagPolicies} expert={expert} patch={patch} open={open.layout} onToggle={()=>toggle('layout')} />
+                <TypographyGroup el={el} tag={tag} tagPolicy={tagPolicy} tf={tf} map={(state.project as any).tagPolicies} expert={expert} patch={patch} open={open.typo} onToggle={()=>toggle('typo')} />
+                <PositionGroup el={el} tag={tag} tagPolicy={tagPolicy} tf={tf} map={(state.project as any).tagPolicies} expert={expert} patch={patch} open={open.position} onToggle={()=>toggle('position')} />
+                <SpacingGroup el={el} tag={tag} tagPolicy={tagPolicy} tf={tf} map={(state.project as any).tagPolicies} expert={expert} patch={patch} open={open.spacing} onToggle={()=>toggle('spacing')} />
+                <BorderGroup el={el} tag={tag} tagPolicy={tagPolicy} tf={tf} map={(state.project as any).tagPolicies} expert={expert} patch={patch} open={open.border} onToggle={()=>toggle('border')} />
+                <BackgroundGroup el={el} tag={tag} tagPolicy={tagPolicy} tf={tf} map={(state.project as any).tagPolicies} expert={expert} patch={patch} open={open.background} onToggle={()=>toggle('background')} />
+                <EffectsGroup el={el} tag={tag} tagPolicy={tagPolicy} tf={tf} map={(state.project as any).tagPolicies} expert={expert} patch={patch} open={open.effects} onToggle={()=>toggle('effects')} />
+                <CustomGroup el={el} tag={tag} tagPolicy={tagPolicy} tf={tf} map={(state.project as any).tagPolicies} expert={expert} patch={patch} open={open.custom} onToggle={()=>toggle('custom')} />
+            </div>
         </div>
     );
 }

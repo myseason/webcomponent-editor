@@ -1,74 +1,86 @@
 'use client';
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useEditor } from '../useEditor';
-import type { Viewport, Page } from '../../core/types';
-import { Monitor, Tablet, Smartphone, RotateCw, Plus, Minus, Undo, Redo } from 'lucide-react';
+import type { Viewport, Page, ViewportMode } from '../../core/types';
+import { Monitor, Tablet, Smartphone, RotateCw, Plus, Minus, Undo, Redo, Info } from 'lucide-react';
 
-const VIEWPORT_WIDTHS: Record<Viewport, { w: number, h: number }> = {
-    base: { w: 1280, h: 800 },
-    tablet: { w: 768, h: 1024 },
-    mobile: { w: 375, h: 667 },
+const VIEWPORT_SIZES: Record<Viewport, { w: number; h: number }> = {
+    base:   { w: 1280, h: 800 },
+    tablet: { w: 768,  h: 1024 },
+    mobile: { w: 375,  h: 667 },
 };
 
-const ZOOM_MIN = 0.25; // 25%
-const ZOOM_MAX = 4.0;  // 400%
-const ZOOM_STEP = 0.25; // 25%
+const VP_ICON: Record<Viewport, React.ReactNode> = {
+    base:   <Monitor size={16} />,
+    tablet: <Tablet size={16} />,
+    mobile: <Smartphone size={16} />,
+};
+
+const VP_LIST: Viewport[] = ['base', 'tablet', 'mobile'];
+const ZOOM_MIN = 0.25, ZOOM_MAX = 4.0, ZOOM_STEP = 0.25;
 
 export default function PageBar() {
+    const state = useEditor();
     const {
-        project, ui, undo, redo, history,
-        setActiveViewport, setCanvasSize, setCanvasZoom, selectPage,
-        toggleCanvasOrientation
-    } = useEditor();
+        project, ui, history,
+        setActiveViewport, setCanvasSize, setCanvasZoom,
+        toggleCanvasOrientation, selectPage,
+        setBaseViewport, setViewportMode,
+        undo, redo,
+    } = state;
 
-    const currentPage = project.pages.find((p: Page) => p.rootId === project.rootId);
-    const { activeViewport, width: canvasWidth, height: canvasHeight, zoom } = ui.canvas;
+    const currentPage = useMemo(
+        () => project.pages.find((p: Page) => p.rootId === project.rootId),
+        [project.pages, project.rootId]
+    );
 
-    const [localWidth, setLocalWidth] = useState(canvasWidth.toString());
-    const [localHeight, setLocalHeight] = useState(canvasHeight.toString());
-    const [localZoom, setLocalZoom] = useState(Math.round(zoom * 100).toString());
+    const { activeViewport, baseViewport, vpMode, width: canvasWidth, height: canvasHeight, zoom } = ui.canvas;
 
-    useEffect(() => { setLocalWidth(canvasWidth.toString()); }, [canvasWidth]);
-    useEffect(() => { setLocalHeight(canvasHeight.toString()); }, [canvasHeight]);
-    useEffect(() => { setLocalZoom(Math.round(zoom * 100).toString()); }, [zoom]);
+    // 로컬 입력
+    const [wStr, setWStr] = useState(String(canvasWidth));
+    const [hStr, setHStr] = useState(String(canvasHeight));
+    const [zoomStr, setZoomStr] = useState(String(Math.round(zoom * 100)));
 
-    const setViewport = (viewport: Viewport) => {
-        setActiveViewport(viewport);
-        setCanvasSize({ width: VIEWPORT_WIDTHS[viewport].w, height: VIEWPORT_WIDTHS[viewport].h });
+    useEffect(() => setWStr(String(canvasWidth)), [canvasWidth]);
+    useEffect(() => setHStr(String(canvasHeight)), [canvasHeight]);
+    useEffect(() => setZoomStr(String(Math.round(zoom * 100))), [zoom]);
+
+    // 간단 토스트
+    const [toast, setToast] = useState<string | null>(null);
+    const notify = (msg: string) => {
+        setToast(msg);
+        window.clearTimeout((notify as any).__t);
+        (notify as any).__t = window.setTimeout(() => setToast(null), 1600);
     };
 
-    const applyCanvasSize = () => {
-        const newWidth = parseInt(localWidth, 10);
-        const newHeight = parseInt(localHeight, 10);
-        if (!isNaN(newWidth) && newWidth > 0 && !isNaN(newHeight) && newHeight > 0) {
-            setCanvasSize({ width: newWidth, height: newHeight });
-        } else {
-            setLocalWidth(canvasWidth.toString());
-            setLocalHeight(canvasHeight.toString());
+    const setViewport = (vp: Viewport) => {
+        setActiveViewport(vp);
+        const sz = VIEWPORT_SIZES[vp];
+        setCanvasSize({ width: sz.w, height: sz.h });
+    };
+
+    const applySize = () => {
+        const w = parseInt(wStr, 10), h = parseInt(hStr, 10);
+        if (!isNaN(w) && w > 0 && !isNaN(h) && h > 0) setCanvasSize({ width: w, height: h });
+        else {
+            setWStr(String(canvasWidth));
+            setHStr(String(canvasHeight));
         }
     };
 
-    const handleZoom = (newZoom: number) => {
-        const clampedZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
-        setCanvasZoom(clampedZoom);
-    };
-
+    const handleZoom = (z: number) => setCanvasZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z)));
     const applyZoom = () => {
-        const newZoom = parseInt(localZoom, 10);
-        if (!isNaN(newZoom)) {
-            handleZoom(newZoom / 100);
-        } else {
-            setLocalZoom(Math.round(zoom * 100).toString());
-        }
+        const v = parseInt(zoomStr, 10);
+        if (!isNaN(v)) handleZoom(v / 100);
+        else setZoomStr(String(Math.round(zoom * 100)));
     };
 
     return (
-        <div className="h-10 px-4 flex items-center justify-between text-sm border-b bg-white shrink-0 text-gray-800">
-            {/* Left Section */}
-            <div className="flex items-center gap-4 flex-1">
+        <div className="relative w-full flex items-center border-b border-gray-200 bg-white px-3 py-2">
+            {/* Left: 페이지 선택 (기존 유지) */}
+            <div className="flex items-center gap-2">
                 <select
-                    className="border rounded px-2 py-1 bg-white text-sm font-semibold"
+                    className="px-2 py-1 rounded border border-gray-200 text-sm"
                     value={currentPage?.id ?? ''}
                     onChange={(e) => selectPage(e.target.value)}
                 >
@@ -76,93 +88,162 @@ export default function PageBar() {
                         <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                 </select>
-                <div className="flex items-center border-l pl-2">
+            </div>
+
+            {/* Center: 요구사항 그룹 순서 & 구분자 */}
+            <div className="mx-auto flex items-center">
+                {/* ─ Undo/Redo ─ */}
+                <div className="flex items-center gap-1">
                     <button
-                        title="Undo (Ctrl+Z)"
+                        className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
                         onClick={undo}
                         disabled={history.past.length === 0}
-                        className="p-1.5 hover:bg-gray-100 rounded disabled:text-gray-300 disabled:cursor-not-allowed"
+                        title="Undo"
                     >
                         <Undo size={16} />
                     </button>
                     <button
-                        title="Redo (Ctrl+Y)"
+                        className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
                         onClick={redo}
                         disabled={history.future.length === 0}
-                        className="p-1.5 hover:bg-gray-100 rounded disabled:text-gray-300 disabled:cursor-not-allowed"
+                        title="Redo"
                     >
                         <Redo size={16} />
                     </button>
                 </div>
-            </div>
 
-            {/* Center Section */}
-            <div className="flex items-center gap-6">
-                <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded">
-                    <button title="Desktop" onClick={() => setViewport('base')} className={`p-1.5 rounded ${activeViewport === 'base' ? 'bg-white shadow-sm' : 'hover:bg-gray-200 text-gray-500'}`}>
-                        <Monitor size={16} />
-                    </button>
-                    <button title="Tablet" onClick={() => setViewport('tablet')} className={`p-1.5 rounded ${activeViewport === 'tablet' ? 'bg-white shadow-sm' : 'hover:bg-gray-200 text-gray-500'}`}>
-                        <Tablet size={16} />
-                    </button>
-                    <button title="Mobile" onClick={() => setViewport('mobile')} className={`p-1.5 rounded ${activeViewport === 'mobile' ? 'bg-white shadow-sm' : 'hover:bg-gray-200 text-gray-500'}`}>
-                        <Smartphone size={16} />
-                    </button>
-                </div>
-                <div className="flex items-center gap-1">
-                    <input
-                        type="number" className="w-14 text-center border rounded-sm px-1 py-0.5 text-xs"
-                        value={localWidth} onChange={e => setLocalWidth(e.target.value)}
-                        onBlur={applyCanvasSize} onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                    />
-                    <span className="text-gray-400 text-xs">×</span>
-                    <input
-                        type="number" className="w-14 text-center border rounded-sm px-1 py-0.5 text-xs"
-                        value={localHeight} onChange={e => setLocalHeight(e.target.value)}
-                        onBlur={applyCanvasSize} onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                    />
-                    <button className="p-1 hover:bg-gray-100 rounded" title="Rotate Canvas" onClick={toggleCanvasOrientation}>
-                        <RotateCw size={14} className="text-gray-500" />
-                    </button>
-                </div>
-                <div className="flex items-center gap-2 border-l pl-4">
-                    <button
-                        className="p-1 hover:bg-gray-100 rounded disabled:text-gray-300 disabled:cursor-not-allowed"
-                        onClick={() => handleZoom(zoom - ZOOM_STEP)}
-                        disabled={zoom <= ZOOM_MIN}
-                    >
-                        <Minus size={14} />
-                    </button>
-                    <div className="w-16 text-center text-xs">
+                {/* 구분자 */}
+                <span className="mx-3 h-5 w-px bg-gray-300" />
+
+                {/* ─ Viewport Mode (라디오) ─ */}
+                <div className="flex items-center gap-3" aria-label="Viewport style mode">
+                    <label className="flex items-center gap-1 text-xs text-gray-700">
                         <input
-                            type="text"
-                            className="w-full text-center bg-transparent"
-                            value={`${localZoom}%`}
-                            onChange={e => setLocalZoom(e.target.value.replace('%', ''))}
-                            onBlur={applyZoom}
-                            onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                            type="radio"
+                            name="vp-mode"
+                            checked={vpMode[activeViewport] === 'Unified'}
+                            onChange={() => { setViewportMode(activeViewport, 'Unified'); notify(`Mode: Unified (${activeViewport})`); }}
+                        />
+                        통합
+                    </label>
+                    <label className="flex items-center gap-1 text-xs text-gray-700" title="이 뷰포트에서만 Base를 오버라이드합니다.">
+                        <input
+                            type="radio"
+                            name="vp-mode"
+                            checked={vpMode[activeViewport] === 'Independent'}
+                            onChange={() => { setViewportMode(activeViewport, 'Independent'); notify(`Mode: Independent (${activeViewport})`); }}
+                        />
+                        개별
+                    </label>
+                </div>
+
+                {/* 구분자 */}
+                <span className="mx-3 h-5 w-px bg-gray-300" />
+
+                {/* ─ Viewport 전환 + Base 라디오(텍스트 없음) ─ */}
+                <div className="flex items-center gap-2">
+                    {VP_LIST.map(vp => (
+                        <div key={vp} className="flex items-center gap-1">
+                            {/* 뷰포트 전환 버튼 */}
+                            <button
+                                onClick={() => setViewport(vp)}
+                                className={[
+                                    'px-2 py-1 rounded border text-sm flex items-center gap-1',
+                                    activeViewport === vp
+                                        ? 'border-blue-500 bg-blue-50'
+                                        : 'border-gray-200 bg-white hover:bg-gray-50',
+                                ].join(' ')}
+                                title={`Switch to ${vp}`}
+                            >
+                                {VP_ICON[vp]} <span className="capitalize">{vp}</span>
+                            </button>
+
+                            {/* Base 라디오 (아이콘/텍스트 옆, 텍스트 없이) */}
+                            <input
+                                type="radio"
+                                name="vp-base"
+                                className="accent-blue-600"
+                                checked={baseViewport === vp}
+                                onChange={() => { setBaseViewport(vp); notify(`Base viewport: ${vp}`); }}
+                                title="Set as Base"
+                            />
+                        </div>
+                    ))}
+                </div>
+
+                {/* 구분자 */}
+                <span className="mx-3 h-5 w-px bg-gray-300" />
+
+                {/* ─ Viewport Size / Rotate / Zoom ─ */}
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                        <input
+                            className="w-16 px-2 py-1 rounded border border-gray-200 text-sm"
+                            value={wStr}
+                            onChange={(e) => setWStr(e.target.value)}
+                            onBlur={applySize}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                            aria-label="Canvas width"
+                        />
+                        <span>×</span>
+                        <input
+                            className="w-16 px-2 py-1 rounded border border-gray-200 text-sm"
+                            value={hStr}
+                            onChange={(e) => setHStr(e.target.value)}
+                            onBlur={applySize}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                            aria-label="Canvas height"
                         />
                     </div>
+
                     <button
-                        className="p-1 hover:bg-gray-100 rounded disabled:text-gray-300 disabled:cursor-not-allowed"
-                        onClick={() => handleZoom(zoom + ZOOM_STEP)}
-                        disabled={zoom >= ZOOM_MAX}
+                        className="p-1.5 rounded border border-gray-200 hover:bg-gray-50"
+                        onClick={() => toggleCanvasOrientation()}
+                        title="Swap width/height"
                     >
-                        <Plus size={14} />
+                        <RotateCw size={16} />
                     </button>
+
+                    <div className="flex items-center gap-1">
+                        <button
+                            className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                            onClick={() => handleZoom(zoom - ZOOM_STEP)}
+                            disabled={zoom <= ZOOM_MIN}
+                            title="Zoom out"
+                        >
+                            <Minus size={16} />
+                        </button>
+                        <input
+                            className="w-14 px-2 py-1 rounded border border-gray-200 text-sm"
+                            value={zoomStr}
+                            onChange={(e) => setZoomStr(e.target.value.replace('%', ''))}
+                            onBlur={applyZoom}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                            aria-label="Zoom percent"
+                        />
+                        <button
+                            className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                            onClick={() => handleZoom(zoom + ZOOM_STEP)}
+                            disabled={zoom >= ZOOM_MAX}
+                            title="Zoom in"
+                        >
+                            <Plus size={16} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Right Section */}
-            <div className="flex items-center gap-3 flex-1 justify-end">
-                <span className="text-xs text-gray-400">Saved</span>
-                <button className="text-xs px-3 py-1 border rounded hover:bg-gray-50">
-                    Preview
-                </button>
-                <button className="text-xs px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">
-                    Publish
-                </button>
-            </div>
+            {/* Right: 균형 유지용 빈 영역 */}
+            <div className="w-[1px]" />
+
+            {/* Toast */}
+            {toast && (
+                <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2">
+                    <div className="flex items-center gap-2 rounded bg-black/80 text-white text-xs px-3 py-1.5 shadow">
+                        <Info size={14} /> {toast}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

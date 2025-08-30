@@ -1,22 +1,21 @@
-/* SSOT: 모든 타입은 본 파일에서만 정의/수출합니다. (any 사용 금지) */
-
-// =======================================================================
-// │                                                                     │
-// │   1. Core Data Models                                               │
-// │   프로젝트의 핵심 데이터(노드, 페이지, 스타일)를 정의합니다.          │
-// │                                                                     │
-// =======================================================================
+/* SSOT: 모든 타입은 본 파일에서만 정의/수출합니다. (any 사용 최소화) */
+/* =============================================================================
+   1. Core Data Models
+   프로젝트의 핵심 데이터(노드, 페이지, 스타일)를 정의합니다.
+============================================================================= */
 
 export type NodeId = string;
+export type CSSDict = Record<string, unknown>;
 
-export type CSSDict = Record<string, string | number | undefined>;
-
+/** V3는 'base' | 'tablet' | 'mobile' 3-뷰포트로 운용합니다. */
 export type Viewport = 'base' | 'tablet' | 'mobile';
 
+/** 스타일 컨테이너 (필요 시 확장) */
 export interface StyleBase {
     element?: Partial<Record<Viewport, CSSDict>>;
 }
 
+/** 에디터에서 다루는 노드(컴포넌트 인스턴스) */
 export interface Node<
     P extends Record<string, unknown> = Record<string, unknown>,
     S extends StyleBase = StyleBase
@@ -30,6 +29,7 @@ export interface Node<
     isVisible?: boolean;
 }
 
+/** 페이지 / 프래그먼트 */
 export interface Page {
     id: string;
     name: string;
@@ -43,6 +43,7 @@ export interface Fragment {
     rootId: NodeId;
 }
 
+/** 외부/인라인 스타일시트(프로젝트 수준) */
 export interface Stylesheet {
     id: string;
     name: string;
@@ -52,37 +53,45 @@ export interface Stylesheet {
     enabled: boolean;
 }
 
-export type ComponentSchemaOverrides = Record<string, PropSchemaEntry[]>;
+export type ComponentSchemaOverrides = Record<
+    string,
+    Array<PropSchemaEntry<any, any>>
+>;
 
+/** 프로젝트 전체 스냅샷 */
 export interface Project {
     pages: Page[];
     fragments: Fragment[];
     nodes: Record<NodeId, Node>;
     rootId: NodeId;
+
     schemaOverrides?: ComponentSchemaOverrides;
-    templates?: Record<TemplateId, TemplateDefinition>;
+    templates?: Record<string, TemplateDefinition>;
     inspectorFilters?: Record<string, InspectorFilter>;
     tagPolicies?: TagPolicyMap;
+
+    /** 레포 기준: stylesheets 존재 (ProjectStylesheets 패널과 연동) */
     stylesheets?: Stylesheet[];
 }
 
-// =======================================================================
-// │                                                                     │
-// │   2. Component & Template Definitions                               │
-// │   컴포넌트의 기본 구조와 정책, 템플릿을 정의합니다.                 │
-// │                                                                     │
-// =======================================================================
+/* =============================================================================
+   2. Component & Template Definitions
+   컴포넌트의 기본 구조와 정책, 템플릿을 정의합니다.
+============================================================================= */
 
 export type CommonMeta = {
     __name?: string;
     __slotId?: string;
     __tag?: string;
-    __tagAttrs?: Record<string, string>;
+    __tagAttrs?: Record<string, unknown>;
 };
 
-export type PropSchemaEntry<P extends Record<string, unknown> = Record<string, unknown>> =
+export type PropSchemaEntry<
+    P extends Record<string, unknown> = Record<string, unknown>,
+    K extends keyof P & string = keyof P & string
+> =
     | {
-    key: keyof P & string;
+    key: K;
     type: 'text';
     label?: string;
     placeholder?: string;
@@ -91,7 +100,7 @@ export type PropSchemaEntry<P extends Record<string, unknown> = Record<string, u
     whenExpr?: string;
 }
     | {
-    key: keyof P & string;
+    key: K;
     type: 'select';
     label?: string;
     options: { label: string; value: unknown }[];
@@ -113,18 +122,21 @@ export interface ComponentDefinition<
 > {
     id: string;
     title: string;
-    defaults: { props: Partial<P>; styles: Partial<S> };
-    propsSchema?: Array<PropSchemaEntry<P>>;
+    defaults: {
+        props: Partial<P>;
+        styles: Partial<S>; // { element: { base: CSSDict } } 등
+    };
+    propsSchema?: Array<PropSchemaEntry<P, any>>;
     capabilities?: ComponentCapabilities;
 }
 
 export type TemplateId = string;
 
 export interface InspectorFilter {
-    props?:  { allow?: string[]; deny?: string[] };
+    props?: { allow?: string[]; deny?: string[] };
     styles?: { allow?: string[]; deny?: string[] };
     actions?: { allowEvents?: SupportedEvent[] };
-    flows?:   { allowKinds?: Array<'Navigate'|'OpenFragment'|'CloseFragment'> };
+    flows?: { allowKinds?: Array<'Navigate' | 'OpenFragment' | 'CloseFragment'> };
     bindings?: { allow?: string[] };
 }
 
@@ -135,15 +147,19 @@ export interface TemplateDefinition {
     defaults?: { props?: Record<string, unknown>; styles?: CSSDict };
     schemaOverride?: PropSchemaEntry[];
     inspectorFilter?: InspectorFilter;
+
     actionPresets?: Partial<Record<SupportedEvent, ActionSpec>>;
     flowPresets?: FlowEdge[];
+
     capabilityDelta?: {
         allowedTagsRestrict?: string[];
-        tagPolicyDelta?: { [tag: string]: {
+        tagPolicyDelta?: {
+            [tag: string]: {
                 dropAttributes?: string[];
                 dropStyleAllows?: string[];
                 addStyleDenies?: string[];
-            }};
+            };
+        };
     };
 }
 
@@ -152,17 +168,13 @@ export interface TagPolicy {
     styles?: { allow?: string[]; deny?: string[] };
     isVoid?: boolean;
 }
-
 export type TagPolicyMap = Record<string, TagPolicy>;
-
 export type BaseDefTagWhitelist = Record<string, string[]>;
 
-// =======================================================================
-// │                                                                     │
-// │   3. Actions & Flows                                                │
-// │   사용자 상호작용과 동적 로직을 정의합니다.                         │
-// │                                                                     │
-// =======================================================================
+/* =============================================================================
+   3. Actions & Flows
+   사용자 상호작용과 동적 로직을 정의합니다.
+============================================================================= */
 
 export type SupportedEvent = 'onClick' | 'onChange' | 'onSubmit' | 'onLoad';
 
@@ -196,20 +208,27 @@ export interface BindingScope {
     project: Project | null;
 }
 
-// =======================================================================
-// │                                                                     │
-// │   4. Editor State & UI Models                                       │
-// │   에디터의 상태와 UI 관련 구조를 정의합니다.                        │
-// │                                                                     │
-// =======================================================================
+/* =============================================================================
+   4. Editor State & UI Models
+   에디터의 상태와 UI 관련 구조를 정의합니다.
+============================================================================= */
 
 export type EditorMode = 'Page' | 'Component';
 export type LeftTabKind = 'Explorer' | 'Composer';
-export type ExplorerPreviewSel = { kind: 'page' | 'component'; id: string } | null;
+export type ExplorerPreviewSel =
+    | { kind: 'page' | 'component'; id: string }
+    | null;
+
 export type BottomRightPanelKind = 'SchemaEditor' | 'PropVisibility' | 'Logs' | 'None';
 
+/** ✅ V4-아키텍처에 필요한 추가 개념
+ *  - baseViewport: '어느 뷰포트가 Base(공통 스타일) 역할인지' 포인터
+ *  - vpMode: 각 뷰포트가 'Unified(공통에 기록)'인지 'Independent(개별 override)'인지
+ */
+export type ViewportMode = 'Unified' | 'Independent';
+
 export interface EditorUI {
-    // --- Global State ---
+    // --- Global ---
     selectedId: NodeId | null;
     mode: EditorMode;
     expertMode: boolean;
@@ -218,32 +237,25 @@ export interface EditorUI {
     // --- Center Panel (Canvas) ---
     canvas: {
         width: number;
-        height: number; // ✅ [추가] 캔버스 세로 높이
+        height: number;              // 세로 높이
         zoom: number;
-        orientation: 'portrait' | 'landscape'; // ✅ [추가] 가로/세로 모드
+        orientation: 'portrait' | 'landscape';
         activeViewport: Viewport;
+
+        /** ★ 추가: Base 포인터 & 뷰포트별 모드 */
+        baseViewport: Viewport;
+        vpMode: Record<Viewport, ViewportMode>;
     };
 
     // --- Side Panels ---
     panels: {
-        left: {
-            tab: LeftTabKind;
-            widthPx: number;
-            splitPct: number;
-            explorerPreview: ExplorerPreviewSel | null;
-        };
-        right: {
-            widthPx: number;
-        };
+        left: { tab: LeftTabKind; widthPx: number; splitPct: number; explorerPreview: ExplorerPreviewSel | null };
+        right: { widthPx: number };
         bottom: {
             heightPx: number;
-            right?: number,
-            isCollapsed?: boolean; // ✅ [추가] 하단 패널 접힘 상태
-            advanced: {
-                open: boolean;
-                kind: BottomRightPanelKind;
-                widthPct: number;
-            } | null;
+            right?: number;
+            isCollapsed?: boolean;
+            advanced: { open: boolean; kind: BottomRightPanelKind; widthPct: number } | null;
         };
     };
 }
@@ -253,28 +265,44 @@ export interface EditorState {
     ui: EditorUI;
     data: Record<string, unknown>;
     settings: Record<string, unknown>;
+
+    /** FlowEdges는 EditorState 루트에 보관 (Project에는 없음) */
     flowEdges: Record<string, FlowEdge>;
-    history: {
-        past: Project[];
-        future: Project[];
-    };
+
+    /** undo/redo는 Project 스냅샷만 기록 */
+    history: { past: Project[]; future: Project[] };
 }
 
-// =======================================================================
-// │                                                                     │
-// │   5. Utility & Meta Types                                           │
-// │   보조적인 유틸리티 및 메타데이터 타입을 정의합니다.                 │
-// │                                                                     │
-// =======================================================================
-// ... (이하 동일)
+/* =============================================================================
+   5. Utility & Meta Types
+============================================================================= */
+
 export interface PropVisibilityOverride {
     whenExpr?: string;
 }
 export type PropVisibilityMap = Record<string, PropVisibilityOverride>;
-export type NodePropsWithMeta = Record<string, unknown> & { __propVisibility?: PropVisibilityMap; } & CommonMeta;
+
+export type NodePropsWithMeta = Record<string, unknown> &
+    { __propVisibility?: PropVisibilityMap } &
+    CommonMeta;
+
 export type DndDragType = 'palette-component' | 'canvas-node' | 'layers-node';
 export type DropPosition = 'inside' | 'before' | 'after';
-export interface DndDragPayloadPalette { kind: 'palette-component'; defId: string; }
-export interface DndDragPayloadNode { kind: 'canvas-node' | 'layers-node'; nodeId: NodeId; }
+
+export interface DndDragPayloadPalette {
+    kind: 'palette-component';
+    defId: string;
+}
+export interface DndDragPayloadNode {
+    kind: 'canvas-node' | 'layers-node';
+    nodeId: NodeId;
+}
 export type DndDragPayload = DndDragPayloadPalette | DndDragPayloadNode;
-export interface DndDropTarget { nodeId: NodeId; position: DropPosition; }
+
+export interface DndDropTarget {
+    nodeId: NodeId;
+    position: DropPosition;
+}
+
+/** 편의: StylesSection 등에서 사용하는 병합 결과 타입 */
+export type CSSDecl = Record<string, unknown>;
