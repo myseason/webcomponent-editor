@@ -244,8 +244,13 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         const prev = current.history.past[current.history.past.length - 1];
         const future = [current.project, ...current.history.future];
         const past = current.history.past.slice(0, -1);
-
-        set({ ...current, project: prev, history: { past, future } });
+        const nextSelected = prev.nodes[current.ui.selectedId ?? ''] ? current.ui.selectedId : prev.rootId;
+        set({
+            ...current,
+            project: prev,
+            ui: { ...current.ui, selectedId: nextSelected },
+            history: { past, future }
+        });
     },
 
     redo: () => {
@@ -254,8 +259,13 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         const next = current.history.future[0];
         const future = current.history.future.slice(1);
         const past = [...current.history.past, current.project];
-
-        set({ ...current, project: next, history: { past, future } });
+        const nextSelected = next.nodes[current.ui.selectedId ?? ''] ? current.ui.selectedId : next.rootId;
+        set({
+            ...current,
+            project: next,
+            ui: { ...current.ui, selectedId: nextSelected },
+            history: { past, future }
+        });
     },
 
     select: (id) => get().update(s => { s.ui.selectedId = id; }),
@@ -372,54 +382,45 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
     }, true),
 
     // 삭제: 루트는 삭제 금지. 선택 포커스 보정.
-    removeNodeCascade: (nodeId) => get().update(s => {
-        if (nodeId === s.project.rootId) return; // 루트 삭제 금지
+    removeNodeCascade: (nodeId) => get().update((s) => {
+        if (nodeId === s.project.rootId) return; // 루트 금지
 
-        // 하위 전체 수집
-        const collect = (id: NodeId, acc: NodeId[]) => {
-            acc.push(id);
-            const n = s.project.nodes[id];
-            (n?.children ?? []).forEach(cid => collect(cid, acc));
-        };
-        const toDel: NodeId[] = [];
-        collect(nodeId, toDel);
-
-        const parentId = findParentId(s.project, nodeId);
-        const next = { ...s.project.nodes };
-        toDel.forEach(id => delete next[id]);
-
+        const nodes = { ...s.project.nodes };
+        // 부모에서 끊기
+        const parentId = (Object.keys(nodes).find(pid => nodes[pid]?.children?.includes(nodeId)) ?? null) as string | null;
         if (parentId) {
-            const p = s.project.nodes[parentId];
-            if (p) next[parentId] = { ...p, children: (p.children ?? []).filter(c => c !== nodeId) };
+            const parent = { ...nodes[parentId]! };
+            parent.children = (parent.children ?? []).filter(cid => cid !== nodeId);
+            nodes[parentId] = parent;
         }
-        s.project.nodes = next;
+
+        // 서브트리 삭제
+        const toDelete = collectSubtreeIds(nodes as any, nodeId);
+        for (const id of toDelete) delete nodes[id];
 
         // 선택 보정
-        const sel = s.ui.selectedId;
-        if (sel && toDel.includes(sel)) s.ui.selectedId = parentId ?? s.project.rootId;
+        const nextSelected = nodes[s.ui.selectedId ?? ''] ? s.ui.selectedId : s.project.rootId;
+
+        s.project.nodes = nodes;
+        s.ui.selectedId = nextSelected;
     }, true),
 
-    toggleNodeVisibility: (nodeId) =>
-        get().update(s => {
-            const n = s.project.nodes[nodeId];
-            if (!n) return;
-            s.project.nodes[nodeId] = { ...n, isVisible: !n.isVisible };
-        }, true),
+    toggleNodeVisibility: (nodeId) => get().update((s) => {
+        const n = s.project.nodes[nodeId]; if (!n) return;
+        s.project.nodes[nodeId] = { ...n, isVisible: !n.isVisible };
+    }, true),
 
-    toggleNodeLock: (nodeId) =>
-        get().update(s => {
-            const n = s.project.nodes[nodeId];
-            if (!n) return;
-            s.project.nodes[nodeId] = { ...n, locked: !n.locked };
-        }, true),
+    toggleNodeLock: (nodeId) => get().update((s) => {
+        const n = s.project.nodes[nodeId]; if (!n) return;
+        s.project.nodes[nodeId] = { ...n, locked: !n.locked };
+    }, true),
 
-    selectPage: (pageId) =>
-        get().update(s => {
-            const page = s.project.pages.find(p => p.id === pageId);
-            if (!page) return;
-            s.project.rootId = page.rootId;
-            s.ui.selectedId = page.rootId;
-        }),
+    selectPage: (pageId) => get().update((s) => {
+        const page = s.project.pages.find(p => p.id === pageId);
+        if (!page) return;
+        s.project.rootId = page.rootId;
+        s.ui.selectedId = page.rootId;
+    }, false),
 
     addPage: (name) => {
         const pageId = genId('page');
@@ -534,16 +535,17 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         const node = s.project.nodes[nodeId];
         if (!node) return null;
 
-        const vp = s.ui.canvas.activeViewport;
-        const base = s.ui.canvas.baseViewport;
-        const mode = s.ui.canvas.vpMode?.[vp] ?? 'Unified';
+        const el = node.styles?.element ?? {};
+        const base = s.ui.canvas.baseViewport;      // ex) 'base' | 'tablet' | 'mobile'
+        const active = s.ui.canvas.activeViewport;  // 현재 보고있는 뷰포트
+        const mode = s.ui.canvas.vpMode[active];    // 'Unified' | 'Independent'
 
-        const el = (node.styles?.element ?? {}) as Record<string, CSSDict | undefined>;
-        const baseDecl = (el[base] ?? el.base ?? {}) as CSSDict;
-        if (mode === 'Unified') return baseDecl;
-
-        const vpDecl = (el[vp] ?? {}) as CSSDict;
-        return { ...baseDecl, ...vpDecl };
+        const baseDecl = (el as any)[base] ?? {};
+        if (mode === 'Independent' && active !== base) {
+            const ov = (el as any)[active] ?? {};
+            return { ...baseDecl, ...ov };
+        }
+        return { ...baseDecl };
     },
 
     // === Key-Value settings ===
