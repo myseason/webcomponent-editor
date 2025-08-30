@@ -69,6 +69,23 @@ let _seq = 0;
 const genId = (prefix: string): string =>
     `${prefix}_${Date.now().toString(36)}_${++_seq}`;
 
+function setByPath(root: any, path: string, value: unknown) {
+    const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
+    const out = { ...(root ?? {}) };
+    let cur: any = out;
+    for (let i = 0; i < parts.length - 1; i++) {
+        const k = parts[i];
+        const prev = cur[k];
+        cur[k] =
+            Array.isArray(prev) ? [...prev]
+                : (prev && typeof prev === 'object') ? { ...prev }
+                    : {};
+        cur = cur[k];
+    }
+    cur[parts[parts.length - 1]] = value;
+    return out;
+}
+
 function buildNodeWithDefaults(defId: string, id: string): Node {
     const def = getDefinition(defId);
     const defProps = def?.defaults?.props ?? {};
@@ -168,6 +185,8 @@ type EditorActions = {
     removePage: (pageId: string) => void;
 
     // 프래그먼트
+    openFragment: (fragmentId?: string) => void;   // 인자 없으면 top push만
+    closeFragment: (fragmentId?: string) => void;  // 인자 없으면 top pop
     addFragment: (name?: string) => string;
     removeFragment: (fragmentId: string) => void;
 
@@ -179,13 +198,19 @@ type EditorActions = {
     // 캔버스/뷰포트
     setCanvasSize: (size: { width: number; height: number }) => void;
     setCanvasZoom: (zoom: number) => void;
+
     toggleCanvasOrientation: () => void;
+    toggleBottomDock: () => void;
+
     setActiveViewport: (viewport: Viewport) => void;
     setBaseViewport: (viewport: Viewport) => void;
     setViewportMode: (viewport: Viewport, mode: ViewportMode) => void;
 
     // 스타일 읽기
     getEffectiveDecl: (nodeId: NodeId) => CSSDict | null;
+
+    setData: (path: string, value: unknown) => void;
+    setSetting: (key: string, value: unknown) => void;
 
     // 초기화
     hydrateDefaults: () => void;
@@ -420,6 +445,18 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         }
     }, true),
 
+    openFragment: (fragmentId) => get().update((s) => {
+        const next = [...(s.ui.overlays ?? [])];
+        if (fragmentId) next.push(fragmentId);
+        s.ui.overlays = next;
+    }, false),
+
+    closeFragment: (fragmentId) => get().update((s) => {
+        const prev = s.ui.overlays ?? [];
+        if (!prev.length) return;
+        s.ui.overlays = fragmentId ? prev.filter(id => id !== fragmentId) : prev.slice(0, -1);
+    }, false),
+
     addFragment: (name) => {
         const newId = genId('fragment');
         const rootId = genId('frag_root');
@@ -471,6 +508,14 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         s.ui.canvas.height = width;
     }),
 
+    toggleBottomDock: () => {
+        const cur = get();
+        get().update((s) => {
+            const bottom = s.ui.panels.bottom ?? { heightPx: 240, isCollapsed: false, advanced: null };
+            s.ui.panels.bottom = { ...bottom, isCollapsed: !bottom.isCollapsed };
+        }, false); // UI 토글은 히스토리에 남기지 않음
+    },
+
     setActiveViewport: (viewport) => get().update(s => {
         s.ui.canvas.activeViewport = viewport;
     }),
@@ -500,6 +545,16 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         const vpDecl = (el[vp] ?? {}) as CSSDict;
         return { ...baseDecl, ...vpDecl };
     },
+
+    // === Key-Value settings ===
+    setSetting: (key, value) => get().update((s) => {
+        s.settings = { ...(s.settings ?? {}), [key]: value };
+    }, true),
+
+    // === Arbitrary data (path 지원) ===
+    setData: (path, value) => get().update((s) => {
+        s.data = setByPath(s.data ?? {}, path, value);
+    }, true),
 
     /** 정의 기본값 + 현재 노드 기본값 보정 */
     hydrateDefaults: () => get().update(s => {
