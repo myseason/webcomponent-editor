@@ -19,10 +19,14 @@ import {
     Settings as SettingsIcon,
     GripHorizontal as GripIcon,
 } from 'lucide-react';
+import {PanelTitle} from "@/figmaV3/editor/common/PanelTitle";
 
 // 임시 Settings 패널(기존에 없다면 유지)
 const SettingsPanel = () => (
-    <div className="p-4 text-sm text-gray-500">Settings Panel (To be implemented)</div>
+    <div className="flex flex-col h-full">
+        <PanelTitle title="Settings" />
+        <div className="p-4 text-sm text-gray-500">Settings Panel (To be implemented)</div>
+    </div>
 );
 
 // 모든 허브 탭(모드에 따라 필터링됨)
