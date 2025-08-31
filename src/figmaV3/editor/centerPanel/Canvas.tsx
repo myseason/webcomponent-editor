@@ -71,16 +71,33 @@ export function Canvas({ dropTarget }: { dropTarget: DndDropTarget | null }) {
     const state = useEditor();
     const { mode, editingFragmentId } = state.ui;
 
-    const rootId = mode === 'Component' && editingFragmentId
-        ? state.project.fragments.find(f => f.id === editingFragmentId)?.rootId
-        : state.project.rootId;
+    // ✨ [수정] 모드에 따라 렌더링할 루트 노드를 결정하는 로직 개선
+    const rootId = useMemo(() => {
+        if (mode === 'Page') {
+            return state.project.rootId;
+        }
+        if (mode === 'Component' && editingFragmentId) {
+            return state.project.fragments.find(f => f.id === editingFragmentId)?.rootId ?? null;
+        }
+        // 컴포넌트 모드이지만 편집 대상이 없으면 null 반환
+        return null;
+    }, [mode, editingFragmentId, state.project.rootId, state.project.fragments]);
+
 
     const { width, height, zoom } = state.ui.canvas;
     const scaledW = Math.round(width * zoom);
     const scaledH = Math.round(height * zoom);
 
-    if (!rootId) {
-        return <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">Select a page or component to start editing.</div>;
+    // ✨ [수정] 렌더링할 대상이 없을 경우 안내 메시지 표시
+    if (!rootId || !state.project.nodes[rootId]) {
+        const message = mode === 'Component'
+            ? "Select a component to start editing."
+            : "Select a page to start editing.";
+        return (
+            <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
+                {message}
+            </div>
+        );
     }
 
     return (

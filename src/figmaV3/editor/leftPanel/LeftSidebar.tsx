@@ -20,17 +20,46 @@ const HUB_TABS: { id: ProjectHubTab; icon: React.ElementType }[] = [
     { id: 'Settings', icon: Settings },
 ];
 
+const COMPONENT_MODE_TABS: Set<ProjectHubTab> = new Set(['Components', 'Layers']);
+
 export function LeftSidebar() {
     const state = useEditor();
-    const { ui, setEditorMode, setActiveHubTab } = state;
+    // ✨ [수정] setNotification 액션을 가져옵니다.
+    const { ui, setEditorMode, setActiveHubTab, setNotification } = state;
     const { activeHubTab } = ui.panels.left;
     const { mode } = ui;
+
+    const availableTabs = React.useMemo(() => {
+        if (mode === 'Component') {
+            return HUB_TABS.filter(tab => COMPONENT_MODE_TABS.has(tab.id));
+        }
+        return HUB_TABS;
+    }, [mode]);
+
+    React.useEffect(() => {
+        if (mode === 'Component' && !COMPONENT_MODE_TABS.has(activeHubTab)) {
+            setActiveHubTab('Components');
+        }
+    }, [mode, activeHubTab, setActiveHubTab]);
+
+    // ✨ [추가] 모드 전환 시 알림을 표시하는 핸들러
+    const handleModeChange = (newMode: EditorMode) => {
+        if (ui.mode === newMode) return;
+        setEditorMode(newMode);
+        const message = newMode === 'Page'
+            ? '🚀 페이지 빌드 모드로 전환되었습니다.'
+            : '🛠️ 컴포넌트 개발 모드로 전환되었습니다.';
+        setNotification(message);
+    };
+
+    // ✨ [추가] 모드에 따른 테두리 색상 클래스
+    const modeBorderStyle = mode === 'Page' ? 'border-t-blue-500' : 'border-t-purple-500';
 
     return (
         <div className="h-full flex min-h-0 bg-white border-r border-gray-200">
             {/* 1. 수직 아이콘 탭 바 */}
             <div className="w-12 h-full border-r bg-gray-50 flex flex-col items-center py-4 gap-2">
-                {HUB_TABS.map(({ id, icon: Icon }) => (
+                {availableTabs.map(({ id, icon: Icon }) => (
                     <button
                         key={id}
                         onClick={() => setActiveHubTab(id)}
@@ -44,11 +73,15 @@ export function LeftSidebar() {
 
             {/* 2. 선택된 탭에 해당하는 패널 */}
             <div className="flex-1 min-w-0 flex flex-col">
+                {/* ✨ [추가] 모드 구분을 위한 색상 테두리 */}
+                <div className={`w-full border-t-4 ${modeBorderStyle}`}></div>
+
                 {/* 패널 최상단에 모드 스위처 배치 */}
                 <div className="p-2 border-b">
                     <select
                         value={mode}
-                        onChange={(e) => setEditorMode(e.target.value as EditorMode)}
+                        // ✨ [수정] 모드 변경 핸들러 연결
+                        onChange={(e) => handleModeChange(e.target.value as EditorMode)}
                         className="w-full px-2 py-1.5 text-sm font-semibold border rounded bg-white"
                     >
                         <option value="Page">🚀 Page Build Mode</option>

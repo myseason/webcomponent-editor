@@ -13,6 +13,7 @@ import type {
     ProjectHubTab,
     Asset,
     Page,
+    Fragment,
 } from '../core/types';
 
 /** =======================================================================
@@ -49,6 +50,7 @@ const initialState: EditorState = {
         expertMode: false,
         overlays: [],
         editingFragmentId: null,
+        notification: null,
         canvas: {
             width: 1280,
             height: 800,
@@ -59,7 +61,13 @@ const initialState: EditorState = {
             vpMode: { base: 'Unified', tablet: 'Unified', mobile: 'Unified' },
         },
         panels: {
-            left: { activeHubTab: 'Pages', widthPx: 320 },
+            left: {
+                activeHubTab: 'Pages',
+                widthPx: 320,
+                lastActivePageId: null,
+                isSplit: false, // ✨ [추가]
+                splitPercentage: 50, // ✨ [추가]
+            },
             right: { widthPx: 420 },
             bottom: { heightPx: 240, isCollapsed: false, advanced: null },
         },
@@ -218,6 +226,7 @@ type EditorActions = {
     closeFragment: (fragmentId?: string) => void;
     addFragment: (name?: string) => string;
     removeFragment: (fragmentId: string) => void;
+    updateFragment: (fragmentId: string, patch: Partial<Omit<Fragment, 'id' | 'rootId'>>) => void;
 
     addFlowEdge: (edge: FlowEdge) => void;
     updateFlowEdge: (edgeId: string, patch: Partial<FlowEdge>) => void;
@@ -246,6 +255,12 @@ type EditorActions = {
     getEffectiveDecl: (nodeId: NodeId) => CSSDict | null;
     setData: (path: string, value: unknown) => void;
     setSetting: (key: string, value: unknown) => void;
+
+    setNotification: (message: string) => void;
+
+    // ✨ [추가] 분할 보기 액션
+    toggleLeftPanelSplit: () => void;
+    setLeftPanelSplitPercentage: (percentage: number) => void;
 
     hydrateDefaults: () => void;
 };
@@ -418,6 +433,7 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         if (!page) return;
         s.project.rootId = page.rootId;
         s.ui.selectedId = page.rootId;
+        s.ui.panels.left.lastActivePageId = pageId;
     }, false),
 
     addPage: (name) => {
@@ -491,6 +507,12 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         s.project.fragments = s.project.fragments.filter(f => f.id !== fragmentId);
     }, true),
 
+    updateFragment: (fragmentId, patch) => get().update(s => {
+        s.project.fragments = s.project.fragments.map(f =>
+            f.id === fragmentId ? { ...f, ...patch } : f
+        );
+    }, true),
+
     addFlowEdge: (edge) => get().update(s => {
         const id = genId('edge');
         s.flowEdges[id] = { ...edge, id };
@@ -534,10 +556,28 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
     setViewportMode: (viewport, mode) => get().update(s => { s.ui.canvas.vpMode = { ...s.ui.canvas.vpMode, [viewport]: mode }; }, true),
 
     setEditorMode: (mode) => get().update(s => {
+        if (s.ui.mode === mode) return;
         s.ui.mode = mode;
+
         if (mode === 'Page') {
             s.ui.editingFragmentId = null;
-            s.ui.selectedId = s.project.rootId;
+            const lastPageId = s.ui.panels.left.lastActivePageId;
+            const targetPage = s.project.pages.find(p => p.id === lastPageId) ?? s.project.pages[0];
+            if (targetPage) {
+                s.project.rootId = targetPage.rootId;
+                s.ui.selectedId = targetPage.rootId;
+            }
+        } else {
+            const currentPage = s.project.pages.find(p => p.rootId === s.project.rootId);
+            s.ui.panels.left.lastActivePageId = currentPage?.id ?? null;
+            const firstFragment = s.project.fragments[0];
+            if (firstFragment) {
+                s.ui.editingFragmentId = firstFragment.id;
+                s.ui.selectedId = firstFragment.rootId;
+            } else {
+                s.ui.editingFragmentId = null;
+                s.ui.selectedId = null;
+            }
         }
     }),
     setActiveHubTab: (tab) => get().update(s => { s.ui.panels.left.activeHubTab = tab; }),
@@ -545,6 +585,9 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
     openComponentEditor: (fragmentId) => get().update(s => {
         const frag = s.project.fragments.find(f => f.id === fragmentId);
         if (frag) {
+            const currentPage = s.project.pages.find(p => p.rootId === s.project.rootId);
+            s.ui.panels.left.lastActivePageId = currentPage?.id ?? null;
+
             s.ui.mode = 'Component';
             s.ui.editingFragmentId = fragmentId;
             s.ui.selectedId = frag.rootId;
@@ -554,7 +597,12 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
     closeComponentEditor: () => get().update(s => {
         s.ui.mode = 'Page';
         s.ui.editingFragmentId = null;
-        s.ui.selectedId = s.project.rootId;
+        const lastPageId = s.ui.panels.left.lastActivePageId;
+        const targetPage = s.project.pages.find(p => p.id === lastPageId) ?? s.project.pages[0];
+        if (targetPage) {
+            s.project.rootId = targetPage.rootId;
+            s.ui.selectedId = targetPage.rootId;
+        }
     }),
 
     addAsset: (asset) => {
@@ -597,6 +645,23 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
 
     setSetting: (key, value) => get().update((s) => { s.settings = { ...(s.settings ?? {}), [key]: value }; }, true),
     setData: (path, value) => get().update((s) => { s.data = setByPath(s.data ?? {}, path, value); }, true),
+
+    setNotification: (message: string) => get().update(s => {
+        s.ui.notification = { message, timestamp: Date.now() };
+    }),
+
+    // ✨ [추가] 분할 보기 액션 구현
+    toggleLeftPanelSplit: () => get().update(s => {
+        s.ui.panels.left.isSplit = !s.ui.panels.left.isSplit;
+        // 분할 모드를 켤 때, Layers 탭이 아니었다면 Layers로 전환
+        if (s.ui.panels.left.isSplit && s.ui.panels.left.activeHubTab !== 'Layers') {
+            s.ui.panels.left.activeHubTab = 'Layers';
+        }
+    }),
+
+    setLeftPanelSplitPercentage: (percentage: number) => get().update(s => {
+        s.ui.panels.left.splitPercentage = Math.max(20, Math.min(80, percentage)); // 20% ~ 80% 범위로 제한
+    }),
 
     hydrateDefaults: () => get().update(s => {
         const nodes = s.project.nodes;

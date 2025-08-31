@@ -41,6 +41,7 @@ export interface Page {
 export interface Fragment {
     id: string;
     name: string;
+    description?: string;
     rootId: NodeId;
 }
 
@@ -245,6 +246,7 @@ export interface EditorUI {
     expertMode: boolean;
     overlays: string[];
     editingFragmentId: string | null;
+    notification: { message: string; timestamp: number } | null;
 
     // --- Center Panel (Canvas) ---
     canvas: {
@@ -262,6 +264,10 @@ export interface EditorUI {
         left: {
             activeHubTab: ProjectHubTab;
             widthPx: number;
+            lastActivePageId: string | null;
+            // ✨ [추가] 분할 보기 상태
+            isSplit: boolean;
+            splitPercentage: number;
         };
         right: { widthPx: number };
         bottom: {

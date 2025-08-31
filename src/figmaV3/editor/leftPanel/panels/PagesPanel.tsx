@@ -2,124 +2,157 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useEditor } from '../../useEditor';
 import type { Page } from '../../../core/types';
+import { MoreHorizontal, Copy, Trash2 } from 'lucide-react';
 
 function slugify(s: string): string {
     return s.trim().toLowerCase().replace(/[\s_]+/g, '-').slice(0, 64);
 }
 
+/**
+ * ✨ [신규] 페이지 액션 메뉴 컴포넌트
+ */
+const PageActions = ({ page, onDuplicate, onDelete }: { page: Page; onDuplicate: () => void; onDelete: () => void; }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+        <div className="relative" ref={menuRef}>
+            <button onClick={() => setIsOpen(!isOpen)} className="p-1 rounded-md hover:bg-gray-200">
+                <MoreHorizontal size={16} />
+            </button>
+            {isOpen && (
+                <div className="absolute right-0 mt-1 w-40 bg-white border rounded-md shadow-lg z-10">
+                    <ul className="text-xs">
+                        <li>
+                            <button onClick={() => { onDuplicate(); setIsOpen(false); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 flex items-center gap-2">
+                                <Copy size={14} /> Duplicate
+                            </button>
+                        </li>
+                        <li>
+                            <button onClick={() => { onDelete(); setIsOpen(false); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-600 flex items-center gap-2">
+                                <Trash2 size={14} /> Delete
+                            </button>
+                        </li>
+                        {/* 향후 'Save as Template' 기능 추가 위치 */}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+};
+
 export function PagesPanel() {
     const state = useEditor();
     const { project, ui, addPage, removePage, selectPage, update, duplicatePage } = state;
 
-    // ✨ [수정] 이제 로컬 선택 상태가 전역 '열린 페이지' 상태를 따라갑니다.
-    const [selectedPageId, setSelectedPageId] = useState<string | null>(project.rootId ? project.pages.find(p => p.rootId === project.rootId)?.id ?? null : null);
+    const [selectedPageIdForDetails, setSelectedPageIdForDetails] = useState<string | null>(
+        project.pages.find(p => p.rootId === project.rootId)?.id ?? project.pages[0]?.id ?? null
+    );
 
     useEffect(() => {
         const currentPage = project.pages.find(p => p.rootId === project.rootId);
         if (currentPage) {
-            setSelectedPageId(currentPage.id);
+            setSelectedPageIdForDetails(currentPage.id);
         }
     }, [project.rootId, project.pages]);
 
-    const [splitPct, setSplitPct] = useState(50);
-    const containerRef = useRef<HTMLDivElement | null>(null);
 
     if (ui.mode !== 'Page') {
         return <div className="p-4 text-sm text-gray-500">Page management is available in Page Build Mode.</div>
     }
 
-    const selectedPage = project.pages.find(p => p.id === selectedPageId);
+    const selectedPage = project.pages.find(p => p.id === selectedPageIdForDetails);
 
     const createPage = () => {
         const newPageId = addPage('Untitled Page');
-        selectPage(newPageId); // 새로 만든 페이지를 바로 엽니다.
-    };
-
-    const onStartDrag = (e: React.MouseEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        const el = containerRef.current;
-        if (!el) return;
-
-        const onMove = (ev: MouseEvent) => {
-            const rect = el.getBoundingClientRect();
-            const y = ev.clientY - rect.top;
-            const pct = (y / rect.height) * 100;
-            setSplitPct(Math.min(85, Math.max(15, Math.round(pct))));
-        };
-        const onUp = () => {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-        };
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
+        selectPage(newPageId);
     };
 
     return (
-        <div ref={containerRef} className="h-full grid" style={{ gridTemplateRows: `${splitPct}% 6px 1fr` }}>
+        <div className="h-full flex flex-col">
             {/* 상단: 페이지 목록 */}
-            <div className="overflow-auto p-2">
+            <div className="flex-1 overflow-auto p-2">
                 <div className="text-xs font-semibold text-gray-700 px-2 py-1">Pages</div>
                 <ul className="space-y-1 mt-2">
                     {project.pages.map((p) => (
                         <li key={p.id}>
-                            <button
-                                type="button"
-                                // ✨ [수정] 더블클릭 대신 클릭 시 바로 페이지를 열도록 변경
-                                onClick={() => selectPage(p.id)}
-                                className={`w-full text-left px-2 py-1.5 rounded border text-sm ${selectedPageId === p.id ? 'bg-blue-50 border-blue-400' : 'hover:bg-gray-50'}`}
+                            <div
+                                onClick={() => { selectPage(p.id); setSelectedPageIdForDetails(p.id); }}
+                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded border text-sm cursor-pointer ${selectedPageIdForDetails === p.id ? 'bg-blue-50 border-blue-400' : 'hover:bg-gray-50'}`}
                             >
-                                <div className="flex items-center justify-between">
-                                    <span className="truncate">{p.name}</span>
+                                <span className="truncate">{p.name}</span>
+                                <div className="flex items-center gap-2">
                                     {p.rootId === project.rootId && (
-                                        <span className="text-xs text-blue-600 font-semibold ml-2 bg-blue-100 px-2 py-0.5 rounded-full">OPEN</span>
+                                        <span className="text-xs text-blue-600 font-semibold bg-blue-100 px-2 py-0.5 rounded-full">OPEN</span>
                                     )}
+                                    <PageActions
+                                        page={p}
+                                        onDuplicate={() => duplicatePage(p.id)}
+                                        onDelete={() => project.pages.length > 1 && removePage(p.id)}
+                                    />
                                 </div>
-                            </button>
+                            </div>
                         </li>
                     ))}
                 </ul>
             </div>
 
-            {/* 리사이저 */}
-            <div className="h-[6px] cursor-row-resize bg-gray-200 hover:bg-blue-500 transition-colors" onMouseDown={onStartDrag} title="Drag to resize" />
-
-            {/* 하단: 페이지 상세 정보 */}
-            <div className="overflow-auto border-t p-2 space-y-3">
-                <div className="flex gap-2">
-                    <button className="text-xs px-2 py-1 border rounded" onClick={createPage}>+ New Page</button>
-                    {selectedPage && <button className="text-xs px-2 py-1 border rounded" onClick={() => duplicatePage(selectedPage.id)}>Duplicate</button>}
-                    {selectedPage && project.pages.length > 1 && <button className="text-xs px-2 py-1 border rounded text-red-600" onClick={() => removePage(selectedPage.id)}>Delete</button>}
-                </div>
-                {selectedPage ? (
-                    <div className="space-y-2">
-                        <div>
-                            <label className="text-xs font-medium text-gray-600 block mb-1">Page Name</label>
-                            <input
-                                className="w-full border rounded px-2 py-1 text-sm"
-                                value={selectedPage.name}
-                                onChange={e => update(s => { s.project.pages.find(p=>p.id===selectedPageId)!.name = e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-medium text-gray-600 block mb-1">Description</label>
-                            <textarea
-                                className="w-full border rounded px-2 py-1 text-sm h-16 resize-none"
-                                value={selectedPage.description ?? ''}
-                                onChange={e => update(s => { s.project.pages.find(p=>p.id===selectedPageId)!.description = e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-medium text-gray-600 block mb-1">URL Slug</label>
-                            <input
-                                className="w-full border rounded px-2 py-1 font-mono text-xs"
-                                value={selectedPage.slug ?? ''}
-                                onChange={e => update(s => { s.project.pages.find(p=>p.id===selectedPageId)!.slug = slugify(e.target.value) })}
-                            />
-                        </div>
+            {/* 하단: 페이지 상세 정보 및 생성 */}
+            <div className="border-t p-2 space-y-3">
+                <div className="space-y-2">
+                    <div className="text-xs font-semibold text-gray-700 px-1">Create New Page</div>
+                    <div className="flex gap-2">
+                        {/* 향후 페이지 템플릿 목록이 이곳에 채워집니다. */}
+                        <select className="flex-1 border rounded px-2 py-1 text-sm bg-white">
+                            <option value="blank">Blank Page</option>
+                        </select>
+                        <button className="text-xs px-3 py-1 border rounded bg-blue-600 text-white hover:bg-blue-700" onClick={createPage}>+ Create</button>
                     </div>
-                ) : (
-                    <div className="text-xs text-gray-400 pt-2">Select a page to see its details.</div>
-                )}
+                </div>
+
+                <div className="border-t pt-3 space-y-2">
+                    <div className="text-xs font-semibold text-gray-700 px-1">Page Details</div>
+                    {selectedPage ? (
+                        <div className="space-y-2">
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 block mb-1">Page Name</label>
+                                <input
+                                    className="w-full border rounded px-2 py-1 text-sm"
+                                    value={selectedPage.name}
+                                    onChange={e => update(s => { s.project.pages.find(p=>p.id===selectedPageIdForDetails)!.name = e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 block mb-1">Description</label>
+                                <textarea
+                                    className="w-full border rounded px-2 py-1 text-sm h-16 resize-none"
+                                    value={selectedPage.description ?? ''}
+                                    onChange={e => update(s => { s.project.pages.find(p=>p.id===selectedPageIdForDetails)!.description = e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 block mb-1">URL Slug</label>
+                                <input
+                                    className="w-full border rounded px-2 py-1 font-mono text-xs"
+                                    value={selectedPage.slug ?? ''}
+                                    onChange={e => update(s => { s.project.pages.find(p=>p.id===selectedPageIdForDetails)!.slug = slugify(e.target.value) })}
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-xs text-gray-400 pt-2">Select a page to see its details.</div>
+                    )}
+                </div>
             </div>
         </div>
     );

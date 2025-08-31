@@ -26,7 +26,7 @@ export default function PageBar() {
         setActiveViewport, setCanvasSize, setCanvasZoom,
         toggleCanvasOrientation, selectPage,
         setBaseViewport, setViewportMode,
-        undo, redo,
+        undo, redo, setNotification,
     } = state;
 
     const currentPage = useMemo(
@@ -35,6 +35,7 @@ export default function PageBar() {
     );
 
     const { activeViewport, baseViewport, vpMode, width: canvasWidth, height: canvasHeight, zoom } = ui.canvas;
+    const notification = ui.notification;
     const editorMode = ui.mode;
 
     const [wStr, setWStr] = useState(String(canvasWidth));
@@ -45,12 +46,17 @@ export default function PageBar() {
     useEffect(() => setHStr(String(canvasHeight)), [canvasHeight]);
     useEffect(() => setZoomStr(String(Math.round(zoom * 100))), [zoom]);
 
-    const [toast, setToast] = useState<string | null>(null);
-    const notify = (msg: string) => {
-        setToast(msg);
-        window.clearTimeout((notify as any).__t);
-        (notify as any).__t = window.setTimeout(() => setToast(null), 1600);
-    };
+    // ✨ [수정] 전역 notification 상태를 구독하고, 2초 후 자동으로 사라지도록 타이머 설정
+    const [visibleNotification, setVisibleNotification] = useState<string | null>(null);
+    useEffect(() => {
+        if (ui.notification) {
+            setVisibleNotification(ui.notification.message);
+            const timer = setTimeout(() => {
+                setVisibleNotification(null);
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [ui.notification]);
 
     const setViewport = (vp: Viewport) => {
         setActiveViewport(vp);
@@ -76,7 +82,7 @@ export default function PageBar() {
 
     const toggleExpertMode = () => {
         state.update(s => { s.ui.expertMode = !s.ui.expertMode; });
-        notify(`Expert Mode: ${!ui.expertMode ? 'ON' : 'OFF'}`);
+        setNotification(`Expert Mode: ${!ui.expertMode ? 'ON' : 'OFF'}`); // ✨ [수정] 전역 알림 액션 사용
     }
 
     return (
@@ -129,7 +135,7 @@ export default function PageBar() {
                             type="radio"
                             name="vp-mode"
                             checked={vpMode[activeViewport] === 'Unified'}
-                            onChange={() => { setViewportMode(activeViewport, 'Unified'); notify(`Mode: Unified (${activeViewport})`); }}
+                            onChange={() => { setViewportMode(activeViewport, 'Unified'); setNotification(`Mode: Unified (${activeViewport})`); }}
                         />
                         통합
                     </label>
@@ -138,7 +144,7 @@ export default function PageBar() {
                             type="radio"
                             name="vp-mode"
                             checked={vpMode[activeViewport] === 'Independent'}
-                            onChange={() => { setViewportMode(activeViewport, 'Independent'); notify(`Mode: Independent (${activeViewport})`); }}
+                            onChange={() => { setViewportMode(activeViewport, 'Independent'); setNotification(`Mode: Independent (${activeViewport})`); }}
                         />
                         개별
                     </label>
@@ -161,7 +167,7 @@ export default function PageBar() {
                                 name="vp-base"
                                 className="accent-blue-600"
                                 checked={baseViewport === vp}
-                                onChange={() => { setBaseViewport(vp); notify(`Base viewport: ${vp}`); }}
+                                onChange={() => { setBaseViewport(vp); setNotification(`Base viewport: ${vp}`); }}
                                 title="Set as Base"
                             />
                         </div>
@@ -237,10 +243,11 @@ export default function PageBar() {
                 </button>
             </div>
 
-            {toast && (
-                <div className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2">
+            {/* ✨ [수정] 전역 상태 기반 알림(Toast) UI */}
+            {visibleNotification && (
+                <div className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-2 duration-300">
                     <div className="flex items-center gap-2 rounded bg-black/80 text-white text-xs px-3 py-1.5 shadow">
-                        <Info size={14} /> {toast}
+                        <Info size={14} /> {visibleNotification}
                     </div>
                 </div>
             )}
