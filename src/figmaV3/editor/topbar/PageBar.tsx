@@ -35,8 +35,8 @@ export default function PageBar() {
     );
 
     const { activeViewport, baseViewport, vpMode, width: canvasWidth, height: canvasHeight, zoom } = ui.canvas;
+    const editorMode = ui.mode;
 
-    // 로컬 입력
     const [wStr, setWStr] = useState(String(canvasWidth));
     const [hStr, setHStr] = useState(String(canvasHeight));
     const [zoomStr, setZoomStr] = useState(String(Math.round(zoom * 100)));
@@ -45,7 +45,6 @@ export default function PageBar() {
     useEffect(() => setHStr(String(canvasHeight)), [canvasHeight]);
     useEffect(() => setZoomStr(String(Math.round(zoom * 100))), [zoom]);
 
-    // 간단 토스트
     const [toast, setToast] = useState<string | null>(null);
     const notify = (msg: string) => {
         setToast(msg);
@@ -75,30 +74,40 @@ export default function PageBar() {
         else setZoomStr(String(Math.round(zoom * 100)));
     };
 
+    const toggleExpertMode = () => {
+        state.update(s => { s.ui.expertMode = !s.ui.expertMode; });
+        notify(`Expert Mode: ${!ui.expertMode ? 'ON' : 'OFF'}`);
+    }
+
     return (
-        <div className="relative w-full flex items-center border-b border-gray-200 bg-white px-3 py-2">
-            {/* Left: 페이지 선택 (기존 유지) */}
+        <div className="relative w-full flex items-center justify-between border-b border-gray-200 bg-white px-3 py-2">
+            {/* Left: 페이지 선택 또는 컴포넌트 모드 표시 */}
             <div className="flex items-center gap-2">
-                <select
-                    className="px-2 py-1 rounded border border-gray-200 text-sm"
-                    value={currentPage?.id ?? ''}
-                    onChange={(e) => selectPage(e.target.value)}
-                >
-                    {project.pages.map((p: Page) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                </select>
+                {editorMode === 'Page' ? (
+                    <select
+                        className="px-2 py-1 rounded border border-gray-200 text-sm"
+                        value={currentPage?.id ?? ''}
+                        onChange={(e) => selectPage(e.target.value)}
+                    >
+                        {project.pages.map((p: Page) => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                ) : (
+                    <div className="text-sm font-semibold text-purple-600 px-2 py-1">
+                        Editing Component...
+                    </div>
+                )}
             </div>
 
-            {/* Center: 요구사항 그룹 순서 & 구분자 */}
-            <div className="mx-auto flex items-center">
-                {/* ─ Undo/Redo ─ */}
+            {/* Center: 뷰포트 및 캔버스 컨트롤 */}
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
                 <div className="flex items-center gap-1">
                     <button
                         className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
                         onClick={undo}
                         disabled={history.past.length === 0}
-                        title="Undo"
+                        title="Undo (Cmd+Z)"
                     >
                         <Undo size={16} />
                     </button>
@@ -106,16 +115,14 @@ export default function PageBar() {
                         className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
                         onClick={redo}
                         disabled={history.future.length === 0}
-                        title="Redo"
+                        title="Redo (Cmd+Y)"
                     >
                         <Redo size={16} />
                     </button>
                 </div>
 
-                {/* 구분자 */}
                 <span className="mx-3 h-5 w-px bg-gray-300" />
 
-                {/* ─ Viewport Mode (라디오) ─ */}
                 <div className="flex items-center gap-3" aria-label="Viewport style mode">
                     <label className="flex items-center gap-1 text-xs text-gray-700">
                         <input
@@ -137,28 +144,18 @@ export default function PageBar() {
                     </label>
                 </div>
 
-                {/* 구분자 */}
                 <span className="mx-3 h-5 w-px bg-gray-300" />
 
-                {/* ─ Viewport 전환 + Base 라디오(텍스트 없음) ─ */}
                 <div className="flex items-center gap-2">
                     {VP_LIST.map(vp => (
                         <div key={vp} className="flex items-center gap-1">
-                            {/* 뷰포트 전환 버튼 */}
                             <button
                                 onClick={() => setViewport(vp)}
-                                className={[
-                                    'px-2 py-1 rounded border text-sm flex items-center gap-1',
-                                    activeViewport === vp
-                                        ? 'border-blue-500 bg-blue-50'
-                                        : 'border-gray-200 bg-white hover:bg-gray-50',
-                                ].join(' ')}
+                                className={`px-2 py-1 rounded border text-sm flex items-center gap-1 ${activeViewport === vp ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
                                 title={`Switch to ${vp}`}
                             >
                                 {VP_ICON[vp]} <span className="capitalize">{vp}</span>
                             </button>
-
-                            {/* Base 라디오 (아이콘/텍스트 옆, 텍스트 없이) */}
                             <input
                                 type="radio"
                                 name="vp-base"
@@ -171,10 +168,8 @@ export default function PageBar() {
                     ))}
                 </div>
 
-                {/* 구분자 */}
                 <span className="mx-3 h-5 w-px bg-gray-300" />
 
-                {/* ─ Viewport Size / Rotate / Zoom ─ */}
                 <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1">
                         <input
@@ -195,7 +190,6 @@ export default function PageBar() {
                             aria-label="Canvas height"
                         />
                     </div>
-
                     <button
                         className="p-1.5 rounded border border-gray-200 hover:bg-gray-50"
                         onClick={() => toggleCanvasOrientation()}
@@ -203,7 +197,6 @@ export default function PageBar() {
                     >
                         <RotateCw size={16} />
                     </button>
-
                     <div className="flex items-center gap-1">
                         <button
                             className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
@@ -233,12 +226,19 @@ export default function PageBar() {
                 </div>
             </div>
 
-            {/* Right: 균형 유지용 빈 영역 */}
-            <div className="w-[1px]" />
+            {/* Right: 전문가 모드 토글 */}
+            <div className="flex items-center gap-2">
+                <button
+                    className={`p-1.5 rounded border text-xs px-2 ${ui.expertMode ? 'bg-orange-100 text-orange-700' : ''}`}
+                    onClick={toggleExpertMode}
+                    title="Toggle Expert Mode"
+                >
+                    Expert
+                </button>
+            </div>
 
-            {/* Toast */}
             {toast && (
-                <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2">
+                <div className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2">
                     <div className="flex items-center gap-2 rounded bg-black/80 text-white text-xs px-3 py-1.5 shadow">
                         <Info size={14} /> {toast}
                     </div>

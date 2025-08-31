@@ -33,6 +33,7 @@ export interface Node<
 export interface Page {
     id: string;
     name: string;
+    description?: string;
     rootId: NodeId;
     slug?: string;
 }
@@ -53,6 +54,15 @@ export interface Stylesheet {
     enabled: boolean;
 }
 
+/** ✨ [추가] 프로젝트의 정적 자산 (이미지 등) */
+export interface Asset {
+    id: string;
+    name: string;
+    url: string; // Data URL 또는 원격 URL
+    type: 'image' | 'video' | 'font' | 'script';
+}
+
+
 export type ComponentSchemaOverrides = Record<
     string,
     Array<PropSchemaEntry<any, any>>
@@ -65,12 +75,15 @@ export interface Project {
     nodes: Record<NodeId, Node>;
     rootId: NodeId;
 
+    // ✨ [추가] 프로젝트 자산 및 전역 코드
+    assets?: Asset[];
+    globalCss?: string;
+    globalJs?: string;
+
     schemaOverrides?: ComponentSchemaOverrides;
     templates?: Record<string, TemplateDefinition>;
     inspectorFilters?: Record<string, InspectorFilter>;
     tagPolicies?: TagPolicyMap;
-
-    /** 레포 기준: stylesheets 존재 (ProjectStylesheets 패널과 연동) */
     stylesheets?: Stylesheet[];
 }
 
@@ -221,11 +234,9 @@ export type ExplorerPreviewSel =
 
 export type BottomRightPanelKind = 'SchemaEditor' | 'PropVisibility' | 'Logs' | 'None';
 
-/** ✅ V4-아키텍처에 필요한 추가 개념
- *  - baseViewport: '어느 뷰포트가 Base(공통 스타일) 역할인지' 포인터
- *  - vpMode: 각 뷰포트가 'Unified(공통에 기록)'인지 'Independent(개별 override)'인지
- */
 export type ViewportMode = 'Unified' | 'Independent';
+
+export type ProjectHubTab = 'Pages' | 'Assets' | 'Components' | 'Layers' | 'Settings';
 
 export interface EditorUI {
     // --- Global ---
@@ -233,23 +244,25 @@ export interface EditorUI {
     mode: EditorMode;
     expertMode: boolean;
     overlays: string[];
+    editingFragmentId: string | null;
 
     // --- Center Panel (Canvas) ---
     canvas: {
         width: number;
-        height: number;              // 세로 높이
+        height: number;
         zoom: number;
         orientation: 'portrait' | 'landscape';
         activeViewport: Viewport;
-
-        /** ★ 추가: Base 포인터 & 뷰포트별 모드 */
         baseViewport: Viewport;
         vpMode: Record<Viewport, ViewportMode>;
     };
 
     // --- Side Panels ---
     panels: {
-        left: { tab: LeftTabKind; widthPx: number; splitPct: number; explorerPreview: ExplorerPreviewSel | null };
+        left: {
+            activeHubTab: ProjectHubTab;
+            widthPx: number;
+        };
         right: { widthPx: number };
         bottom: {
             heightPx: number;
@@ -260,16 +273,13 @@ export interface EditorUI {
     };
 }
 
+
 export interface EditorState {
     project: Project;
     ui: EditorUI;
     data: Record<string, unknown>;
     settings: Record<string, unknown>;
-
-    /** FlowEdges는 EditorState 루트에 보관 (Project에는 없음) */
     flowEdges: Record<string, FlowEdge>;
-
-    /** undo/redo는 Project 스냅샷만 기록 */
     history: { past: Project[]; future: Project[] };
 }
 
@@ -304,10 +314,8 @@ export interface DndDropTarget {
     position: DropPosition;
 }
 
-/** 편의: StylesSection 등에서 사용하는 병합 결과 타입 */
 export type CSSDecl = Record<string, unknown>;
 
-// HTML void elements 목록 (children 불가)
 export const VOID_TAGS: ReadonlySet<string> = new Set([
     'area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'
 ]);

@@ -1,80 +1,67 @@
 'use client';
-/**
- * LeftSidebar
- * - 좌측 2탭: Explorer / Composer
- * - 각 탭은 상/하 분할(리사이저 포함). 비율은 ui.panels.left.splitPct에 저장
- * - any 금지, 훅 최상위, 얕은 복사 update 규약
- */
 import React from 'react';
 import { useEditor } from '../useEditor';
-import type { EditorState, LeftTabKind } from '../../core/types';
-import { ExplorerPane } from './ExplorerPane';
-import { ComposerPane } from './ComposerPane';
+import type { ProjectHubTab, EditorMode } from '../../core/types';
+import { Component, Layers, Folder, Image, Settings } from 'lucide-react';
+import { PagesPanel } from './panels/PagesPanel';
+import { AssetsPanel } from './panels/AssetsPanel';
+import { ComponentsPanel } from './panels/ComponentsPanel';
+import { Layers as LayersPanel } from './Layers';
+
+// 임시 Placeholder 패널
+const SettingsPanel = () => <div className="p-4 text-sm text-gray-500">Settings Panel (To be implemented)</div>;
+
+
+const HUB_TABS: { id: ProjectHubTab; icon: React.ElementType }[] = [
+    { id: 'Pages', icon: Folder },
+    { id: 'Assets', icon: Image },
+    { id: 'Components', icon: Component },
+    { id: 'Layers', icon: Layers },
+    { id: 'Settings', icon: Settings },
+];
 
 export function LeftSidebar() {
     const state = useEditor();
-
-    // ✅ [수정] 새로운 UI 상태 경로 참조
-    const { tab, splitPct } = state.ui.panels.left;
-    const clampedSplitPct = Math.min(85, Math.max(15, splitPct));
-
-    const setTab = (t: LeftTabKind) =>
-        state.update((s: EditorState) => { s.ui.panels.left.tab = t; });
-
-    // 드래그 리사이저
-    const containerRef = React.useRef<HTMLDivElement | null>(null);
-    const onStartDrag = (e: React.MouseEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        const el = containerRef.current;
-        if (!el) return;
-
-        const onMove = (ev: MouseEvent) => {
-            const rect = el.getBoundingClientRect();
-            const y = ev.clientY - rect.top;
-            const pct = (y / rect.height) * 100;
-            state.update((s: EditorState) => {
-                s.ui.panels.left.splitPct = Math.min(85, Math.max(15, Math.round(pct)));
-            });
-        };
-        const onUp = () => {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-        };
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
-    };
+    const { ui, setEditorMode, setActiveHubTab } = state;
+    const { activeHubTab } = ui.panels.left;
+    const { mode } = ui;
 
     return (
-        <div className="h-full flex flex-col min-h-0 bg-white border-r border-gray-200">
-            {/* 탭 헤더 */}
-            <div className="h-9 border-b px-2 flex items-center gap-2 shrink-0">
-                <button
-                    className={`text-sm px-2 py-1 rounded border ${tab === 'Explorer' ? 'bg-gray-100 font-semibold' : 'hover:bg-gray-50'}`}
-                    onClick={() => setTab('Explorer')}
-                >
-                    Explorer
-                </button>
-                <button
-                    className={`text-sm px-2 py-1 rounded border ${tab === 'Composer' ? 'bg-gray-100 font-semibold' : 'hover:bg-gray-50'}`}
-                    onClick={() => setTab('Composer')}
-                >
-                    Composer
-                </button>
+        <div className="h-full flex min-h-0 bg-white border-r border-gray-200">
+            {/* 1. 수직 아이콘 탭 바 */}
+            <div className="w-12 h-full border-r bg-gray-50 flex flex-col items-center py-4 gap-2">
+                {HUB_TABS.map(({ id, icon: Icon }) => (
+                    <button
+                        key={id}
+                        onClick={() => setActiveHubTab(id)}
+                        className={`w-10 h-10 flex items-center justify-center rounded-lg ${activeHubTab === id ? 'bg-blue-500 text-white' : 'text-gray-500 hover:bg-gray-200'}`}
+                        title={id}
+                    >
+                        <Icon size={20} />
+                    </button>
+                ))}
             </div>
 
-            {/* 상/하 분할 */}
-            <div ref={containerRef} className="flex-1 grid min-h-0" style={{ gridTemplateRows: `${clampedSplitPct}% 6px 1fr` }}>
-                {/* 상단 */}
-                <div className="min-h-0 overflow-auto">
-                    {tab === 'Explorer' ? <ExplorerPane.Top /> : <ComposerPane.Top />}
+            {/* 2. 선택된 탭에 해당하는 패널 */}
+            <div className="flex-1 min-w-0 flex flex-col">
+                {/* 패널 최상단에 모드 스위처 배치 */}
+                <div className="p-2 border-b">
+                    <select
+                        value={mode}
+                        onChange={(e) => setEditorMode(e.target.value as EditorMode)}
+                        className="w-full px-2 py-1.5 text-sm font-semibold border rounded bg-white"
+                    >
+                        <option value="Page">🚀 Page Build Mode</option>
+                        <option value="Component">🛠️ Component Dev Mode</option>
+                    </select>
                 </div>
 
-                {/* 리사이저 */}
-                <div className="h-[6px] cursor-row-resize bg-gray-200 hover:bg-blue-500 transition-colors" onMouseDown={onStartDrag} title="Drag to resize" />
-
-                {/* 하단 */}
-                <div className="min-h-0 overflow-auto border-t">
-                    {tab === 'Explorer' ? <ExplorerPane.Bottom /> : <ComposerPane.Bottom />}
+                <div className="flex-1 overflow-auto">
+                    {activeHubTab === 'Pages' && <PagesPanel />}
+                    {activeHubTab === 'Assets' && <AssetsPanel />}
+                    {activeHubTab === 'Components' && <ComponentsPanel />}
+                    {activeHubTab === 'Layers' && <LayersPanel />}
+                    {activeHubTab === 'Settings' && <SettingsPanel />}
                 </div>
             </div>
         </div>

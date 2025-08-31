@@ -9,11 +9,15 @@ import type {
     CSSDict,
     Viewport,
     ViewportMode,
+    EditorMode,
+    ProjectHubTab,
+    Asset,
+    Page,
 } from '../core/types';
 
 /** =======================================================================
- *  초기 Project (샘플) - 실제로는 persistence 로딩으로 대체 가능
- *  ======================================================================= */
+ * 초기 Project (샘플)
+ * ======================================================================= */
 const initialProject: Project = {
     pages: [{ id: 'page_home', name: 'Home', rootId: 'node_root_home', slug: '/' }],
     fragments: [],
@@ -29,11 +33,14 @@ const initialProject: Project = {
         },
     },
     rootId: 'node_root_home',
+    assets: [],
+    globalCss: '/* Global CSS styles */',
+    globalJs: '// Global JavaScript',
 };
 
 /** =======================================================================
- *  초기 EditorState
- *  ======================================================================= */
+ * 초기 EditorState
+ * ======================================================================= */
 const initialState: EditorState = {
     project: initialProject,
     ui: {
@@ -41,6 +48,7 @@ const initialState: EditorState = {
         mode: 'Page',
         expertMode: false,
         overlays: [],
+        editingFragmentId: null,
         canvas: {
             width: 1280,
             height: 800,
@@ -51,7 +59,7 @@ const initialState: EditorState = {
             vpMode: { base: 'Unified', tablet: 'Unified', mobile: 'Unified' },
         },
         panels: {
-            left: { tab: 'Composer', widthPx: 320, splitPct: 60, explorerPreview: null },
+            left: { activeHubTab: 'Pages', widthPx: 320 },
             right: { widthPx: 420 },
             bottom: { heightPx: 240, isCollapsed: false, advanced: null },
         },
@@ -63,8 +71,8 @@ const initialState: EditorState = {
 };
 
 /** =======================================================================
- *  유틸
- *  ======================================================================= */
+ * 유틸
+ * ======================================================================= */
 let _seq = 0;
 const genId = (prefix: string): string =>
     `${prefix}_${Date.now().toString(36)}_${++_seq}`;
@@ -113,7 +121,6 @@ function collectSubtreeIds(nodes: Record<NodeId, Node>, rootId: NodeId): NodeId[
     return ids;
 }
 
-// 부모 찾기(빠름/간단): project.nodes를 순회해서 childId를 포함한 노드 검색
 function findParentId(p: Project, childId: NodeId): NodeId | null {
     for (const nid of Object.keys(p.nodes)) {
         const n = p.nodes[nid]!;
@@ -122,17 +129,11 @@ function findParentId(p: Project, childId: NodeId): NodeId | null {
     return null;
 }
 
-/** 해당 defId가 컨테이너인지 판정 (Box는 강제 컨테이너 허용) */
 function isContainerDef(defId: string): boolean {
     const def = getDefinition(defId);
     return def?.capabilities?.canHaveChildren === true || defId === 'box';
 }
 
-/**
- * 현재 위치(desiredParent)에서 가장 가까운 "컨테이너(Box) 조상"을 선택.
- * - desiredParent가 비어있으면 root부터 시작
- * - 컨테이너를 못 찾으면 root 반환
- */
 function chooseValidParentId(
     p: Project,
     desiredParent: NodeId | null | undefined,
@@ -141,10 +142,8 @@ function chooseValidParentId(
     let cur: NodeId =
         desiredParent && p.nodes[desiredParent] ? desiredParent : fallbackRoot;
 
-    // cur가 컨테이너면 즉시 OK
     if (isContainerDef(p.nodes[cur]!.componentId)) return cur;
 
-    // 위로 타고 올라가며 컨테이너를 찾는다
     let guard = 0;
     while (guard++ < 1024) {
         const parent = findParentId(p, cur);
@@ -152,14 +151,45 @@ function chooseValidParentId(
         if (isContainerDef(p.nodes[parent]!.componentId)) return parent;
         cur = parent;
     }
-    // 그래도 못 찾으면 root 보장
     return fallbackRoot;
+}
+
+function cloneSubtree(nodes: Record<NodeId, Node>, srcRootId: NodeId): { nodes: Record<NodeId, Node>; newRootId: NodeId } {
+    const newNodes: Record<NodeId, Node> = {};
+    const idMap = new Map<NodeId, NodeId>();
+
+    const cloneNode = (id: NodeId): NodeId | null => {
+        if (idMap.has(id)) return idMap.get(id)!;
+
+        const oldNode = nodes[id];
+        if (!oldNode) {
+            console.warn(`Node not found during clone: ${id}. Skipping.`);
+            return null;
+        }
+
+        const newId = genId('node');
+        idMap.set(id, newId);
+
+        const newChildren = (oldNode.children?.map(cloneNode).filter(Boolean) as NodeId[]) ?? [];
+
+        newNodes[newId] = {
+            ...JSON.parse(JSON.stringify(oldNode)),
+            id: newId,
+            children: newChildren,
+        };
+        return newId;
+    };
+
+    const newRootId = cloneNode(srcRootId);
+    if (!newRootId) throw new Error("Failed to clone root node.");
+
+    return { nodes: newNodes, newRootId };
 }
 
 
 /** =======================================================================
- *  Actions 타입
- *  ======================================================================= */
+ * Actions 타입
+ * ======================================================================= */
 type EditorActions = {
     update: (fn: (draft: EditorState) => void, recordHistory?: boolean) => void;
     undo: () => void;
@@ -179,23 +209,20 @@ type EditorActions = {
     toggleNodeVisibility: (nodeId: NodeId) => void;
     toggleNodeLock: (nodeId: NodeId) => void;
 
-    // 페이지
     selectPage: (pageId: string) => void;
     addPage: (name?: string) => string;
     removePage: (pageId: string) => void;
+    duplicatePage: (pageId: string) => void;
 
-    // 프래그먼트
-    openFragment: (fragmentId?: string) => void;   // 인자 없으면 top push만
-    closeFragment: (fragmentId?: string) => void;  // 인자 없으면 top pop
+    openFragment: (fragmentId?: string) => void;
+    closeFragment: (fragmentId?: string) => void;
     addFragment: (name?: string) => string;
     removeFragment: (fragmentId: string) => void;
 
-    // 플로우
     addFlowEdge: (edge: FlowEdge) => void;
     updateFlowEdge: (edgeId: string, patch: Partial<FlowEdge>) => void;
     removeFlowEdge: (edgeId: string) => void;
 
-    // 캔버스/뷰포트
     setCanvasSize: (size: { width: number; height: number }) => void;
     setCanvasZoom: (zoom: number) => void;
 
@@ -206,21 +233,28 @@ type EditorActions = {
     setBaseViewport: (viewport: Viewport) => void;
     setViewportMode: (viewport: Viewport, mode: ViewportMode) => void;
 
-    // 스타일 읽기
-    getEffectiveDecl: (nodeId: NodeId) => CSSDict | null;
+    setEditorMode: (mode: EditorMode) => void;
+    setActiveHubTab: (tab: ProjectHubTab) => void;
+    openComponentEditor: (fragmentId: string) => void;
+    closeComponentEditor: () => void;
 
+    addAsset: (asset: Omit<Asset, 'id'>) => string;
+    removeAsset: (assetId: string) => void;
+    updateGlobalCss: (css: string) => void;
+    updateGlobalJs: (js: string) => void;
+
+    getEffectiveDecl: (nodeId: NodeId) => CSSDict | null;
     setData: (path: string, value: unknown) => void;
     setSetting: (key: string, value: unknown) => void;
 
-    // 초기화
     hydrateDefaults: () => void;
 };
 
 export type EditorStoreState = EditorState & EditorActions;
 
 /** =======================================================================
- *  Store
- *  ======================================================================= */
+ * Store
+ * ======================================================================= */
 export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreState>((set, get) => ({
     ...initialState,
 
@@ -281,12 +315,6 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
             s.project.nodes[id] = { ...node, props: { ...node.props, ...props } };
         }, true),
 
-    /** 스타일 라우팅:
-     * - viewport 인자가 주어지면 해당 뷰포트에 병합
-     * - 없으면, activeViewport의 모드로 판단:
-     *   - Unified → baseViewport에 기록
-     *   - Independent → activeViewport에 기록
-     */
     updateNodeStyles: (id, styles, viewport) =>
         get().update(s => {
             const node = s.project.nodes[id];
@@ -307,23 +335,14 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         const newId = genId(`node_${defId}`);
         get().update((s: EditorState) => {
             const p = s.project;
-
-            // 노드 맵 얕은 복사 + 새 노드 생성
             const nodes = { ...p.nodes };
             nodes[newId] = buildNodeWithDefaults(defId, newId);
-
-            // ✅ parent 선택 로직: 지정 → 선택된 노드 → root
             const desired = parentId ?? s.ui.selectedId ?? p.rootId;
-            // ✅ 컨테이너 보정(가장 가까운 Box 조상)
             const parentKey = chooseValidParentId(p, desired, p.rootId);
             const parent = nodes[parentKey]!;
-
-            // ✅ 부모 노드 객체 자체를 교체(참조 변경 보장)
             const nextChildren = [...(parent.children ?? []), newId];
             nodes[parentKey] = { ...parent, children: nextChildren };
-
             s.project = { ...p, nodes };
-            // UX: 방금 추가한 노드 선택
             s.ui = { ...s.ui, selectedId: newId };
         });
         return newId;
@@ -333,19 +352,14 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         const newId = genId(`node_${defId}`);
         get().update((s: EditorState) => {
             const p = s.project;
-
             const nodes = { ...p.nodes };
             nodes[newId] = buildNodeWithDefaults(defId, newId);
-
-            // ✅ 인자로 온 parentId가 컨테이너가 아닐 수 있으므로 보정
             const desired = parentId ?? s.ui.selectedId ?? p.rootId;
             const parentKey = chooseValidParentId(p, desired, p.rootId);
             const parent = nodes[parentKey]!;
-
             const children = [...(parent.children ?? [])];
             const clamped = Math.max(0, Math.min(index, children.length));
             children.splice(clamped, 0, newId);
-
             nodes[parentKey] = { ...parent, children };
             s.project = { ...p, nodes };
             s.ui = { ...s.ui, selectedId: newId };
@@ -354,53 +368,37 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
     },
 
     moveNode: (nodeId, desiredParentId, newIndex) => get().update(s => {
-        // ✅ 루트 이동 금지
         if (nodeId === s.project.rootId) return;
-
         const nodes = { ...s.project.nodes };
-
-        // 기존 부모에서 제거
         const oldParentId = findParentId(s.project, nodeId);
         if (oldParentId) {
             const oldP = { ...nodes[oldParentId]! };
             oldP.children = (oldP.children ?? []).filter(c => c !== nodeId);
             nodes[oldParentId] = oldP;
         }
-
-        // 새 부모는 selection/desired에서 가장 가까운 컨테이너
         const desired = desiredParentId ?? s.ui.selectedId ?? s.project.rootId;
         const newParentId = chooseValidParentId(s.project, desired, s.project.rootId);
-
         const np = { ...nodes[newParentId]! };
         const arr = [...(np.children ?? [])];
         const idx = Math.max(0, Math.min(newIndex ?? arr.length, arr.length));
         arr.splice(idx, 0, nodeId);
         np.children = arr;
-
         nodes[newParentId] = np;
         s.project.nodes = nodes;
     }, true),
 
-    // 삭제: 루트는 삭제 금지. 선택 포커스 보정.
     removeNodeCascade: (nodeId) => get().update((s) => {
-        if (nodeId === s.project.rootId) return; // 루트 금지
-
+        if (nodeId === s.project.rootId) return;
         const nodes = { ...s.project.nodes };
-        // 부모에서 끊기
         const parentId = (Object.keys(nodes).find(pid => nodes[pid]?.children?.includes(nodeId)) ?? null) as string | null;
         if (parentId) {
             const parent = { ...nodes[parentId]! };
             parent.children = (parent.children ?? []).filter(cid => cid !== nodeId);
             nodes[parentId] = parent;
         }
-
-        // 서브트리 삭제
         const toDelete = collectSubtreeIds(nodes as any, nodeId);
         for (const id of toDelete) delete nodes[id];
-
-        // 선택 보정
         const nextSelected = nodes[s.ui.selectedId ?? ''] ? s.ui.selectedId : s.project.rootId;
-
         s.project.nodes = nodes;
         s.ui.selectedId = nextSelected;
     }, true),
@@ -444,6 +442,21 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
             s.project.rootId = s.project.pages[0].rootId;
             s.ui.selectedId = s.project.rootId;
         }
+    }, true),
+
+    duplicatePage: (pageId) => get().update(s => {
+        const originalPage = s.project.pages.find(p => p.id === pageId);
+        if (!originalPage) return;
+        const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, originalPage.rootId);
+        const newPage: Page = {
+            id: genId('page'),
+            name: `${originalPage.name} Copy`,
+            description: originalPage.description,
+            slug: originalPage.slug ? `${originalPage.slug}-copy` : undefined,
+            rootId: newRootId,
+        };
+        s.project.nodes = { ...s.project.nodes, ...clonedNodes };
+        s.project.pages.push(newPage);
     }, true),
 
     openFragment: (fragmentId) => get().update((s) => {
@@ -510,35 +523,69 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
     }),
 
     toggleBottomDock: () => {
-        const cur = get();
         get().update((s) => {
             const bottom = s.ui.panels.bottom ?? { heightPx: 240, isCollapsed: false, advanced: null };
             s.ui.panels.bottom = { ...bottom, isCollapsed: !bottom.isCollapsed };
-        }, false); // UI 토글은 히스토리에 남기지 않음
+        }, false);
     },
 
-    setActiveViewport: (viewport) => get().update(s => {
-        s.ui.canvas.activeViewport = viewport;
+    setActiveViewport: (viewport) => get().update(s => { s.ui.canvas.activeViewport = viewport; }),
+    setBaseViewport: (viewport) => get().update(s => { s.ui.canvas.baseViewport = viewport; }, true),
+    setViewportMode: (viewport, mode) => get().update(s => { s.ui.canvas.vpMode = { ...s.ui.canvas.vpMode, [viewport]: mode }; }, true),
+
+    setEditorMode: (mode) => get().update(s => {
+        s.ui.mode = mode;
+        if (mode === 'Page') {
+            s.ui.editingFragmentId = null;
+            s.ui.selectedId = s.project.rootId;
+        }
+    }),
+    setActiveHubTab: (tab) => get().update(s => { s.ui.panels.left.activeHubTab = tab; }),
+
+    openComponentEditor: (fragmentId) => get().update(s => {
+        const frag = s.project.fragments.find(f => f.id === fragmentId);
+        if (frag) {
+            s.ui.mode = 'Component';
+            s.ui.editingFragmentId = fragmentId;
+            s.ui.selectedId = frag.rootId;
+        }
     }),
 
-    setBaseViewport: (viewport) => get().update(s => {
-        s.ui.canvas.baseViewport = viewport;
-    }, true),
+    closeComponentEditor: () => get().update(s => {
+        s.ui.mode = 'Page';
+        s.ui.editingFragmentId = null;
+        s.ui.selectedId = s.project.rootId;
+    }),
 
-    setViewportMode: (viewport, mode) => get().update(s => {
-        s.ui.canvas.vpMode = { ...s.ui.canvas.vpMode, [viewport]: mode };
-    }, true),
+    addAsset: (asset) => {
+        const newId = genId('asset');
+        get().update(s => {
+            if (!s.project.assets) s.project.assets = [];
+            s.project.assets.push({ ...asset, id: newId });
+        }, true);
+        return newId;
+    },
 
-    /** Base + (Independent일 때만 Active) 병합 */
+    removeAsset: (assetId) => {
+        get().update(s => {
+            if (s.project.assets) {
+                s.project.assets = s.project.assets.filter(a => a.id !== assetId);
+            }
+        }, true);
+    },
+
+    updateGlobalCss: (css) => { get().update(s => { s.project.globalCss = css; }, true); },
+    updateGlobalJs: (js) => { get().update(s => { s.project.globalJs = js; }, true); },
+
     getEffectiveDecl: (nodeId) => {
         const s = get();
         const node = s.project.nodes[nodeId];
         if (!node) return null;
 
         const el = node.styles?.element ?? {};
-        const base = s.ui.canvas.baseViewport;      // ex) 'base' | 'tablet' | 'mobile'
-        const active = s.ui.canvas.activeViewport;  // 현재 보고있는 뷰포트
-        const mode = s.ui.canvas.vpMode[active];    // 'Unified' | 'Independent'
+        const base = s.ui.canvas.baseViewport;
+        const active = s.ui.canvas.activeViewport;
+        const mode = s.ui.canvas.vpMode[active];
 
         const baseDecl = (el as any)[base] ?? {};
         if (mode === 'Independent' && active !== base) {
@@ -548,17 +595,9 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         return { ...baseDecl };
     },
 
-    // === Key-Value settings ===
-    setSetting: (key, value) => get().update((s) => {
-        s.settings = { ...(s.settings ?? {}), [key]: value };
-    }, true),
+    setSetting: (key, value) => get().update((s) => { s.settings = { ...(s.settings ?? {}), [key]: value }; }, true),
+    setData: (path, value) => get().update((s) => { s.data = setByPath(s.data ?? {}, path, value); }, true),
 
-    // === Arbitrary data (path 지원) ===
-    setData: (path, value) => get().update((s) => {
-        s.data = setByPath(s.data ?? {}, path, value);
-    }, true),
-
-    /** 정의 기본값 + 현재 노드 기본값 보정 */
     hydrateDefaults: () => get().update(s => {
         const nodes = s.project.nodes;
         for (const id in nodes) {
@@ -578,5 +617,3 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         }
     }, true),
 }));
-
-//export type { StoreApi } from 'zustand/vanilla';
