@@ -5,6 +5,7 @@ import type { NodeId, Node } from '../../core/types';
 import { getDefinition } from '../../core/registry';
 import { Lock, Unlock, Eye, EyeOff, Trash2, GripVertical } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
+import {PanelTitle} from "@/figmaV3/editor/common/PanelTitle";
 
 const LINE_COLOR = '#e5e7eb';
 
@@ -118,8 +119,11 @@ export function Layers() {
     }
 
     return (
-        <div className="h-full overflow-auto">
-            <Tree id={rootId} depth={0} />
+        <div className="flex flex-col h-full">
+            <PanelTitle title="Layers" />
+            <div className="h-full overflow-auto">
+                <Tree id={rootId} depth={0} />
+            </div>
         </div>
     );
 }
