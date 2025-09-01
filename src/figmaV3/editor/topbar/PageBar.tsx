@@ -35,7 +35,6 @@ export default function PageBar() {
     );
 
     const { activeViewport, baseViewport, vpMode, width: canvasWidth, height: canvasHeight, zoom } = ui.canvas;
-    const notification = ui.notification;
     const editorMode = ui.mode;
 
     const [wStr, setWStr] = useState(String(canvasWidth));
@@ -46,7 +45,6 @@ export default function PageBar() {
     useEffect(() => setHStr(String(canvasHeight)), [canvasHeight]);
     useEffect(() => setZoomStr(String(Math.round(zoom * 100))), [zoom]);
 
-    // ✨ [수정] 전역 notification 상태를 구독하고, 2초 후 자동으로 사라지도록 타이머 설정
     const [visibleNotification, setVisibleNotification] = useState<string | null>(null);
     useEffect(() => {
         if (ui.notification) {
@@ -80,14 +78,8 @@ export default function PageBar() {
         else setZoomStr(String(Math.round(zoom * 100)));
     };
 
-    const toggleExpertMode = () => {
-        state.update(s => { s.ui.expertMode = !s.ui.expertMode; });
-        setNotification(`Expert Mode: ${!ui.expertMode ? 'ON' : 'OFF'}`); // ✨ [수정] 전역 알림 액션 사용
-    }
-
     return (
         <div className="relative w-full flex items-center justify-between border-b border-gray-200 bg-white px-3 py-2">
-            {/* Left: 페이지 선택 또는 컴포넌트 모드 표시 */}
             <div className="flex items-center gap-2">
                 {editorMode === 'Page' ? (
                     <select
@@ -106,7 +98,6 @@ export default function PageBar() {
                 )}
             </div>
 
-            {/* Center: 뷰포트 및 캔버스 컨트롤 */}
             <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
                 <div className="flex items-center gap-1">
                     <button
@@ -232,18 +223,9 @@ export default function PageBar() {
                 </div>
             </div>
 
-            {/* Right: 전문가 모드 토글 */}
-            <div className="flex items-center gap-2">
-                <button
-                    className={`p-1.5 rounded border text-xs px-2 ${ui.expertMode ? 'bg-orange-100 text-orange-700' : ''}`}
-                    onClick={toggleExpertMode}
-                    title="Toggle Expert Mode"
-                >
-                    Expert
-                </button>
-            </div>
+            {/* ✨ [제거] Expert 모드 토글 버튼 */}
+            <div className="w-20"></div> {/* Right side alignment placeholder */}
 
-            {/* ✨ [수정] 전역 상태 기반 알림(Toast) UI */}
             {visibleNotification && (
                 <div className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-2 duration-300">
                     <div className="flex items-center gap-2 rounded bg-black/80 text-white text-xs px-3 py-1.5 shadow">

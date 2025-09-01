@@ -1,0 +1,56 @@
+// Global StylePolicy (v1.1)
+// 전역 디자인 토큰/값 제약/허용-금지 키/값 소스 정의
+// StyleGraph, Inspector, Export가 동일 정책을 참조합니다.
+import type { StylePolicy } from '../core/types';
+
+export const GLOBAL_STYLE_POLICY: StylePolicy = {
+    version: '1.1',
+
+    tokens: {
+        // theme.module.css의 톤을 반영 — 필요 시 동기화 스크립트로 관리 권장
+        color: {
+            primary: '#3b82f6',
+            success: '#10b981',
+            warning: '#f59e0b',
+            danger:  '#ef4444',
+            text:    '#e5e7eb',
+            muted:   '#9aa3af',
+            panelBg: '#1a1d21'
+        },
+        spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
+        radius:  { sm: 4, md: 6, lg: 10, xl: 14 },
+        font:    { xs: 11, sm: 12, base: 13, lg: 16, xl: 20 }
+    },
+
+    // 전역 기본값(필요 최소)
+    defaults: {
+        fontSize: 'token:font.base',
+        lineHeight: 1.45
+    },
+
+    // 전역 허용/금지: 기본은 * 전체 허용, 위험 키만 금지
+    allow: ['*'],
+    deny:  ['behavior','content'],
+
+    // 값 제약(런타임/Export/Inspector에서 동일 적용)
+    constraints: {
+        opacity: { min: 0, max: 1, step: 0.01 },
+        borderRadius: { min: 0, max: 64 },
+        fontSize: { min: 8, max: 96 },
+        lineHeight: { min: 1, max: 2.5, step: 0.05 },
+        width: { min: 0, max: 4096 },
+        height: { min: 0, max: 4096 }
+    },
+
+    // 키군별 허용 값 소스
+    //  - token: "token:family.key"
+    //  - raw:   수치(px, 등) 또는 원시 값
+    //  - css-var: "var(--name)"
+    valueSources: {
+        color: ['token','raw','css-var'],
+        length: ['raw','token','css-var'],
+        radius: ['token','raw'],
+        font: ['token','raw'],
+        opacity: ['raw']
+    }
+};

@@ -1,19 +1,12 @@
 'use client';
 
-/**
- * TypographyGroup
- * - 레포 표준 인터페이스(el/patch/tag/tagPolicy/tf/map/expert/open/onToggle)
- * - 허용 키 필터: useAllowed
- * - 제한 시 배지: DisabledHint
- * - lucide 아이콘은(원본 기준) 본 그룹에서는 사용하지 않음 — LayoutGroup에서 아이콘 사용
- */
-
 import React from 'react';
 import type {
     CSSDict,
     InspectorFilter,
     TagPolicy,
     TagPolicyMap,
+    NodeId, // ✨ [추가]
 } from '../../../../core/types';
 import {
     ColorField,
@@ -23,7 +16,10 @@ import {
     DisabledHint,
     useAllowed,
     type DisallowReason,
+    PermissionLock,
+    reasonForKey, // ✨ [추가]
 } from './common';
+import { useEditor } from '../../../useEditor';
 
 export function TypographyGroup(props: {
     el: Record<string, unknown>;
@@ -35,31 +31,27 @@ export function TypographyGroup(props: {
     expert: boolean;
     open: boolean;
     onToggle: () => void;
+    nodeId: NodeId; // ✨ [추가]
+    componentId: string;
 }) {
-    const { el, patch, tag, tf, map, expert, tagPolicy, open, onToggle } = props;
+    const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
+    const { ui } = useEditor();
 
-    // 허용 키(원본과 동일)
-    const allow = useAllowed(
-        ['color', 'fontSize', 'fontWeight', 'textAlign'],
-        tf,
-        tag,
-        map,
-        expert
-    );
+    // ✨ [수정] useAllowed 훅이 nodeId를 사용하도록 변경
+    const allow = useAllowed(nodeId);
 
-    // 제한 사유 계산(원본과 동일한 로직)
-    const dis = (k: string): DisallowReason => {
-        if (tagPolicy?.styles?.allow && !tagPolicy.styles.allow.includes(k)) return 'tag';
-        if (tagPolicy?.styles?.deny && tagPolicy.styles.deny.includes(k)) return 'tag';
-        if (!expert && tf?.styles) {
-            if (tf.styles.allow && !tf.styles.allow.includes(k)) return 'template';
-            if (tf.styles.deny && tf.styles.deny.includes(k)) return 'template';
-        }
-        return null;
-    };
+    // ✨ [수정] disallow reason 계산 로직을 새로운 헬퍼 함수로 변경
+    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
 
     const fw = String((el as any).fontWeight ?? '');
     const ta = String((el as any).textAlign ?? '');
+
+    const renderLock = (controlKey: string) => {
+        if (ui.mode === 'Component') {
+            return <PermissionLock componentId={componentId} controlKey={controlKey} />;
+        }
+        return null;
+    };
 
     return (
         <section className="mt-3">
@@ -75,6 +67,7 @@ export function TypographyGroup(props: {
                     {/* color */}
                     <div className="flex items-center gap-2">
                         <Label>color</Label>
+                        {renderLock('color')}
                         {!allow.has('color') && <DisabledHint reason={dis('color')!} />}
                         {allow.has('color') ? (
                             <ColorField
@@ -89,6 +82,7 @@ export function TypographyGroup(props: {
                     {/* fontSize */}
                     <div className="flex items-center gap-2">
                         <Label>fontSize</Label>
+                        {renderLock('fontSize')}
                         {!allow.has('fontSize') && <DisabledHint reason={dis('fontSize')!} />}
                         {allow.has('fontSize') ? (
                             <MiniInput
@@ -101,9 +95,10 @@ export function TypographyGroup(props: {
                         )}
                     </div>
 
-                    {/* fontWeight(레포 그대로: Regular/Bold Chip) */}
+                    {/* fontWeight */}
                     <div className="flex items-center gap-2">
                         <Label>fontWeight</Label>
+                        {renderLock('fontWeight')}
                         {!allow.has('fontWeight') && <DisabledHint reason={dis('fontWeight')!} />}
                         {allow.has('fontWeight') ? (
                             <div className="flex gap-1">
@@ -123,9 +118,10 @@ export function TypographyGroup(props: {
                         )}
                     </div>
 
-                    {/* textAlign(레포 그대로: left/center/right Chip) */}
+                    {/* textAlign */}
                     <div className="flex items-center gap-2">
                         <Label>textAlign</Label>
+                        {renderLock('textAlign')}
                         {!allow.has('textAlign') && <DisabledHint reason={dis('textAlign')!} />}
                         {allow.has('textAlign') ? (
                             <div className="flex gap-1">

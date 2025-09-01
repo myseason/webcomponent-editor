@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useEditor } from '../../useEditor';
 import { getDefinition } from '../../../core/registry';
 import type { NodeId, PropSchemaEntry } from '../../../core/types';
 import { Database } from 'lucide-react';
 import { DataBindingPopover } from './DataBindingPopover';
+import { PermissionLock } from './styles/common';
 
 function Row({ children }: { children: React.ReactNode }) {
     return <div className="flex items-center gap-2 px-1 py-0.5">{children}</div>;
@@ -20,7 +21,8 @@ const RESERVED_PROP_KEYS = new Set<string>([
 
 export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     const state = useEditor();
-    const node = state.project.nodes[nodeId];
+    const { project, ui, updateNodeProps } = state;
+    const node = project.nodes[nodeId];
     const def = getDefinition(defId);
 
     const [binding, setBinding] = useState<{ prop: string; anchor: HTMLElement } | null>(null);
@@ -28,10 +30,32 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
     const schema: PropSchemaEntry[] = def?.propsSchema ?? [];
     if (!def || schema.length === 0) return null;
 
-    const getCurrent = (key: string): unknown => (node.props as Record<string, unknown>)?.[key];
-    const setProp = (key: string, value: unknown) => state.updateNodeProps(nodeId, { [key]: value });
+    // ✨ [수정] ComponentPolicy를 확인하여 페이지 빌더에게 보여줄 속성만 필터링합니다.
+    const visibleEntries = useMemo(() => {
+        const baseEntries = schema.filter((e) => !RESERVED_PROP_KEYS.has(e.key));
+        if (ui.mode === 'Page' && !ui.expertMode) {
+            const componentPolicy = project.policies?.components?.[def.title];
+            if (componentPolicy) {
+                return baseEntries.filter(entry => {
+                    const controlKey = `props:${entry.key}`;
+                    return componentPolicy.inspector?.controls?.[controlKey]?.visible !== false;
+                });
+            }
+        }
+        return baseEntries;
+    }, [schema, ui.mode, ui.expertMode, project.policies, def?.title]);
 
-    const visibleEntries = schema.filter((e) => !RESERVED_PROP_KEYS.has(e.key));
+
+    const getCurrent = (key: string): unknown => (node.props as Record<string, unknown>)?.[key];
+    const setProp = (key: string, value: unknown) => updateNodeProps(nodeId, { [key]: value });
+
+    const renderLock = (propKey: string) => {
+        if (ui.mode === 'Component') {
+            return <PermissionLock componentId={defId} controlKey={`props:${propKey}`} />;
+        }
+        return null;
+    };
+
 
     if (visibleEntries.length === 0) return null;
 
@@ -56,6 +80,7 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
                         return (
                             <Row key={entry.key}>
                                 <Label>{entry.label ?? entry.key}</Label>
+                                {renderLock(entry.key)}
                                 <div className="flex-1 flex items-center gap-1">
                                     <input
                                         className="text-[11px] border rounded px-2 py-1 flex-1 min-w-0"
@@ -75,6 +100,7 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
                         return (
                             <Row key={entry.key}>
                                 <Label>{entry.label ?? entry.key}</Label>
+                                {renderLock(entry.key)}
                                 <div className="flex-1 flex items-center gap-1">
                                     <select
                                         className="text-[11px] border rounded px-2 py-1 flex-1 min-w-0"

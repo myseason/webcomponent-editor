@@ -55,7 +55,6 @@ export interface Stylesheet {
     enabled: boolean;
 }
 
-/** ✨ [추가] 프로젝트의 정적 자산 (이미지 등) */
 export interface Asset {
     id: string;
     name: string;
@@ -75,21 +74,73 @@ export interface Project {
     fragments: Fragment[];
     nodes: Record<NodeId, Node>;
     rootId: NodeId;
-
-    // ✨ [추가] 프로젝트 자산 및 전역 코드
     assets?: Asset[];
     globalCss?: string;
     globalJs?: string;
-
     schemaOverrides?: ComponentSchemaOverrides;
     templates?: Record<string, TemplateDefinition>;
     inspectorFilters?: Record<string, InspectorFilter>;
     tagPolicies?: TagPolicyMap;
     stylesheets?: Stylesheet[];
+    policies?: ProjectSettingsPoliciesOverride;
 }
 
 /* =============================================================================
-   2. Component & Template Definitions
+   2. Policy Definitions (정책 시스템)
+   Inspector, 런타임, Export의 동작을 제어하는 정책을 정의합니다.
+============================================================================= */
+
+export type PolicyVersion = `${number}.${number}`;
+
+export interface TagPolicy {
+    version: PolicyVersion;
+    tag: string;
+    attributes?: { allow?: string[]; deny?: string[] };
+    events?:     { allow?: string[]; deny?: string[] };
+    styles?: {
+        allow?: string[]; deny?: string[];
+        groups?: Record<string, string[]>;
+    };
+}
+
+export interface StylePolicy {
+    version: PolicyVersion;
+    tokens?: Record<string, Record<string, string | number>>;
+    defaults?: Record<string, string | number>;
+    allow?: string[];
+    deny?: string[];
+    constraints?: Record<string, { min?: number; max?: number; step?: number }>;
+    valueSources?: Record<string, ('token' | 'raw' | 'css-var')[]>;
+}
+
+export interface ComponentPolicy {
+    version: PolicyVersion;
+    component: string;
+    tag: string;
+    inspector?: {
+        groups?: Record<string, { visible?: boolean; expanded?: boolean }>;
+        controls?: Record<string, { visible?: boolean; preset?: (string | number)[] }>;
+    };
+    defaults?: { props?: Record<string, unknown>; styles?: Record<string, string | number> };
+    runtime?: { strict?: boolean };
+    savePolicy?: { allowPrivate?: boolean; allowPublic?: boolean };
+}
+
+export interface EffectivePolicies {
+    tag: Record<string, TagPolicy>;
+    style: StylePolicy;
+    components?: Record<string, ComponentPolicy>;
+}
+
+export interface ProjectSettingsPoliciesOverride {
+    tag?: Partial<EffectivePolicies['tag']>;
+    style?: Partial<StylePolicy>;
+    components?: Partial<EffectivePolicies['components']>;
+}
+
+
+/* =============================================================================
+   3. Component & Template Definitions
    컴포넌트의 기본 구조와 정책, 템플릿을 정의합니다.
 ============================================================================= */
 
@@ -138,7 +189,7 @@ export interface ComponentDefinition<
     title: string;
     defaults: {
         props: Partial<P>;
-        styles: Partial<S>; // { element: { base: CSSDict } } 등
+        styles: Partial<S>;
     };
     propsSchema?: Array<PropSchemaEntry<P, any>>;
     capabilities?: ComponentCapabilities;
@@ -161,10 +212,8 @@ export interface TemplateDefinition {
     defaults?: { props?: Record<string, unknown>; styles?: CSSDict };
     schemaOverride?: PropSchemaEntry[];
     inspectorFilter?: InspectorFilter;
-
     actionPresets?: Partial<Record<SupportedEvent, ActionSpec>>;
     flowPresets?: FlowEdge[];
-
     capabilityDelta?: {
         allowedTagsRestrict?: string[];
         tagPolicyDelta?: {
@@ -177,16 +226,15 @@ export interface TemplateDefinition {
     };
 }
 
-export interface TagPolicy {
+export type TagPolicyMap = Record<string, {
     allowedAttributes: string[];
     styles?: { allow?: string[]; deny?: string[] };
     isVoid?: boolean;
-}
-export type TagPolicyMap = Record<string, TagPolicy>;
+}>;
 export type BaseDefTagWhitelist = Record<string, string[]>;
 
 /* =============================================================================
-   3. Actions & Flows
+   4. Actions & Flows
    사용자 상호작용과 동적 로직을 정의합니다.
 ============================================================================= */
 
@@ -223,7 +271,7 @@ export interface BindingScope {
 }
 
 /* =============================================================================
-   4. Editor State & UI Models
+   5. Editor State & UI Models
    에디터의 상태와 UI 관련 구조를 정의합니다.
 ============================================================================= */
 
@@ -265,7 +313,7 @@ export interface EditorUI {
             activeHubTab: ProjectHubTab;
             widthPx: number;
             lastActivePageId: string | null;
-            // ✨ [추가] 분할 보기 상태
+            lastActiveFragmentId: string | null; // ✨ [추가] 마지막 활성 컴포넌트 ID
             isSplit: boolean;
             splitPercentage: number;
         };
@@ -290,9 +338,9 @@ export interface EditorState {
 }
 
 /* =============================================================================
-   5. Utility & Meta Types
+   6. Utility & Meta Types
 ============================================================================= */
-
+// ... (기존 타입들은 변경 없음)
 export interface PropVisibilityOverride {
     whenExpr?: string;
 }

@@ -1,11 +1,4 @@
 'use client';
-/**
- * PositionGroup v2
- * - position(static/relative/absolute/fixed/sticky)
- * - offset(top/right/bottom/left) / zIndex
- * - overflow-x / overflow-y (기존 설계에 따라 Position 그룹에서 제공)
- * - 허용 키 필터(useAllowed), 제한 배지(DisabledHint)
- */
 
 import React from 'react';
 import type {
@@ -13,6 +6,7 @@ import type {
     InspectorFilter,
     TagPolicy,
     TagPolicyMap,
+    NodeId,
 } from '../../../../core/types';
 import {
     Label,
@@ -22,8 +16,10 @@ import {
     useAllowed,
     reasonForKey,
     type DisallowReason,
+    PermissionLock,
 } from './common';
 import { coerceLen } from '../../../../runtime/styleUtils';
+import { useEditor } from '../../../useEditor';
 
 export function PositionGroup(props: {
     el: Record<string, unknown>;
@@ -35,20 +31,26 @@ export function PositionGroup(props: {
     expert: boolean;
     open: boolean;
     onToggle: () => void;
+    nodeId: NodeId;
+    componentId: string;
 }) {
-    const { el, patch, tag, tagPolicy, tf, map, expert, open, onToggle } = props;
+    const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
+    const { ui } = useEditor();
 
-    const KEYS = [
-        'position', 'top', 'right', 'bottom', 'left', 'zIndex',
-        'overflowX', 'overflowY',
-    ] as string[];
-    const allow = useAllowed(KEYS, tf, tag, map, expert);
-    const dis = (k: string): DisallowReason => reasonForKey(k, tagPolicy, tf, expert);
+    const allow = useAllowed(nodeId);
+    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
 
     const pos = ((el as any).position as string) ?? 'static';
     const isOffsetEnabled = pos !== 'static';
 
     const overflowOptions = ['visible', 'hidden', 'scroll', 'auto', 'clip'];
+
+    const renderLock = (controlKey: string) => {
+        if (ui.mode === 'Component') {
+            return <PermissionLock componentId={componentId} controlKey={controlKey} />;
+        }
+        return null;
+    };
 
     return (
         <section className="mt-3">
@@ -61,9 +63,9 @@ export function PositionGroup(props: {
 
             {open && (
                 <div className="mt-1 space-y-3">
-                    {/* position */}
                     <div className="flex items-center gap-2">
                         <Label>position</Label>
+                        {renderLock('position')}
                         {!allow.has('position') && <DisabledHint reason={dis('position')!} />}
                         {allow.has('position') ? (
                             <MiniSelect
@@ -76,9 +78,12 @@ export function PositionGroup(props: {
                         )}
                     </div>
 
-                    {/* offsets */}
                     <div className="flex items-center gap-2">
                         <Label>offset</Label>
+                        {renderLock('top')}
+                        {renderLock('right')}
+                        {renderLock('bottom')}
+                        {renderLock('left')}
                         {(['top', 'right', 'bottom', 'left'] as const).map((k) => {
                             const disabled = !isOffsetEnabled || !allow.has(k);
                             return (
@@ -90,15 +95,16 @@ export function PositionGroup(props: {
                                         placeholder={k}
                                         disabled={disabled}
                                         title={isOffsetEnabled ? k : 'position이 static일 때는 사용 불가'}
+                                        className="w-16"
                                     />
                                 </div>
                             );
                         })}
                     </div>
 
-                    {/* zIndex */}
                     <div className="flex items-center gap-2">
                         <Label>zIndex</Label>
+                        {renderLock('zIndex')}
                         {!allow.has('zIndex') && <DisabledHint reason={dis('zIndex')!} />}
                         {allow.has('zIndex') ? (
                             <MiniInput
@@ -114,9 +120,10 @@ export function PositionGroup(props: {
                         )}
                     </div>
 
-                    {/* overflow axis */}
                     <div className="flex items-center gap-2">
                         <Label>overflow-x / y</Label>
+                        {renderLock('overflowX')}
+                        {renderLock('overflowY')}
                         {!allow.has('overflowX') && <DisabledHint reason={dis('overflowX')!} />}
                         {allow.has('overflowX') ? (
                             <MiniSelect

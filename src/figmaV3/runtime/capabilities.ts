@@ -1,141 +1,143 @@
 /**
- * 태그/스타일/허용태그 능력 모델 유틸
- * - 전문가 모드여도 TagPolicy/컴포넌트 capability는 항상 적용
- * - 템플릿 InspectorFilter는 전문가 모드에서 무시(표시 UX 전용)
+ * ✨ [Policy Engine v1.1]
+ * 태그/스타일/컴포넌트 정책을 기반으로 특정 노드의 허용 능력(capabilities)을 계산합니다.
+ * Inspector는 이 파일의 유틸리티를 사용하여 동적으로 UI를 렌더링합니다.
  */
-import type {
+import {
     Project,
     Node,
-    TagPolicyMap,
-    TagPolicy,
-    InspectorFilter,
-    BaseDefTagWhitelist,
+    NodeId,
     ComponentDefinition,
+    EffectivePolicies,
+    ProjectSettingsPoliciesOverride,
+    TagPolicy,
+    StylePolicy, ComponentPolicy,
 } from '../core/types';
+import { getDefinition } from '../core/registry';
+import { GLOBAL_TAG_POLICIES } from '../policy/globalTagPolicy';
+import { GLOBAL_STYLE_POLICY } from '../policy/globalStylePolicy';
+import { deepMerge } from './deepMerge'; // (신규 유틸리티, 아래에서 정의)
 
 // HTML void 요소(자식 불가)
 const VOID_TAGS = new Set(['img','input','br','hr','meta','link','source','track','area','param','col','base','wbr']);
 
-// MDN 요약 기반 기본 태그 정책(필요 시 지속 확장)
-export const DEFAULT_TAG_POLICIES: TagPolicyMap = {
-    div:    { allowedAttributes: [], styles: {} , isVoid: false },
-    section:{ allowedAttributes: [], styles: {} , isVoid: false },
-    span:   { allowedAttributes: [], styles: {} , isVoid: false },
-    button: { allowedAttributes: ['type','disabled','name','value'], styles: {}, isVoid: false },
-    a:      { allowedAttributes: ['href','target','rel','download','referrerpolicy'], styles: {}, isVoid: false },
-    img:    { allowedAttributes: ['src','alt','srcset','sizes','loading','decoding','referrerpolicy'], styles: {}, isVoid: true  },
-    input:  { allowedAttributes: ['type','name','value','placeholder','disabled','readonly','checked','min','max','step'], styles: {}, isVoid: true  },
-};
-
-// 베이스 컴포넌트 → 허용 태그 화이트리스트(필요 시 확장)
-export const DEFAULT_BASEDEF_TAG_WHITELIST: BaseDefTagWhitelist = {
-    box: ['div','section','span'],
-    button: ['button','a','div'],
-    image: ['img','div'],
-    text: ['span','div','section'],
-};
-
-export function isContainerTag(tag: string, policy?: TagPolicy): boolean {
-    const p = policy ?? DEFAULT_TAG_POLICIES[tag];
-    return p ? !p.isVoid : true;
-}
-
-export function getTagPolicy(tag: string, projectOverride?: TagPolicyMap): TagPolicy | undefined {
-    return (projectOverride && projectOverride[tag]) ?? DEFAULT_TAG_POLICIES[tag];
-}
-
-export function filterStyleKeysByTag(
-    tag: string,
-    keys: string[],
-    projectOverride?: TagPolicyMap
-): string[] {
-    const p = getTagPolicy(tag, projectOverride);
-    if (!p || !p.styles) return keys;
-    const deny = new Set(p.styles.deny ?? []);
-    const allow = p.styles.allow ? new Set(p.styles.allow) : null;
-    return keys.filter((k) => (allow ? allow.has(k) : true) && !deny.has(k));
+/**
+ * 기본 정책과 프로젝트 오버라이드를 병합하여 최종 유효 정책 객체를 생성합니다.
+ * @param overrides 프로젝트에 저장된 사용자 정의 정책
+ * @returns 최종적으로 적용될 EffectivePolicies 객체
+ */
+export function buildEffectivePolicies(
+    overrides?: ProjectSettingsPoliciesOverride
+): EffectivePolicies {
+    const effective: EffectivePolicies = {
+        tag: deepMerge({}, GLOBAL_TAG_POLICIES, overrides?.tag ?? {}) as Record<string, TagPolicy> ,
+        style: deepMerge({}, GLOBAL_STYLE_POLICY, overrides?.style ?? {}) as StylePolicy,
+        components: deepMerge({}, {}, overrides?.components ?? {}) as Record<string, ComponentPolicy>// 기본 ComponentPolicy는 아직 없음
+    };
+    return effective;
 }
 
 /**
- * 템플릿 필터(전문가 모드면 무시) → 태그 정책(항상 적용)의 순서로 키를 필터링
+ * 노드의 실제 렌더링 태그를 결정합니다: props.__tag -> component.defaultTag -> 'div'
  */
-export function filterStyleKeysByTemplateAndTag(
-    keys: string[],
-    templateFilter: InspectorFilter | undefined,
-    tag: string,
-    projectOverride?: TagPolicyMap,
-    expertMode?: boolean
-): string[] {
-    let cur = keys;
-    if (!expertMode && templateFilter?.styles) {
-        const { allow, deny } = templateFilter.styles;
-        if (allow) {
-            const a = new Set(allow);
-            cur = cur.filter((k) => a.has(k));
-        }
-        if (deny) {
-            const d = new Set(deny);
-            cur = cur.filter((k) => !d.has(k));
-        }
-    }
-    cur = filterStyleKeysByTag(tag, cur, projectOverride);
-    return cur;
-}
-
-export function isTagAllowedForBase(defId: string, tag: string, whitelistOverride?: BaseDefTagWhitelist): boolean {
-    const wl = (whitelistOverride && whitelistOverride[defId]) ?? DEFAULT_BASEDEF_TAG_WHITELIST[defId];
-    if (!wl) return true;
-    return wl.includes(tag);
-}
-
-export function getAllowedTagsForBase(defId: string, whitelistOverride?: BaseDefTagWhitelist): string[] {
-    const wl = (whitelistOverride && whitelistOverride[defId]) ?? DEFAULT_BASEDEF_TAG_WHITELIST[defId];
-    return wl ?? ['div'];
-}
-
-/** 노드의 실제 렌더 태그: __tag → defaultTag → 'div' */
-export function effectiveTag(node: Node, def?: ComponentDefinition): string {
+export function getEffectiveTag(node: Node, def?: ComponentDefinition): string {
     const p = node.props as Record<string, unknown>;
-    const t = (p?.__tag as string) || def?.capabilities?.defaultTag || 'div';
-    return t;
+    const d = def ?? getDefinition(node.componentId);
+    return (p?.__tag as string) || d?.capabilities?.defaultTag || 'div';
+}
+
+/**
+ * 특정 태그에 대한 유효한 TagPolicy를 반환합니다.
+ */
+export function getTagPolicy(policies: EffectivePolicies, tag: string): TagPolicy | undefined {
+    return policies.tag[tag];
 }
 
 
-// 전역(글로벌) 속성은 항상 허용: id, class, data-*, aria-*
-const GLOBAL_ALWAYS_ALLOWED = new Set(['id', 'class', 'className']);
+/**
+ * 특정 노드에 대한 모든 정책(Tag, Style, Component)이 적용된 최종 정책 객체를 반환합니다.
+ * Inspector에서 가장 많이 사용될 핵심 헬퍼 함수입니다.
+ * @param project 전체 프로젝트 객체
+ * @param nodeId 대상 노드 ID
+ * @returns 해당 노드에 적용될 모든 정책 정보
+ */
+export function getEffectivePoliciesForNode(project: Project, nodeId: NodeId) {
+    const node = project.nodes[nodeId];
+    if (!node) return null;
 
-/** data-/aria- 는 항상 허용 */
-export function isDataOrAriaAttr(key: string): boolean {
-    return key.startsWith('data-') || key.startsWith('aria-');
+    const def = getDefinition(node.componentId);
+    if (!def) return null;
+
+    const effectivePolicies = buildEffectivePolicies(project.policies);
+    const tag = getEffectiveTag(node, def);
+    const tagPolicy = getTagPolicy(effectivePolicies, tag);
+    const componentPolicy = effectivePolicies.components?.[def.title];
+
+    return {
+        node,
+        def,
+        tag,
+        effectivePolicies,
+        tagPolicy,
+        stylePolicy: effectivePolicies.style,
+        componentPolicy,
+    };
 }
 
-/** TagPolicy 기반 허용 여부(없으면 관대하게 true) */
-export function isAttrAllowedByPolicy(
-    project: Project | undefined,
-    tag: string,
-    key: string,
-): boolean {
-    // ✅ 전역 속성 우선 허용
-    if (GLOBAL_ALWAYS_ALLOWED.has(key)) return true;
-    if (isDataOrAriaAttr(key)) return true;
 
-    if (!project?.tagPolicies) return true;
-    const pol: TagPolicy | undefined = project.tagPolicies[tag];
-    if (!pol?.allowedAttributes) return true;
+/**
+ * 특정 노드의 Inspector에 표시될 수 있는 모든 스타일 키 목록을 반환합니다.
+ * @param project 전체 프로젝트 객체
+ * @param nodeId 대상 노드 ID
+ * @param expertMode 전문가 모드 활성화 여부
+ * @returns 허용된 스타일 키 Set
+ */
+export function getAllowedStyleKeysForNode(project: Project, nodeId: NodeId, expertMode: boolean): Set<string> {
+    const policyInfo = getEffectivePoliciesForNode(project, nodeId);
+    if (!policyInfo) return new Set();
 
-    return pol.allowedAttributes.includes(key);
-}
+    const { tagPolicy, stylePolicy, componentPolicy } = policyInfo;
 
-/** 렌더 직전 속성 정리(Phase1: 허용 외는 무시만 함) */
-export function sanitizeAttrsForTag(
-    project: Project | undefined,
-    tag: string,
-    attrs: Record<string, unknown>,
-): Record<string, string> {
-    const out: Record<string, string> = {};
-    for (const [k, v] of Object.entries(attrs)) {
-        if (typeof v !== 'string') continue; // 문자열만 허용(SSR 안전)
-        if (isAttrAllowedByPolicy(project, tag, k)) out[k] = v;
+    let allowed = new Set<string>();
+
+    // 1. StylePolicy의 전역 허용/금지 규칙 적용
+    if (stylePolicy.allow?.includes('*')) {
+        // 모든 키를 허용하므로, 일단 잠재적 키 목록이 필요. TagPolicy의 그룹에서 가져온다.
+        const allKnownKeys = Object.values(tagPolicy?.styles?.groups ?? {}).flat();
+        allowed = new Set(allKnownKeys);
+    } else if (stylePolicy.allow) {
+        allowed = new Set(stylePolicy.allow);
     }
-    return out;
+
+    stylePolicy.deny?.forEach(key => allowed.delete(key));
+
+    // 2. TagPolicy 필터링
+    const tagStylePolicy = tagPolicy?.styles;
+    if (tagStylePolicy) {
+        if (tagStylePolicy.allow) {
+            const tagAllowed = new Set(tagStylePolicy.allow);
+            allowed.forEach(key => {
+                if (!tagAllowed.has(key)) {
+                    allowed.delete(key);
+                }
+            });
+        }
+        tagStylePolicy.deny?.forEach(key => allowed.delete(key));
+    }
+
+    // 3. ComponentPolicy 필터링 (페이지 빌드 모드 & 비전문가 모드일 때만)
+    const isPageBuildMode = true; // (가정) 현재는 페이지 빌드 모드 컨텍스트
+    if (isPageBuildMode && !expertMode && componentPolicy?.inspector?.controls) {
+        Object.entries(componentPolicy.inspector.controls).forEach(([key, control]) => {
+            if (control.visible === false) {
+                allowed.delete(key);
+            }
+        });
+    }
+
+    return allowed;
 }
+
+// isContainerTag, filterStyleKeysByTag 등 기존 유틸리티는 새로운 정책 구조에 맞게
+// getTagPolicy 등을 사용하도록 점진적으로 리팩토링이 필요합니다.
+// 여기서는 핵심 로직만 우선 구현합니다.

@@ -1,7 +1,8 @@
 'use client';
 import React from 'react';
-import type { CSSDict, InspectorFilter, TagPolicy, TagPolicyMap } from '../../../../core/types';
-import { ColorField, ChipBtn, Label, MiniInput, MiniSelect, DisabledHint, useAllowed, DisallowReason } from './common';
+import type { CSSDict, InspectorFilter, TagPolicy, TagPolicyMap, NodeId } from '../../../../core/types';
+import { ColorField, ChipBtn, Label, MiniInput, MiniSelect, DisabledHint, useAllowed, DisallowReason, PermissionLock, reasonForKey } from './common';
+import { useEditor } from '../../../useEditor';
 
 type BgMode = 'none' | 'color' | 'image' | 'transparent';
 
@@ -15,23 +16,18 @@ export function BackgroundGroup(props: {
     expert: boolean;
     open: boolean;
     onToggle: () => void;
+    nodeId: NodeId;
+    componentId: string;
 }) {
-    const { el, patch, tag, tf, map, expert, tagPolicy, open, onToggle } = props;
+    const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
+    const { ui } = useEditor();
 
-    const allow = useAllowed(
-        ['backgroundColor', 'backgroundImage', 'backgroundSize', 'backgroundRepeat', 'backgroundPosition'],
-        tf,
-        tag,
-        map,
-        expert
-    );
+    const allow = useAllowed(nodeId);
+    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
 
-    const dis = (k: string): DisallowReason => {
-        if (tagPolicy?.styles?.allow && !tagPolicy.styles.allow.includes(k)) return 'tag';
-        if (tagPolicy?.styles?.deny && tagPolicy.styles.deny.includes(k)) return 'tag';
-        if (!expert && tf?.styles) {
-            if (tf.styles.allow && !tf.styles.allow.includes(k)) return 'template';
-            if (tf.styles.deny && tf.styles.deny.includes(k)) return 'template';
+    const renderLock = (controlKey: string) => {
+        if (ui.mode === 'Component') {
+            return <PermissionLock componentId={componentId} controlKey={controlKey} />;
         }
         return null;
     };
@@ -90,7 +86,6 @@ export function BackgroundGroup(props: {
 
     return (
         <div>
-            {/* 통일된 타이틀 */}
             <div
                 className="flex items-center justify-between text-xs font-semibold text-neutral-700 cursor-pointer select-none px-1 py-1 mt-2"
                 onClick={onToggle}
@@ -100,7 +95,6 @@ export function BackgroundGroup(props: {
 
             {open && (
                 <div className="mt-2 space-y-3 px-1">
-                    {/* mode */}
                     <div className="flex items-center gap-2">
                         <Label>mode</Label>
                         {(['none', 'color', 'image', 'transparent'] as BgMode[]).map((m) => (
@@ -110,11 +104,11 @@ export function BackgroundGroup(props: {
                         ))}
                     </div>
 
-                    {/* color */}
                     {mode === 'color' && (
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
                                 <Label>backgroundColor</Label>
+                                {renderLock('backgroundColor')}
                                 {!allow.has('backgroundColor') && <DisabledHint reason={dis('backgroundColor')!} />}
                                 {allow.has('backgroundColor') ? (
                                     <>
@@ -133,11 +127,11 @@ export function BackgroundGroup(props: {
                         </div>
                     )}
 
-                    {/* image */}
                     {mode === 'image' && (
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
                                 <Label>gradient presets</Label>
+                                {renderLock('backgroundImage')}
                                 {gradients.map((g) => (
                                     <ChipBtn
                                         key={g.name}
@@ -148,23 +142,15 @@ export function BackgroundGroup(props: {
                                         {g.name}
                                     </ChipBtn>
                                 ))}
-                                <ChipBtn
-                                    title="clear"
-                                    onClick={() => patch({ backgroundImage: undefined })}
-                                    disabled={!allow.has('backgroundImage')}
-                                >
-                                    Clear
-                                </ChipBtn>
                             </div>
 
                             <div className="flex items-center gap-2">
-                                <Label>URL</Label>
+                                <Label>URL / Upload</Label>
                                 {allow.has('backgroundImage') ? (
                                     <>
-                                        <MiniInput value={url} onChange={setUrl} placeholder="https://…" />
-                                        <ChipBtn title="apply" onClick={applyUrl}>
-                                            Apply
-                                        </ChipBtn>
+                                        <MiniInput value={url} onChange={setUrl} placeholder="https://…" className="w-24" />
+                                        <ChipBtn title="apply" onClick={applyUrl}>Apply</ChipBtn>
+                                        <input type="file" accept="image/*" onChange={onUpload} className="text-[11px]" />
                                     </>
                                 ) : (
                                     <span className="text-xs text-neutral-500">제한됨</span>
@@ -172,16 +158,8 @@ export function BackgroundGroup(props: {
                             </div>
 
                             <div className="flex items-center gap-2">
-                                <Label>Upload</Label>
-                                {allow.has('backgroundImage') ? (
-                                    <input type="file" accept="image/*" onChange={onUpload} />
-                                ) : (
-                                    <span className="text-xs text-neutral-500">제한됨</span>
-                                )}
-                            </div>
-
-                            <div className="flex items-center gap-2">
                                 <Label>backgroundSize</Label>
+                                {renderLock('backgroundSize')}
                                 {!allow.has('backgroundSize') && <DisabledHint reason={dis('backgroundSize')!} />}
                                 {allow.has('backgroundSize') ? (
                                     <MiniInput
@@ -195,6 +173,7 @@ export function BackgroundGroup(props: {
 
                             <div className="flex items-center gap-2">
                                 <Label>backgroundRepeat</Label>
+                                {renderLock('backgroundRepeat')}
                                 {!allow.has('backgroundRepeat') && <DisabledHint reason={dis('backgroundRepeat')!} />}
                                 {allow.has('backgroundRepeat') ? (
                                     <MiniInput
@@ -208,6 +187,7 @@ export function BackgroundGroup(props: {
 
                             <div className="flex items-center gap-2">
                                 <Label>backgroundPosition</Label>
+                                {renderLock('backgroundPosition')}
                                 {!allow.has('backgroundPosition') && <DisabledHint reason={dis('backgroundPosition')!} />}
                                 {allow.has('backgroundPosition') ? (
                                     <MiniInput

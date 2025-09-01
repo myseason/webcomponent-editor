@@ -14,11 +14,11 @@ import type {
     Asset,
     Page,
     Fragment,
+    ComponentPolicy,
 } from '../core/types';
+import { deepMerge } from '../runtime/deepMerge';
 
-/** =======================================================================
- * 초기 Project (샘플)
- * ======================================================================= */
+// ... (초기 상태 및 대부분의 유틸리티 함수는 이전과 동일)
 const initialProject: Project = {
     pages: [{ id: 'page_home', name: 'Home', rootId: 'node_root_home', slug: '/' }],
     fragments: [],
@@ -39,9 +39,6 @@ const initialProject: Project = {
     globalJs: '// Global JavaScript',
 };
 
-/** =======================================================================
- * 초기 EditorState
- * ======================================================================= */
 const initialState: EditorState = {
     project: initialProject,
     ui: {
@@ -65,8 +62,9 @@ const initialState: EditorState = {
                 activeHubTab: 'Pages',
                 widthPx: 320,
                 lastActivePageId: null,
-                isSplit: false, // ✨ [추가]
-                splitPercentage: 50, // ✨ [추가]
+                lastActiveFragmentId: null,
+                isSplit: false,
+                splitPercentage: 50,
             },
             right: { widthPx: 420 },
             bottom: { heightPx: 240, isCollapsed: false, advanced: null },
@@ -77,10 +75,6 @@ const initialState: EditorState = {
     flowEdges: {},
     history: { past: [], future: [] },
 };
-
-/** =======================================================================
- * 유틸
- * ======================================================================= */
 let _seq = 0;
 const genId = (prefix: string): string =>
     `${prefix}_${Date.now().toString(36)}_${++_seq}`;
@@ -194,85 +188,63 @@ function cloneSubtree(nodes: Record<NodeId, Node>, srcRootId: NodeId): { nodes: 
     return { nodes: newNodes, newRootId };
 }
 
-
-/** =======================================================================
- * Actions 타입
- * ======================================================================= */
 type EditorActions = {
     update: (fn: (draft: EditorState) => void, recordHistory?: boolean) => void;
     undo: () => void;
     redo: () => void;
-
     select: (id: NodeId | null) => void;
-
     addByDef: (defId: string, parentId?: NodeId) => NodeId;
     addByDefAt: (defId: string, parentId: NodeId, index: number) => void;
     patchNode: (id: NodeId, patch: Partial<Node>) => void;
-
     updateNodeProps: (id: NodeId, props: Record<string, unknown>) => void;
     updateNodeStyles: (id: NodeId, styles: CSSDict, viewport?: Viewport) => void;
-
     moveNode: (nodeId: NodeId, newParentId: NodeId, newIndex: number) => void;
     removeNodeCascade: (nodeId: NodeId) => void;
     toggleNodeVisibility: (nodeId: NodeId) => void;
     toggleNodeLock: (nodeId: NodeId) => void;
-
     selectPage: (pageId: string) => void;
     addPage: (name?: string) => string;
     removePage: (pageId: string) => void;
     duplicatePage: (pageId: string) => void;
-
     openFragment: (fragmentId?: string) => void;
     closeFragment: (fragmentId?: string) => void;
     addFragment: (name?: string) => string;
     removeFragment: (fragmentId: string) => void;
     updateFragment: (fragmentId: string, patch: Partial<Omit<Fragment, 'id' | 'rootId'>>) => void;
-
     addFlowEdge: (edge: FlowEdge) => void;
     updateFlowEdge: (edgeId: string, patch: Partial<FlowEdge>) => void;
     removeFlowEdge: (edgeId: string) => void;
-
     setCanvasSize: (size: { width: number; height: number }) => void;
     setCanvasZoom: (zoom: number) => void;
-
     toggleCanvasOrientation: () => void;
     toggleBottomDock: () => void;
-
     setActiveViewport: (viewport: Viewport) => void;
     setBaseViewport: (viewport: Viewport) => void;
     setViewportMode: (viewport: Viewport, mode: ViewportMode) => void;
-
     setEditorMode: (mode: EditorMode) => void;
     setActiveHubTab: (tab: ProjectHubTab) => void;
     openComponentEditor: (fragmentId: string) => void;
     closeComponentEditor: () => void;
-
     addAsset: (asset: Omit<Asset, 'id'>) => string;
     removeAsset: (assetId: string) => void;
     updateGlobalCss: (css: string) => void;
     updateGlobalJs: (js: string) => void;
-
     getEffectiveDecl: (nodeId: NodeId) => CSSDict | null;
     setData: (path: string, value: unknown) => void;
     setSetting: (key: string, value: unknown) => void;
-
     setNotification: (message: string) => void;
-
-    // ✨ [추가] 분할 보기 액션
     toggleLeftPanelSplit: () => void;
     setLeftPanelSplitPercentage: (percentage: number) => void;
-
+    updateComponentPolicy: (componentId: string, patch: Partial<ComponentPolicy>) => void;
     hydrateDefaults: () => void;
 };
 
 export type EditorStoreState = EditorState & EditorActions;
 
-/** =======================================================================
- * Store
- * ======================================================================= */
 export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreState>((set, get) => ({
     ...initialState,
 
+    // ... (대부분의 액션은 변경 없음)
     update: (fn, recordHistory = false) => {
         const current = get();
         const prevProject = current.project;
@@ -487,12 +459,19 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         s.ui.overlays = fragmentId ? prev.filter(id => id !== fragmentId) : prev.slice(0, -1);
     }, false),
 
+    // ✨ [수정] 새 컴포넌트 생성 시 즉시 편집 상태로 전환하는 로직 추가
     addFragment: (name) => {
         const newId = genId('fragment');
         const rootId = genId('frag_root');
         get().update(s => {
             s.project.nodes[rootId] = buildNodeWithDefaults('box', rootId);
             s.project.fragments = [...s.project.fragments, { id: newId, name: name ?? `Fragment ${s.project.fragments.length + 1}`, rootId }];
+
+            // 컴포넌트 생성 후 즉시 편집 모드로 전환
+            s.ui.mode = 'Component';
+            s.ui.editingFragmentId = newId;
+            s.ui.panels.left.lastActiveFragmentId = newId;
+            s.ui.selectedId = rootId;
         }, true);
         return newId;
     },
@@ -505,6 +484,12 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         toDel.forEach(id => delete next[id]);
         s.project.nodes = next;
         s.project.fragments = s.project.fragments.filter(f => f.id !== fragmentId);
+
+        // 만약 삭제된 프래그먼트가 현재 편집 중이었다면, 편집 상태를 초기화
+        if (s.ui.editingFragmentId === fragmentId) {
+            s.ui.editingFragmentId = null;
+            s.ui.selectedId = null;
+        }
     }, true),
 
     updateFragment: (fragmentId, patch) => get().update(s => {
@@ -513,6 +498,57 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         );
     }, true),
 
+    setEditorMode: (mode) => get().update(s => {
+        if (s.ui.mode === mode) return;
+
+        if (s.ui.mode === 'Page') {
+            const currentPage = s.project.pages.find(p => p.rootId === s.project.rootId);
+            s.ui.panels.left.lastActivePageId = currentPage?.id ?? null;
+        } else {
+            s.ui.panels.left.lastActiveFragmentId = s.ui.editingFragmentId;
+        }
+
+        s.ui.mode = mode;
+
+        if (mode === 'Page') {
+            s.ui.editingFragmentId = null;
+            const targetPage = s.project.pages.find(p => p.id === s.ui.panels.left.lastActivePageId) ?? s.project.pages[0];
+            if (targetPage) {
+                s.project.rootId = targetPage.rootId;
+                s.ui.selectedId = targetPage.rootId;
+            }
+        } else {
+            const targetFragment = s.project.fragments.find(f => f.id === s.ui.panels.left.lastActiveFragmentId) ?? s.project.fragments[0];
+            if (targetFragment) {
+                s.ui.editingFragmentId = targetFragment.id;
+                s.ui.selectedId = targetFragment.rootId;
+            } else {
+                s.ui.editingFragmentId = null;
+                s.ui.selectedId = null;
+            }
+        }
+    }),
+
+    openComponentEditor: (fragmentId) => get().update(s => {
+        const frag = s.project.fragments.find(f => f.id === fragmentId);
+        if (frag) {
+            if (s.ui.mode === 'Page') {
+                const currentPage = s.project.pages.find(p => p.rootId === s.project.rootId);
+                s.ui.panels.left.lastActivePageId = currentPage?.id ?? null;
+            }
+
+            s.ui.mode = 'Component';
+            s.ui.editingFragmentId = fragmentId;
+            s.ui.panels.left.lastActiveFragmentId = fragmentId;
+            s.ui.selectedId = frag.rootId;
+        }
+    }),
+
+    closeComponentEditor: () => {
+        get().setEditorMode('Page');
+    },
+
+    // ... (나머지 액션들은 변경 없음)
     addFlowEdge: (edge) => get().update(s => {
         const id = genId('edge');
         s.flowEdges[id] = { ...edge, id };
@@ -554,56 +590,7 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
     setActiveViewport: (viewport) => get().update(s => { s.ui.canvas.activeViewport = viewport; }),
     setBaseViewport: (viewport) => get().update(s => { s.ui.canvas.baseViewport = viewport; }, true),
     setViewportMode: (viewport, mode) => get().update(s => { s.ui.canvas.vpMode = { ...s.ui.canvas.vpMode, [viewport]: mode }; }, true),
-
-    setEditorMode: (mode) => get().update(s => {
-        if (s.ui.mode === mode) return;
-        s.ui.mode = mode;
-
-        if (mode === 'Page') {
-            s.ui.editingFragmentId = null;
-            const lastPageId = s.ui.panels.left.lastActivePageId;
-            const targetPage = s.project.pages.find(p => p.id === lastPageId) ?? s.project.pages[0];
-            if (targetPage) {
-                s.project.rootId = targetPage.rootId;
-                s.ui.selectedId = targetPage.rootId;
-            }
-        } else {
-            const currentPage = s.project.pages.find(p => p.rootId === s.project.rootId);
-            s.ui.panels.left.lastActivePageId = currentPage?.id ?? null;
-            const firstFragment = s.project.fragments[0];
-            if (firstFragment) {
-                s.ui.editingFragmentId = firstFragment.id;
-                s.ui.selectedId = firstFragment.rootId;
-            } else {
-                s.ui.editingFragmentId = null;
-                s.ui.selectedId = null;
-            }
-        }
-    }),
     setActiveHubTab: (tab) => get().update(s => { s.ui.panels.left.activeHubTab = tab; }),
-
-    openComponentEditor: (fragmentId) => get().update(s => {
-        const frag = s.project.fragments.find(f => f.id === fragmentId);
-        if (frag) {
-            const currentPage = s.project.pages.find(p => p.rootId === s.project.rootId);
-            s.ui.panels.left.lastActivePageId = currentPage?.id ?? null;
-
-            s.ui.mode = 'Component';
-            s.ui.editingFragmentId = fragmentId;
-            s.ui.selectedId = frag.rootId;
-        }
-    }),
-
-    closeComponentEditor: () => get().update(s => {
-        s.ui.mode = 'Page';
-        s.ui.editingFragmentId = null;
-        const lastPageId = s.ui.panels.left.lastActivePageId;
-        const targetPage = s.project.pages.find(p => p.id === lastPageId) ?? s.project.pages[0];
-        if (targetPage) {
-            s.project.rootId = targetPage.rootId;
-            s.ui.selectedId = targetPage.rootId;
-        }
-    }),
 
     addAsset: (asset) => {
         const newId = genId('asset');
@@ -650,18 +637,29 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         s.ui.notification = { message, timestamp: Date.now() };
     }),
 
-    // ✨ [추가] 분할 보기 액션 구현
     toggleLeftPanelSplit: () => get().update(s => {
         s.ui.panels.left.isSplit = !s.ui.panels.left.isSplit;
-        // 분할 모드를 켤 때, Layers 탭이 아니었다면 Layers로 전환
         if (s.ui.panels.left.isSplit && s.ui.panels.left.activeHubTab !== 'Layers') {
             s.ui.panels.left.activeHubTab = 'Layers';
         }
     }),
 
     setLeftPanelSplitPercentage: (percentage: number) => get().update(s => {
-        s.ui.panels.left.splitPercentage = Math.max(20, Math.min(80, percentage)); // 20% ~ 80% 범위로 제한
+        s.ui.panels.left.splitPercentage = Math.max(20, Math.min(80, percentage));
     }),
+
+    updateComponentPolicy: (componentId, patch) => get().update(s => {
+        if (!s.project.policies) {
+            s.project.policies = {};
+        }
+        if (!s.project.policies.components) {
+            s.project.policies.components = {};
+        }
+        const existing = s.project.policies.components[componentId] ?? {
+            version: '1.1', component: componentId, tag: getDefinition(componentId)?.capabilities?.defaultTag ?? 'div'
+        };
+        s.project.policies.components[componentId] = deepMerge(existing, patch);
+    }, true),
 
     hydrateDefaults: () => get().update(s => {
         const nodes = s.project.nodes;

@@ -6,15 +6,18 @@ import type {
     TagPolicy,
     TagPolicyMap,
     CSSDict,
+    ComponentPolicy,
+    NodeId,
 } from '../../../../core/types';
-import {
-    filterStyleKeysByTemplateAndTag,
-} from '../../../../runtime/capabilities';
+import { getAllowedStyleKeysForNode, getEffectivePoliciesForNode } from '../../../../runtime/capabilities';
+import { Lock, Unlock } from 'lucide-react';
+import { useEditor } from '../../../useEditor';
 
 /* ────────────────────────────────────────────────────
  * 공통 레이아웃 컴포넌트
  * ──────────────────────────────────────────────────── */
 
+// ... (Section, Label 등 기존 레이아웃 컴포넌트는 변경 없음)
 export const Section: React.FC<{
     title: string;
     open: boolean;
@@ -36,22 +39,63 @@ export const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     <span className="text-xs text-neutral-600 w-24 select-none">{children}</span>
 );
 
-export const DisabledHint: React.FC<{ reason: 'template' | 'tag' }> = ({ reason }) => (
+export const DisabledHint: React.FC<{ reason: 'template' | 'tag' | 'component' }> = ({ reason }) => (
     <span
         className="text-[10px] px-1 py-0.5 rounded border border-neutral-200 text-neutral-500"
-        title={reason === 'tag' ? 'TagPolicy에 의해 제한' : 'Template 필터에 의해 제한'}
+        title={
+            reason === 'tag' ? 'TagPolicy에 의해 제한' :
+                reason === 'component' ? 'ComponentPolicy에 의해 제한' :
+                    'Template 필터에 의해 제한'
+        }
     >
-    {reason === 'tag' ? '⛔ TagPolicy' : '▣ Template'}
-  </span>
+        {
+            reason === 'tag' ? '⛔ Tag' :
+                reason === 'component' ? '🔒 Comp' :
+                    '▣ Tpl'
+        }
+    </span>
 );
+
+export const PermissionLock: React.FC<{
+    componentId: string;
+    controlKey: string;
+}> = ({ componentId, controlKey }) => {
+    const { project, updateComponentPolicy } = useEditor();
+
+    const isVisible = project.policies?.components?.[componentId]?.inspector?.controls?.[controlKey]?.visible !== false;
+
+    const toggleVisibility = () => {
+        const patch: Partial<ComponentPolicy> = {
+            inspector: {
+                controls: {
+                    [controlKey]: {
+                        visible: !isVisible
+                    }
+                }
+            }
+        };
+        updateComponentPolicy(componentId, patch);
+    };
+
+    return (
+        <button
+            onClick={toggleVisibility}
+            className="p-1 rounded-md text-gray-400 hover:bg-gray-200 hover:text-gray-700"
+            title={isVisible ? `Lock control for Page Builders` : `Unlock control for Page Builders`}
+        >
+            {isVisible ? <Unlock size={12} /> : <Lock size={12} />}
+        </button>
+    );
+};
+
 
 /* ────────────────────────────────────────────────────
  * 폼 위젯
  * ──────────────────────────────────────────────────── */
-
+// ... (MiniInput, NumberInput 등 기존 폼 위젯들은 변경 없음)
 export const MiniInput: React.FC<{
     value: string | number | undefined;
-    onChange: (v: string) => void;  // 입력 원문을 부모가 적절히 파싱/보정(coerceLen 등)
+    onChange: (v: string) => void;
     placeholder?: string;
     disabled?: boolean;
     title?: string;
@@ -77,7 +121,7 @@ export const NumberInput: React.FC<{
     step?: number;
     min?: number;
     max?: number;
-    className?: string; // 확장
+    className?: string;
     disabled?: boolean;
     title?: string;
 }> = ({ value, onChange, step = 1, min, max, className, disabled, title }) => (
@@ -145,7 +189,6 @@ export const ChipBtn: React.FC<{
     </button>
 );
 
-/** 아이콘 버튼(아이콘 자리에 children) */
 export const IconBtn: React.FC<{
     active?: boolean;
     title: string;
@@ -168,7 +211,6 @@ export const IconBtn: React.FC<{
     </button>
 );
 
-/** 컬러 피커 + 텍스트 동기화 */
 export const ColorField: React.FC<{
     value: string | undefined;
     onChange: (v: string) => void;
@@ -201,42 +243,63 @@ export const ColorField: React.FC<{
     );
 };
 
+
 /* ────────────────────────────────────────────────────
  * 허용/제한 판단 유틸
  * ──────────────────────────────────────────────────── */
 
-export type DisallowReason = 'template' | 'tag' | null;
+export type DisallowReason = 'template' | 'tag' | 'component' | null;
 
 /**
- * 템플릿(Filter) → 태그 정책 순으로 keys 필터링하여 허용 set 반환
- * - 전문가 모드(expert=true)면 템플릿 필터는 무시(표시 UX 전용)
+ * ✨ [수정] Page 모드에서 ComponentPolicy의 'visible' 설정을 반영하도록 수정
  */
-export function useAllowed(
-    keys: string[],
-    tf: InspectorFilter | undefined,
-    tag: string,
-    map: TagPolicyMap | undefined,
-    expert: boolean
-): Set<string> {
-    const deps = React.useMemo(() => keys.join(','), [keys]);
-    return React.useMemo(
-        () => new Set(filterStyleKeysByTemplateAndTag([...keys], tf, tag, map, expert)),
-        [deps, tf, tag, map, expert]
-    );
+export function useAllowed(nodeId: NodeId): Set<string> {
+    const { project, ui } = useEditor();
+    const { mode, expertMode } = ui;
+
+    return React.useMemo(() => {
+        const policyInfo = getEffectivePoliciesForNode(project, nodeId);
+        if (!policyInfo) return new Set();
+
+        const baseAllowed = getAllowedStyleKeysForNode(project, nodeId, expertMode);
+
+        // 페이지 빌드 모드이고 전문가 모드가 아닐 때만 ComponentPolicy의 visible 필터링 적용
+        if (mode === 'Page' && !expertMode) {
+            const { componentPolicy } = policyInfo;
+            if (componentPolicy?.inspector?.controls) {
+                Object.entries(componentPolicy.inspector.controls).forEach(([key, control]) => {
+                    if (control.visible === false) {
+                        baseAllowed.delete(key);
+                    }
+                });
+            }
+        }
+
+        return baseAllowed;
+
+    }, [project, nodeId, mode, expertMode]);
 }
 
-/** 단일 키에 대해 제한 사유 계산(배지용) */
 export function reasonForKey(
+    nodeId: NodeId,
     key: string,
-    tagPolicy: TagPolicy | undefined,
-    tf: InspectorFilter | undefined,
     expert: boolean
 ): DisallowReason {
-    if (tagPolicy?.styles?.allow && !tagPolicy.styles.allow.includes(key)) return 'tag';
-    if (tagPolicy?.styles?.deny && tagPolicy.styles.deny.includes(key)) return 'tag';
-    if (!expert && tf?.styles) {
-        if (tf.styles.allow && !tf.styles.allow.includes(key)) return 'template';
-        if (tf.styles.deny && tf.styles.deny.includes(key)) return 'template';
+    const { project, ui } = useEditor();
+    const policyInfo = getEffectivePoliciesForNode(project, nodeId);
+    if (!policyInfo) return null;
+
+    const { tagPolicy, componentPolicy } = policyInfo;
+
+    // ✨ [수정] 페이지 빌드 모드일 때 ComponentPolicy 확인
+    if (ui.mode === 'Page' && !expert && componentPolicy?.inspector?.controls?.[key]?.visible === false) {
+        return 'component';
     }
+
+    if (tagPolicy?.styles) {
+        if (tagPolicy.styles.deny?.includes(key)) return 'tag';
+        if (tagPolicy.styles.allow && !tagPolicy.styles.allow.includes('*') && !tagPolicy.styles.allow.includes(key)) return 'tag';
+    }
+
     return null;
 }

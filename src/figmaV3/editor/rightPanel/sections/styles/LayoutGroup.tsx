@@ -1,20 +1,13 @@
 'use client';
 
-/**
- * LayoutGroup
- * - display, overflow, width/height
- * - Flex 컨테이너: direction / justify / align / gap
- * - Grid 컨테이너: columns/rows preset + gap/rowGap/columnGap + auto-flow
- * - 허용 키 필터(useAllowed), 제한 배지(DisabledHint)
- * - lucide-react 아이콘(원본과 동일한 매핑) 유지
- */
-
 import React from 'react';
 import type {
     CSSDict,
     InspectorFilter,
     TagPolicy,
     TagPolicyMap,
+    NodeId,
+    ComponentDefinition,
 } from '../../../../core/types';
 import {
     useAllowed,
@@ -25,8 +18,11 @@ import {
     DisabledHint,
     type DisallowReason,
     IconBtn,
+    PermissionLock,
+    reasonForKey,
 } from './common';
-import { isContainerTag } from '../../../../runtime/capabilities';
+// ✨ [제거] import { isContainerTag } from '../../../../runtime/capabilities';
+import { getDefinition } from '../../../../core/registry'; // ✨ [추가]
 import {
     AlignStartHorizontal,
     AlignCenterHorizontal,
@@ -48,8 +44,15 @@ import {
     ArrowUpDown,
 } from 'lucide-react';
 import { coerceLen } from '../../../../runtime/styleUtils';
+import { useEditor } from '../../../useEditor';
 
 type IconCmp = React.ComponentType<{ size?: number; className?: string }>;
+
+// ✨ [추가] 컴포넌트 정의를 직접 확인하는 로컬 헬퍼 함수
+function isContainer(def: ComponentDefinition | undefined): boolean {
+    return def?.capabilities?.canHaveChildren === true;
+}
+
 
 export function LayoutGroup(props: {
     el: Record<string, unknown>;
@@ -61,62 +64,30 @@ export function LayoutGroup(props: {
     patch: (css: CSSDict) => void;
     open: boolean;
     onToggle: () => void;
+    nodeId: NodeId;
+    componentId: string;
 }) {
-    const { el, tag, patch, tf, map, expert, tagPolicy, open, onToggle } = props;
+    const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
+    const { ui } = useEditor();
+    const def = getDefinition(componentId);
 
-    // 허용 키(원본 키셋 유지)
-    const allowLayout = useAllowed(
-        ['display', 'overflow', 'width', 'height'],
-        tf,
-        tag,
-        map,
-        expert
-    );
-    const allowFlex = useAllowed(
-        ['flexDirection', 'justifyContent', 'alignItems', 'gap'],
-        tf,
-        tag,
-        map,
-        expert
-    );
-    const allowGrid = useAllowed(
-        [
-            'gridTemplateColumns',
-            'gridTemplateRows',
-            'gridAutoFlow',
-            'gap',
-            'rowGap',
-            'columnGap',
-            'justifyItems',
-            'alignItems',
-            'justifyContent',
-            'alignContent',
-        ],
-        tf,
-        tag,
-        map,
-        expert
-    );
-
-    // 제한 사유(원본과 동일한 규칙)
-    const dis = (k: string): DisallowReason => {
-        if (tagPolicy?.styles?.allow && !tagPolicy.styles.allow.includes(k)) return 'tag';
-        if (tagPolicy?.styles?.deny && tagPolicy.styles.deny.includes(k)) return 'tag';
-        if (!expert && tf?.styles) {
-            if (tf.styles.allow && !tf.styles.allow.includes(k)) return 'template';
-            if (tf.styles.deny && tf.styles.deny.includes(k)) return 'template';
-        }
-        return null;
-    };
+    const allow = useAllowed(nodeId);
+    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
 
     const display = ((el as any).display as string) ?? 'block';
     const isInline = display === 'inline';
-    const container = isContainerTag(tag, tagPolicy);
+    const container = isContainer(def); // ✨ [수정] 로컬 헬퍼 사용
 
     const dir = ((el as any).flexDirection as string) ?? 'row';
     const isCol = dir === 'column' || dir === 'column-reverse';
 
-    // 주축/교차축 아이콘 매핑(원본과 동일)
+    const renderLock = (controlKey: string) => {
+        if (ui.mode === 'Component') {
+            return <PermissionLock componentId={componentId} controlKey={controlKey} />;
+        }
+        return null;
+    };
+
     const justifyIcons: { v: string; title: string; I: IconCmp }[] = isCol
         ? [
             { v: 'flex-start', title: 'flex-start', I: AlignStartVertical },
@@ -149,7 +120,6 @@ export function LayoutGroup(props: {
             { v: 'stretch', title: 'stretch', I: StretchVertical },
         ];
 
-    // grid preset 유틸(원본 유지)
     const parseRepeat = (v: unknown): number | null => {
         if (typeof v !== 'string') return null;
         const m = v.trim().match(/^repeat\((\d+),\s*1fr\)$/);
@@ -177,11 +147,11 @@ export function LayoutGroup(props: {
 
             {open && (
                 <div className="mt-1 space-y-2">
-                    {/* display */}
                     <div className="flex items-center gap-2">
                         <Label>display</Label>
-                        {!allowLayout.has('display') && <DisabledHint reason={dis('display')!} />}
-                        {allowLayout.has('display') ? (
+                        {renderLock('display')}
+                        {!allow.has('display') && <DisabledHint reason={dis('display')!} />}
+                        {allow.has('display') ? (
                             <div className="flex gap-1">
                                 {(['block', 'inline', 'flex', 'grid'] as const).map((v) => (
                                     <ChipBtn
@@ -199,11 +169,11 @@ export function LayoutGroup(props: {
                         )}
                     </div>
 
-                    {/* overflow */}
                     <div className="flex items-center gap-2">
                         <Label>overflow</Label>
-                        {!allowLayout.has('overflow') && <DisabledHint reason={dis('overflow')!} />}
-                        {allowLayout.has('overflow') ? (
+                        {renderLock('overflow')}
+                        {!allow.has('overflow') && <DisabledHint reason={dis('overflow')!} />}
+                        {allow.has('overflow') ? (
                             <MiniSelect
                                 value={(el as any).overflow as string | undefined}
                                 options={['visible', 'hidden', 'scroll', 'auto', 'clip']}
@@ -214,13 +184,14 @@ export function LayoutGroup(props: {
                         )}
                     </div>
 
-                    {/* width/height (display:inline이면 브라우저가 무시 → 안내) */}
                     {!isInline ? (
                         <>
                             <div className="flex items-center gap-2">
                                 <Label>width / height</Label>
-                                {!allowLayout.has('width') && <DisabledHint reason={dis('width')!} />}
-                                {allowLayout.has('width') ? (
+                                {renderLock('width')}
+                                {renderLock('height')}
+                                {!allow.has('width') && <DisabledHint reason={dis('width')!} />}
+                                {allow.has('width') ? (
                                     <MiniInput
                                         value={(el as any)['width'] as string | number | undefined}
                                         onChange={(v) => patch({ width: coerceLen(v) })}
@@ -229,8 +200,8 @@ export function LayoutGroup(props: {
                                 ) : (
                                     <span className="text-[11px] text-neutral-400">제한됨</span>
                                 )}
-                                {!allowLayout.has('height') && <DisabledHint reason={dis('height')!} />}
-                                {allowLayout.has('height') ? (
+                                {!allow.has('height') && <DisabledHint reason={dis('height')!} />}
+                                {allow.has('height') ? (
                                     <MiniInput
                                         value={(el as any)['height'] as string | number | undefined}
                                         onChange={(v) => patch({ height: coerceLen(v) })}
@@ -247,15 +218,14 @@ export function LayoutGroup(props: {
                         </div>
                     )}
 
-                    {/* Flex 컨테이너 */}
                     {container && (el as any).display === 'flex' && (
                         <>
                             <div className="text-[10px] text-neutral-500 pt-1">Flex Container</div>
 
-                            {/* direction */}
                             <div className="flex items-center gap-2">
                                 <Label>direction</Label>
-                                {!allowFlex.has('flexDirection') && (
+                                {renderLock('flexDirection')}
+                                {!allow.has('flexDirection') && (
                                     <DisabledHint reason={dis('flexDirection')!} />
                                 )}
                                 <div className="flex gap-1">
@@ -269,7 +239,7 @@ export function LayoutGroup(props: {
                                             key={v}
                                             title={title}
                                             onClick={() => patch({ flexDirection: v })}
-                                            disabled={!allowFlex.has('flexDirection')}
+                                            disabled={!allow.has('flexDirection')}
                                             active={dir === v}
                                         >
                                             <I size={16} />
@@ -278,10 +248,10 @@ export function LayoutGroup(props: {
                                 </div>
                             </div>
 
-                            {/* justify */}
                             <div className="flex items-center gap-2">
                                 <Label>justify</Label>
-                                {!allowFlex.has('justifyContent') && (
+                                {renderLock('justifyContent')}
+                                {!allow.has('justifyContent') && (
                                     <DisabledHint reason={dis('justifyContent')!} />
                                 )}
                                 <div className="flex gap-1">
@@ -290,7 +260,7 @@ export function LayoutGroup(props: {
                                             key={v}
                                             title={title}
                                             onClick={() => patch({ justifyContent: v })}
-                                            disabled={!allowFlex.has('justifyContent')}
+                                            disabled={!allow.has('justifyContent')}
                                             active={(el as any).justifyContent === v}
                                         >
                                             <I size={16} />
@@ -299,10 +269,10 @@ export function LayoutGroup(props: {
                                 </div>
                             </div>
 
-                            {/* align */}
                             <div className="flex items-center gap-2">
                                 <Label>align</Label>
-                                {!allowFlex.has('alignItems') && (
+                                {renderLock('alignItems')}
+                                {!allow.has('alignItems') && (
                                     <DisabledHint reason={dis('alignItems')!} />
                                 )}
                                 <div className="flex gap-1">
@@ -311,7 +281,7 @@ export function LayoutGroup(props: {
                                             key={v}
                                             title={title}
                                             onClick={() => patch({ alignItems: v })}
-                                            disabled={!allowFlex.has('alignItems')}
+                                            disabled={!allow.has('alignItems')}
                                             active={(el as any).alignItems === v}
                                         >
                                             <I size={16} />
@@ -320,11 +290,11 @@ export function LayoutGroup(props: {
                                 </div>
                             </div>
 
-                            {/* gap */}
                             <div className="flex items-center gap-2">
                                 <Label>gap</Label>
-                                {!allowFlex.has('gap') && <DisabledHint reason={dis('gap')!} />}
-                                {allowFlex.has('gap') ? (
+                                {renderLock('gap')}
+                                {!allow.has('gap') && <DisabledHint reason={dis('gap')!} />}
+                                {allow.has('gap') ? (
                                     <MiniInput
                                         value={(el as any)['gap'] as string | number | undefined}
                                         onChange={(v) => patch({ gap: coerceLen(v) })}
@@ -337,18 +307,17 @@ export function LayoutGroup(props: {
                         </>
                     )}
 
-                    {/* Grid 컨테이너 */}
                     {container && (el as any).display === 'grid' && (
                         <>
                             <div className="text-[10px] text-neutral-500 pt-1">Grid Container</div>
 
-                            {/* columns */}
                             <div className="flex items-center gap-2">
                                 <Label>columns</Label>
-                                {!allowGrid.has('gridTemplateColumns') && (
+                                {renderLock('gridTemplateColumns')}
+                                {!allow.has('gridTemplateColumns') && (
                                     <DisabledHint reason={dis('gridTemplateColumns')!} />
                                 )}
-                                {allowGrid.has('gridTemplateColumns') ? (
+                                {allow.has('gridTemplateColumns') ? (
                                     <div className="flex gap-1">
                                         <ChipBtn
                                             title="Auto"
@@ -373,13 +342,13 @@ export function LayoutGroup(props: {
                                 )}
                             </div>
 
-                            {/* rows */}
                             <div className="flex items-center gap-2">
                                 <Label>rows</Label>
-                                {!allowGrid.has('gridTemplateRows') && (
+                                {renderLock('gridTemplateRows')}
+                                {!allow.has('gridTemplateRows') && (
                                     <DisabledHint reason={dis('gridTemplateRows')!} />
                                 )}
-                                {allowGrid.has('gridTemplateRows') ? (
+                                {allow.has('gridTemplateRows') ? (
                                     <div className="flex gap-1">
                                         <ChipBtn
                                             title="Auto"
@@ -404,11 +373,11 @@ export function LayoutGroup(props: {
                                 )}
                             </div>
 
-                            {/* gaps */}
                             <div className="flex items-center gap-2">
                                 <Label>gap</Label>
-                                {!allowGrid.has('gap') && <DisabledHint reason={dis('gap')!} />}
-                                {allowGrid.has('gap') ? (
+                                {renderLock('gap')}
+                                {!allow.has('gap') && <DisabledHint reason={dis('gap')!} />}
+                                {allow.has('gap') ? (
                                     <MiniInput
                                         value={(el as any)['gap'] as string | number | undefined}
                                         onChange={(v) => patch({ gap: coerceLen(v) })}
@@ -421,8 +390,9 @@ export function LayoutGroup(props: {
 
                             <div className="flex items-center gap-2">
                                 <Label>rowGap</Label>
-                                {!allowGrid.has('rowGap') && <DisabledHint reason={dis('rowGap')!} />}
-                                {allowGrid.has('rowGap') ? (
+                                {renderLock('rowGap')}
+                                {!allow.has('rowGap') && <DisabledHint reason={dis('rowGap')!} />}
+                                {allow.has('rowGap') ? (
                                     <MiniInput
                                         value={(el as any)['rowGap'] as string | number | undefined}
                                         onChange={(v) => patch({ rowGap: coerceLen(v) })}
@@ -435,8 +405,9 @@ export function LayoutGroup(props: {
 
                             <div className="flex items-center gap-2">
                                 <Label>columnGap</Label>
-                                {!allowGrid.has('columnGap') && <DisabledHint reason={dis('columnGap')!} />}
-                                {allowGrid.has('columnGap') ? (
+                                {renderLock('columnGap')}
+                                {!allow.has('columnGap') && <DisabledHint reason={dis('columnGap')!} />}
+                                {allow.has('columnGap') ? (
                                     <MiniInput
                                         value={(el as any)['columnGap'] as string | number | undefined}
                                         onChange={(v) => patch({ columnGap: coerceLen(v) })}
@@ -447,13 +418,13 @@ export function LayoutGroup(props: {
                                 )}
                             </div>
 
-                            {/* auto-flow */}
                             <div className="flex items-center gap-2">
                                 <Label>auto-flow</Label>
-                                {!allowGrid.has('gridAutoFlow') && (
+                                {renderLock('gridAutoFlow')}
+                                {!allow.has('gridAutoFlow') && (
                                     <DisabledHint reason={dis('gridAutoFlow')!} />
                                 )}
-                                {allowGrid.has('gridAutoFlow') ? (
+                                {allow.has('gridAutoFlow') ? (
                                     <MiniSelect
                                         value={(el as any).gridAutoFlow as string | undefined}
                                         options={['row', 'column', 'dense', 'row dense', 'column dense']}

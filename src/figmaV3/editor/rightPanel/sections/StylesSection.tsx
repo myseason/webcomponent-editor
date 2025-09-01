@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { useEditor } from '../../useEditor';
 import type { CSSDict, Viewport } from '../../../core/types';
-import { effectiveTag, getTagPolicy } from '../../../runtime/capabilities';
+import { getEffectivePoliciesForNode } from '../../../runtime/capabilities'; // ✨ [수정]
 
 // V3 그룹 UI (레포 경로 그대로 유지)
 import { LayoutGroup } from './styles/LayoutGroup';
@@ -31,22 +31,22 @@ export function StylesSection() {
     const nodeId = state.ui.selectedId ?? state.project.rootId;
     const node = state.project.nodes[nodeId];
 
-    if (!node) {
+    // ✨ [수정] 새로운 정책 엔진을 통해 정책 정보를 가져옵니다.
+    const policyInfo = useMemo(() => getEffectivePoliciesForNode(state.project, nodeId), [state.project, nodeId]);
+
+    if (!node || !policyInfo) {
         return <div className="p-3 text-sm text-gray-500">Select a node to edit styles.</div>;
     }
 
-    const tag = effectiveTag(node); // __tag → defaultTag → 'div'
+    const { tag, tagPolicy, def } = policyInfo;
     const activeViewport: Viewport = state.ui.canvas.activeViewport;
-    const mode = state.ui.canvas.vpMode[activeViewport]; // 'Unified' | 'Independent'
+    const mode = state.ui.canvas.vpMode[activeViewport];
     const tf = state.project.inspectorFilters?.[node.componentId];
-    const tagPolicy = getTagPolicy(tag, state.project.tagPolicies);
 
-    // 읽기: Base + (Independent일 때만 Active) 병합
     const el = useMemo(() => {
         return (state.getEffectiveDecl(nodeId) ?? {}) as CSSDict;
-    }, [state.project, state.ui.canvas, nodeId]);
+    }, [state, nodeId]);
 
-    // 쓰기: Unified→Base, Independent→Active
     const patch = (kv: CSSDict) =>
         state.updateNodeStyles(nodeId, kv, mode === 'Independent' ? activeViewport : undefined);
 
@@ -61,6 +61,19 @@ export function StylesSection() {
         custom: false,
     });
     const toggle = (k: keyof OpenState) => setOpen(prev => ({ ...prev, [k]: !prev[k] }));
+
+    // ✨ [수정] 각 그룹에 nodeId와 componentId를 전달합니다.
+    const groupProps = {
+        el: el as any,
+        patch,
+        tag,
+        tagPolicy,
+        tf,
+        map: state.project.tagPolicies, // (기존 호환성을 위해 유지, 점진적으로 제거)
+        expert,
+        nodeId,
+        componentId: def.id,
+    };
 
     return (
         <div className="p-3">
@@ -77,15 +90,14 @@ export function StylesSection() {
                     padding: 8,
                 }}
             >
-                {/* V3 그룹 UI - 기존 prop 시그니처 존중 */}
-                <LayoutGroup     el={el as any} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.layout} onToggle={() => toggle('layout')} />
-                <TypographyGroup el={el as any} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.typo} onToggle={() => toggle('typo')} />
-                <PositionGroup   el={el as any} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.position} onToggle={() => toggle('position')} />
-                <SpacingGroup    el={el as any} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.spacing} onToggle={() => toggle('spacing')} />
-                <BorderGroup     el={el as any} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.border} onToggle={() => toggle('border')} />
-                <BackgroundGroup el={el as any} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.background} onToggle={() => toggle('background')} />
-                <EffectsGroup    el={el as any} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.effects} onToggle={() => toggle('effects')} />
-                <CustomGroup     el={el as any} patch={patch} tag={tag} tagPolicy={tagPolicy} tf={tf} map={state.project.tagPolicies} expert={expert} open={open.custom} onToggle={() => toggle('custom')} />
+                <LayoutGroup     {...groupProps} open={open.layout}     onToggle={() => toggle('layout')} />
+                <TypographyGroup {...groupProps} open={open.typo}       onToggle={() => toggle('typo')} />
+                <PositionGroup   {...groupProps} open={open.position}   onToggle={() => toggle('position')} />
+                <SpacingGroup    {...groupProps} open={open.spacing}    onToggle={() => toggle('spacing')} />
+                <BorderGroup     {...groupProps} open={open.border}     onToggle={() => toggle('border')} />
+                <BackgroundGroup {...groupProps} open={open.background} onToggle={() => toggle('background')} />
+                <EffectsGroup    {...groupProps} open={open.effects}    onToggle={() => toggle('effects')} />
+                <CustomGroup     {...groupProps} open={open.custom}     onToggle={() => toggle('custom')} />
             </div>
         </div>
     );

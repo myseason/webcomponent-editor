@@ -1,11 +1,4 @@
 'use client';
-/**
- * SpacingGroup v2
- * - margin / padding: 기본(전체) + 고급(각 방향) 입력
- * - 프리셋(0, 4, 8, 12, 16, 24)
- * - 링크 토글(전체 ↔ 개별) UI
- * - 허용 키 필터(useAllowed), 제한 배지(DisabledHint)
- */
 
 import React from 'react';
 import type {
@@ -13,6 +6,7 @@ import type {
     InspectorFilter,
     TagPolicy,
     TagPolicyMap,
+    NodeId,
 } from '../../../../core/types';
 import {
     Label,
@@ -23,9 +17,11 @@ import {
     useAllowed,
     reasonForKey,
     type DisallowReason,
+    PermissionLock,
 } from './common';
 import { coerceLen } from '../../../../runtime/styleUtils';
 import { Link as LinkIcon, Link2Off as UnlinkIcon } from 'lucide-react';
+import { useEditor } from '../../../useEditor';
 
 export function SpacingGroup(props: {
     el: Record<string, unknown>;
@@ -37,28 +33,29 @@ export function SpacingGroup(props: {
     expert: boolean;
     open: boolean;
     onToggle: () => void;
+    nodeId: NodeId;
+    componentId: string;
 }) {
-    const { el, patch, tag, tagPolicy, tf, map, expert, open, onToggle } = props;
+    const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
+    const { ui } = useEditor();
 
-    // 허용 키
-    const KEYS = [
-        'margin', 'padding',
-        'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
-        'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-    ] as string[];
-    const allow = useAllowed(KEYS, tf, tag, map, expert);
+    const allow = useAllowed(nodeId);
+    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
 
-    const dis = (k: string): DisallowReason => reasonForKey(k, tagPolicy, tf, expert);
-
-    // 링크(전체 ↔ 개별) 토글
     const [linkMargin, setLinkMargin] = React.useState(true);
     const [linkPadding, setLinkPadding] = React.useState(true);
+
+    const renderLock = (controlKey: string) => {
+        if (ui.mode === 'Component') {
+            return <PermissionLock componentId={componentId} controlKey={controlKey} />;
+        }
+        return null;
+    };
 
     const applyMargin = (v: string) => {
         if (linkMargin) {
             patch({ margin: coerceLen(v) });
         } else {
-            // 개별 입력 중 "전체" 필드 편집은 4방향 동시 갱신
             patch({
                 marginTop: coerceLen(v),
                 marginRight: coerceLen(v),
@@ -99,8 +96,7 @@ export function SpacingGroup(props: {
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
                             <Label>margin</Label>
-
-                            {/* 링크 토글 */}
+                            {renderLock('margin')}
                             <IconBtn
                                 title={linkMargin ? 'unlink' : 'link all'}
                                 onClick={() => setLinkMargin(!linkMargin)}
@@ -110,19 +106,17 @@ export function SpacingGroup(props: {
 
                             {!allow.has('margin') && !allow.has('marginTop') && <DisabledHint reason={dis('margin')!} />}
 
-                            {/* 전체 입력 */}
                             {(linkMargin ? allow.has('margin') : (allow.has('marginTop') && allow.has('marginRight') && allow.has('marginBottom') && allow.has('marginLeft'))) ? (
                                 <MiniInput
                                     value={(el as any).margin ?? ''}
                                     onChange={applyMargin}
-                                    placeholder={linkMargin ? 'e.g. 8 | 1rem | 8px 16px' : 'apply all sides'}
+                                    placeholder={linkMargin ? 'e.g. 8 | 1rem' : 'all sides'}
                                     className="w-40"
                                 />
                             ) : (
                                 <span className="text-[11px] text-neutral-400">제한됨</span>
                             )}
 
-                            {/* 프리셋 */}
                             <div className="ml-2 flex gap-1">
                                 {presets.map((p) => (
                                     <ChipBtn
@@ -136,7 +130,6 @@ export function SpacingGroup(props: {
                             </div>
                         </div>
 
-                        {/* 개별(고급) */}
                         {!linkMargin && (
                             <div className="pl-24 space-y-1">
                                 {([
@@ -147,6 +140,7 @@ export function SpacingGroup(props: {
                                 ] as [string, string][]).map(([k, label]) => (
                                     <div key={k} className="flex items-center gap-2">
                                         <Label>{label}</Label>
+                                        {renderLock(k)}
                                         {!allow.has(k) && <DisabledHint reason={dis(k)!} />}
                                         {allow.has(k) ? (
                                             <MiniInput
@@ -167,7 +161,7 @@ export function SpacingGroup(props: {
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
                             <Label>padding</Label>
-
+                            {renderLock('padding')}
                             <IconBtn
                                 title={linkPadding ? 'unlink' : 'link all'}
                                 onClick={() => setLinkPadding(!linkPadding)}
@@ -181,7 +175,7 @@ export function SpacingGroup(props: {
                                 <MiniInput
                                     value={(el as any).padding ?? ''}
                                     onChange={applyPadding}
-                                    placeholder={linkPadding ? 'e.g. 8 | 1rem | 8px 16px' : 'apply all sides'}
+                                    placeholder={linkPadding ? 'e.g. 8 | 1rem' : 'all sides'}
                                     className="w-40"
                                 />
                             ) : (
@@ -211,6 +205,7 @@ export function SpacingGroup(props: {
                                 ] as [string, string][]).map(([k, label]) => (
                                     <div key={k} className="flex items-center gap-2">
                                         <Label>{label}</Label>
+                                        {renderLock(k)}
                                         {!allow.has(k) && <DisabledHint reason={dis(k)!} />}
                                         {allow.has(k) ? (
                                             <MiniInput
@@ -226,7 +221,6 @@ export function SpacingGroup(props: {
                             </div>
                         )}
                     </div>
-
                 </div>
             )}
         </section>

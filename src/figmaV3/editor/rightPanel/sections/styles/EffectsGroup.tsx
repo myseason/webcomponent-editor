@@ -1,8 +1,9 @@
 'use client';
 import React from 'react';
-import type { CSSDict, InspectorFilter, TagPolicy, TagPolicyMap } from '../../../../core/types';
-import { ChipBtn, DisabledHint, Label, MiniInput, NumberInput, useAllowed, DisallowReason, ColorField } from './common';
+import type { CSSDict, InspectorFilter, TagPolicy, TagPolicyMap, NodeId } from '../../../../core/types';
+import { ChipBtn, DisabledHint, Label, MiniInput, NumberInput, useAllowed, DisallowReason, ColorField, PermissionLock, reasonForKey } from './common';
 import { fmtFilter, fmtShadow, parseFilter, parseShadow, FilterVals, Shadow } from './effects-utils';
+import { useEditor } from '../../../useEditor';
 
 export function EffectsGroup(props: {
     el: Record<string, unknown>;
@@ -14,17 +15,18 @@ export function EffectsGroup(props: {
     map: TagPolicyMap | undefined;
     open: boolean;
     onToggle: () => void;
+    nodeId: NodeId;
+    componentId: string;
 }) {
-    const { el, patch, expert, tag, tf, map, tagPolicy, open, onToggle } = props;
+    const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
+    const { ui } = useEditor();
 
-    const allow = useAllowed(['boxShadow', 'filter', 'opacity'], tf, tag, map, expert);
+    const allow = useAllowed(nodeId);
+    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
 
-    const dis = (k: string): DisallowReason => {
-        if (tagPolicy?.styles?.allow && !tagPolicy.styles.allow.includes(k)) return 'tag';
-        if (tagPolicy?.styles?.deny && tagPolicy.styles.deny.includes(k)) return 'tag';
-        if (!expert && tf?.styles) {
-            if (tf.styles.allow && !tf.styles.allow.includes(k)) return 'template';
-            if (tf.styles.deny && tf.styles.deny.includes(k)) return 'template';
+    const renderLock = (controlKey: string) => {
+        if (ui.mode === 'Component') {
+            return <PermissionLock componentId={componentId} controlKey={controlKey} />;
         }
         return null;
     };
@@ -55,7 +57,6 @@ export function EffectsGroup(props: {
 
     return (
         <div>
-            {/* 통일된 타이틀 */}
             <div
                 className="flex items-center justify-between text-xs font-semibold text-neutral-700 cursor-pointer select-none px-1 py-1 mt-2"
                 onClick={onToggle}
@@ -65,16 +66,15 @@ export function EffectsGroup(props: {
 
             {open && (
                 <div className="mt-2 space-y-3 px-1">
-                    {/* boxShadow */}
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
                             <Label>boxShadow</Label>
+                            {renderLock('boxShadow')}
                             {!allow.has('boxShadow') && <DisabledHint reason={dis('boxShadow')!} />}
                         </div>
 
                         {allow.has('boxShadow') ? (
                             <>
-                                {/* Presets */}
                                 <div className="flex items-center gap-2 flex-wrap">
                                     {[
                                         { name: 'None', v: '' },
@@ -90,7 +90,6 @@ export function EffectsGroup(props: {
                                     ))}
                                 </div>
 
-                                {/* Raw */}
                                 <MiniInput
                                     value={String((el as any).boxShadow ?? '')}
                                     onChange={(v) => patch({ boxShadow: v })}
@@ -98,7 +97,6 @@ export function EffectsGroup(props: {
                                     className="w-[280px]"
                                 />
 
-                                {/* 전문가: 요소별 조절 */}
                                 {expert && (
                                     <div className="grid grid-cols-2 gap-2 items-center">
                                         <Label>x(px)</Label>
@@ -128,16 +126,15 @@ export function EffectsGroup(props: {
                         )}
                     </div>
 
-                    {/* filter */}
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
                             <Label>filter</Label>
+                            {renderLock('filter')}
                             {!allow.has('filter') && <DisabledHint reason={dis('filter')!} />}
                         </div>
 
                         {allow.has('filter') ? (
                             <>
-                                {/* Presets */}
                                 <div className="flex items-center gap-2 flex-wrap">
                                     {[
                                         { name: 'None', v: '' },
@@ -153,57 +150,22 @@ export function EffectsGroup(props: {
                                     ))}
                                 </div>
 
-                                {/* Raw */}
                                 <MiniInput
                                     value={String((el as any).filter ?? '')}
                                     onChange={(v) => patch({ filter: v })}
                                     placeholder="blur(4px) brightness(110%) …"
                                     className="w-[280px]"
                                 />
-
-                                {/* 전문가: 요소별 조절 */}
-                                {expert && (
-                                    <div className="grid grid-cols-2 gap-2 items-center">
-                                        <Label>blur(px)</Label>
-                                        <NumberInput
-                                            value={fvals.blur}
-                                            onChange={(v) => commitFilter({ blur: Math.max(0, Number.isFinite(v) ? v : 0) })}
-                                            step={0.5}
-                                            min={0}
-                                        />
-                                        <Label>brightness(%)</Label>
-                                        <NumberInput
-                                            value={fvals.brightness}
-                                            onChange={(v) => commitFilter({ brightness: Math.max(0, Number.isFinite(v) ? v : 0) })}
-                                            step={1}
-                                            min={0}
-                                        />
-                                        <Label>contrast(%)</Label>
-                                        <NumberInput
-                                            value={fvals.contrast}
-                                            onChange={(v) => commitFilter({ contrast: Math.max(0, Number.isFinite(v) ? v : 0) })}
-                                            step={1}
-                                            min={0}
-                                        />
-                                        <Label>saturate(%)</Label>
-                                        <NumberInput
-                                            value={fvals.saturate}
-                                            onChange={(v) => commitFilter({ saturate: Math.max(0, Number.isFinite(v) ? v : 0) })}
-                                            step={1}
-                                            min={0}
-                                        />
-                                    </div>
-                                )}
                             </>
                         ) : (
                             <span className="text-xs text-neutral-500">제한됨</span>
                         )}
                     </div>
 
-                    {/* opacity 0~1 → % UI */}
                     <div className="space-y-1">
                         <div className="flex items-center gap-2">
                             <Label>opacity</Label>
+                            {renderLock('opacity')}
                             {!allow.has('opacity') && <DisabledHint reason={dis('opacity')!} />}
                         </div>
                         {allow.has('opacity') ? (

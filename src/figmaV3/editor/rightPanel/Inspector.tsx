@@ -17,7 +17,7 @@ const InlineDivider: React.FC<{ label: string; className?: string }> = ({ label,
 );
 
 /**
- * 페이지 빌드 모드에서 사용되는 인스펙터
+ * 페이지 빌드 모드에서 사용되는 인스펙터 (For Builder)
  */
 function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     const def = getDefinition(defId);
@@ -45,12 +45,12 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
 }
 
 /**
- * 컴포넌트 개발 모드에서 사용되는 인스펙터
+ * 컴포넌트 개발 모드에서 사용되는 정책 편집기 (For Creator)
  */
-function ComponentInspector({ fragmentId }: { fragmentId: string }) {
+function ComponentPolicyEditor({ fragmentId }: { fragmentId: string }) {
     const state = useEditor();
     const fragment = state.project.fragments.find(f => f.id === fragmentId);
-    if (!fragment) return null;
+    if (!fragment) return <div className="p-3 text-sm text-gray-500">Cannot find component definition.</div>;
 
     const rootNode = state.project.nodes[fragment.rootId];
     if (!rootNode) return null;
@@ -60,12 +60,31 @@ function ComponentInspector({ fragmentId }: { fragmentId: string }) {
     return (
         <div>
             <div className="p-3">
-                <h3 className="text-sm font-semibold">Component Definition</h3>
-                <p className="text-xs text-gray-500">Editing: <strong>{def?.title ?? rootNode.componentId}</strong></p>
+                <h3 className="text-sm font-semibold">Component Policy Editor</h3>
+                <p className="text-xs text-gray-500">
+                    Defining policies for: <strong>{def?.title ?? rootNode.componentId}</strong>
+                </p>
             </div>
-            <InlineDivider label="Component Properties (Schema)" className="px-3" />
-            <div className="p-2">
-                <SchemaEditor nodeId={rootNode.id} />
+
+            {/* ✨ [수정] 컴포넌트 정책 편집을 위해 모든 섹션을 렌더링합니다. */}
+            <CommonSection nodeId={rootNode.id} defId={rootNode.componentId} />
+            <div className="mt-4">
+                <InlineDivider label="Props & Permissions" />
+                <div className="mt-2">
+                    <PropsAutoSection nodeId={rootNode.id} defId={rootNode.componentId} />
+                </div>
+            </div>
+            <div className="mt-4">
+                <InlineDivider label="Styles & Permissions" />
+                <div className="mt-2">
+                    <StylesSection />
+                </div>
+            </div>
+            <div className="mt-4">
+                <InlineDivider label="Schema Editor (Add Custom Props)" className="px-3" />
+                <div className="p-2">
+                    <SchemaEditor nodeId={rootNode.id} />
+                </div>
             </div>
         </div>
     );
@@ -74,8 +93,9 @@ function ComponentInspector({ fragmentId }: { fragmentId: string }) {
 
 export function Inspector() {
     const state = useEditor();
-    const { mode, selectedId, editingFragmentId } = state.ui;
-    const { rootId, fragments, nodes } = state.project;
+    const { ui, project, update, setNotification } = state;
+    const { mode, selectedId, editingFragmentId, expertMode } = ui;
+    const { rootId, fragments, nodes } = project;
 
     const targetNodeId = mode === 'Page'
         ? selectedId ?? rootId
@@ -83,21 +103,55 @@ export function Inspector() {
 
     const node = targetNodeId ? nodes[targetNodeId] : null;
 
-    // ✨ [추가] 모드에 따른 테두리 색상 클래스
     const modeBorderStyle = mode === 'Page' ? 'border-t-blue-500' : 'border-t-purple-500';
+    const modeTextStyle = mode === 'Page' ? 'text-blue-500' : 'text-purple-500';
+
+    const handleToggleExpertMode = () => {
+        const nextExpertMode = !expertMode;
+        update(s => { s.ui.expertMode = nextExpertMode; });
+        setNotification(`고급 모드: ${nextExpertMode ? 'ON' : 'OFF'}`);
+    };
 
     if (!node) {
-        return <div className="p-3 text-sm text-gray-500">Select a node to inspect.</div>;
+        const message = mode === 'Page'
+            ? "Select a node to inspect."
+            : "Select a component from the left panel to define its policies.";
+        return (
+            <div className={`h-full border-t-4 ${modeBorderStyle}`}>
+                <div className="px-2 py-2 border-b bg-white flex items-center gap-2 shrink-0">
+                    <div className="font-semibold text-sm">Inspector</div>
+                    <div className={`text-xs font-bold ${modeTextStyle}`}>
+                        {mode === 'Page' ? '( 🚀 Page Build Mode )' : '( 🛠️ Component Dev Mode )'}
+                    </div>
+                </div>
+                <div className="p-3 text-sm text-gray-500">{message}</div>
+            </div>
+        );
     }
 
     return (
-        // ✨ [수정] 최상위 div에 모드별 테두리 클래스 적용
         <div className={`h-full flex flex-col border-t-4 ${modeBorderStyle}`}>
             <div className="px-2 py-2 border-b bg-white flex items-center gap-2 shrink-0">
                 <div className="font-semibold text-sm">Inspector</div>
-                <div className="ml-auto text-xs font-medium text-purple-600">
-                    Mode: {mode}
+                <div className="text-xs font-medium text-gray-500">
+                    {mode === 'Page' ? '(🚀 Page Build Mode)' : '(🛠️ Component Dev Mode)'}
                 </div>
+                {mode === 'Page' && (
+                    <div className="ml-auto flex items-center gap-1 p-0.5 bg-gray-100 rounded-md">
+                        <button
+                            onClick={() => expertMode && handleToggleExpertMode()}
+                            className={`px-2 py-0.5 text-xs rounded-md ${!expertMode ? 'bg-white shadow-sm font-semibold' : 'text-gray-500'}`}
+                        >
+                            기본
+                        </button>
+                        <button
+                            onClick={() => !expertMode && handleToggleExpertMode()}
+                            className={`px-2 py-0.5 text-xs rounded-md ${expertMode ? 'bg-white shadow-sm font-semibold' : 'text-gray-500'}`}
+                        >
+                            고급
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="flex-1 overflow-auto px-2 pb-4">
@@ -105,7 +159,7 @@ export function Inspector() {
                     <PageInspector nodeId={node.id} defId={node.componentId} />
                 )}
                 {mode === 'Component' && editingFragmentId && (
-                    <ComponentInspector fragmentId={editingFragmentId} />
+                    <ComponentPolicyEditor fragmentId={editingFragmentId} />
                 )}
             </div>
         </div>
