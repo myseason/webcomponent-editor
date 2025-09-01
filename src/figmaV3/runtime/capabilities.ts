@@ -6,17 +6,17 @@
 import {
     Project,
     Node,
-    NodeId,
     ComponentDefinition,
     EffectivePolicies,
     ProjectSettingsPoliciesOverride,
     TagPolicy,
-    StylePolicy, ComponentPolicy,
+    StylePolicy,
+    NodeId, ComponentPolicy, // ✨ [추가]
 } from '../core/types';
 import { getDefinition } from '../core/registry';
 import { GLOBAL_TAG_POLICIES } from '../policy/globalTagPolicy';
 import { GLOBAL_STYLE_POLICY } from '../policy/globalStylePolicy';
-import { deepMerge } from './deepMerge'; // (신규 유틸리티, 아래에서 정의)
+import { deepMerge } from './deepMerge';
 
 // HTML void 요소(자식 불가)
 const VOID_TAGS = new Set(['img','input','br','hr','meta','link','source','track','area','param','col','base','wbr']);
@@ -30,9 +30,9 @@ export function buildEffectivePolicies(
     overrides?: ProjectSettingsPoliciesOverride
 ): EffectivePolicies {
     const effective: EffectivePolicies = {
-        tag: deepMerge({}, GLOBAL_TAG_POLICIES, overrides?.tag ?? {}) as Record<string, TagPolicy> ,
+        tag: deepMerge({}, GLOBAL_TAG_POLICIES, overrides?.tag ?? {}) as Record<string, TagPolicy>,
         style: deepMerge({}, GLOBAL_STYLE_POLICY, overrides?.style ?? {}) as StylePolicy,
-        components: deepMerge({}, {}, overrides?.components ?? {}) as Record<string, ComponentPolicy>// 기본 ComponentPolicy는 아직 없음
+        components: deepMerge({}, {}, overrides?.components ?? {}) as Record<string, ComponentPolicy>,
     };
     return effective;
 }
@@ -61,7 +61,10 @@ export function getTagPolicy(policies: EffectivePolicies, tag: string): TagPolic
  * @param nodeId 대상 노드 ID
  * @returns 해당 노드에 적용될 모든 정책 정보
  */
-export function getEffectivePoliciesForNode(project: Project, nodeId: NodeId) {
+export function getEffectivePoliciesForNode(project: Project, nodeId: NodeId | null) { // ✨ [수정] nodeId가 null일 수 있음을 명시
+    // ✨ [추가] nodeId 유효성 검사
+    if (!nodeId) return null;
+
     const node = project.nodes[nodeId];
     if (!node) return null;
 
@@ -100,9 +103,7 @@ export function getAllowedStyleKeysForNode(project: Project, nodeId: NodeId, exp
 
     let allowed = new Set<string>();
 
-    // 1. StylePolicy의 전역 허용/금지 규칙 적용
     if (stylePolicy.allow?.includes('*')) {
-        // 모든 키를 허용하므로, 일단 잠재적 키 목록이 필요. TagPolicy의 그룹에서 가져온다.
         const allKnownKeys = Object.values(tagPolicy?.styles?.groups ?? {}).flat();
         allowed = new Set(allKnownKeys);
     } else if (stylePolicy.allow) {
@@ -111,10 +112,9 @@ export function getAllowedStyleKeysForNode(project: Project, nodeId: NodeId, exp
 
     stylePolicy.deny?.forEach(key => allowed.delete(key));
 
-    // 2. TagPolicy 필터링
     const tagStylePolicy = tagPolicy?.styles;
     if (tagStylePolicy) {
-        if (tagStylePolicy.allow) {
+        if (tagStylePolicy.allow && !tagStylePolicy.allow.includes('*')) {
             const tagAllowed = new Set(tagStylePolicy.allow);
             allowed.forEach(key => {
                 if (!tagAllowed.has(key)) {
@@ -125,8 +125,7 @@ export function getAllowedStyleKeysForNode(project: Project, nodeId: NodeId, exp
         tagStylePolicy.deny?.forEach(key => allowed.delete(key));
     }
 
-    // 3. ComponentPolicy 필터링 (페이지 빌드 모드 & 비전문가 모드일 때만)
-    const isPageBuildMode = true; // (가정) 현재는 페이지 빌드 모드 컨텍스트
+    const isPageBuildMode = true;
     if (isPageBuildMode && !expertMode && componentPolicy?.inspector?.controls) {
         Object.entries(componentPolicy.inspector.controls).forEach(([key, control]) => {
             if (control.visible === false) {
@@ -137,7 +136,3 @@ export function getAllowedStyleKeysForNode(project: Project, nodeId: NodeId, exp
 
     return allowed;
 }
-
-// isContainerTag, filterStyleKeysByTag 등 기존 유틸리티는 새로운 정책 구조에 맞게
-// getTagPolicy 등을 사용하도록 점진적으로 리팩토링이 필요합니다.
-// 여기서는 핵심 로직만 우선 구현합니다.

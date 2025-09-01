@@ -20,10 +20,10 @@ export function BackgroundGroup(props: {
     componentId: string;
 }) {
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui } = useEditor();
+    const { ui, project } = useEditor();
 
     const allow = useAllowed(nodeId);
-    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
+    const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
     const renderLock = (controlKey: string) => {
         if (ui.mode === 'Component') {

@@ -21,8 +21,7 @@ import {
     PermissionLock,
     reasonForKey,
 } from './common';
-// ✨ [제거] import { isContainerTag } from '../../../../runtime/capabilities';
-import { getDefinition } from '../../../../core/registry'; // ✨ [추가]
+import { getDefinition } from '../../../../core/registry';
 import {
     AlignStartHorizontal,
     AlignCenterHorizontal,
@@ -48,7 +47,6 @@ import { useEditor } from '../../../useEditor';
 
 type IconCmp = React.ComponentType<{ size?: number; className?: string }>;
 
-// ✨ [추가] 컴포넌트 정의를 직접 확인하는 로컬 헬퍼 함수
 function isContainer(def: ComponentDefinition | undefined): boolean {
     return def?.capabilities?.canHaveChildren === true;
 }
@@ -68,15 +66,15 @@ export function LayoutGroup(props: {
     componentId: string;
 }) {
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui } = useEditor();
+    const { ui, project } = useEditor();
     const def = getDefinition(componentId);
 
     const allow = useAllowed(nodeId);
-    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
+    const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
     const display = ((el as any).display as string) ?? 'block';
     const isInline = display === 'inline';
-    const container = isContainer(def); // ✨ [수정] 로컬 헬퍼 사용
+    const container = isContainer(def);
 
     const dir = ((el as any).flexDirection as string) ?? 'row';
     const isCol = dir === 'column' || dir === 'column-reverse';

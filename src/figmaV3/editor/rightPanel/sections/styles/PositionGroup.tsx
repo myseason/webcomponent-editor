@@ -35,10 +35,11 @@ export function PositionGroup(props: {
     componentId: string;
 }) {
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui } = useEditor();
+    const { ui, project } = useEditor(); // ✨ [수정] project 상태 가져오기
 
     const allow = useAllowed(nodeId);
-    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
+    // ✨ [수정] reasonForKey에 project와 ui 인자 전달
+    const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
     const pos = ((el as any).position as string) ?? 'static';
     const isOffsetEnabled = pos !== 'static';

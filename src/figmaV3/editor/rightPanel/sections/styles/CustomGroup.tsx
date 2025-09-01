@@ -18,7 +18,7 @@ export function CustomGroup(props: {
     componentId: string;
 }) {
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui } = useEditor();
+    const { ui, project } = useEditor(); // ✨ [수정] project 상태 가져오기
 
     const KNOWN_KEYS: string[] = [
         'display','overflow','width','height',
@@ -34,7 +34,8 @@ export function CustomGroup(props: {
     ];
 
     const allowAll = useAllowed(nodeId);
-    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
+    // ✨ [수정] reasonForKey에 project와 ui 인자 전달
+    const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
     const [k, setK] = React.useState('');
     const [v, setV] = React.useState('');

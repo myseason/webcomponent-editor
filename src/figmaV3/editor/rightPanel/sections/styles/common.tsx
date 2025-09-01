@@ -8,6 +8,8 @@ import type {
     CSSDict,
     ComponentPolicy,
     NodeId,
+    Project, // ✨ [추가]
+    EditorUI, // ✨ [추가]
 } from '../../../../core/types';
 import { getAllowedStyleKeysForNode, getEffectivePoliciesForNode } from '../../../../runtime/capabilities';
 import { Lock, Unlock } from 'lucide-react';
@@ -17,7 +19,6 @@ import { useEditor } from '../../../useEditor';
  * 공통 레이아웃 컴포넌트
  * ──────────────────────────────────────────────────── */
 
-// ... (Section, Label 등 기존 레이아웃 컴포넌트는 변경 없음)
 export const Section: React.FC<{
     title: string;
     open: boolean;
@@ -92,7 +93,6 @@ export const PermissionLock: React.FC<{
 /* ────────────────────────────────────────────────────
  * 폼 위젯
  * ──────────────────────────────────────────────────── */
-// ... (MiniInput, NumberInput 등 기존 폼 위젯들은 변경 없음)
 export const MiniInput: React.FC<{
     value: string | number | undefined;
     onChange: (v: string) => void;
@@ -243,16 +243,12 @@ export const ColorField: React.FC<{
     );
 };
 
-
 /* ────────────────────────────────────────────────────
  * 허용/제한 판단 유틸
  * ──────────────────────────────────────────────────── */
 
 export type DisallowReason = 'template' | 'tag' | 'component' | null;
 
-/**
- * ✨ [수정] Page 모드에서 ComponentPolicy의 'visible' 설정을 반영하도록 수정
- */
 export function useAllowed(nodeId: NodeId): Set<string> {
     const { project, ui } = useEditor();
     const { mode, expertMode } = ui;
@@ -263,7 +259,6 @@ export function useAllowed(nodeId: NodeId): Set<string> {
 
         const baseAllowed = getAllowedStyleKeysForNode(project, nodeId, expertMode);
 
-        // 페이지 빌드 모드이고 전문가 모드가 아닐 때만 ComponentPolicy의 visible 필터링 적용
         if (mode === 'Page' && !expertMode) {
             const { componentPolicy } = policyInfo;
             if (componentPolicy?.inspector?.controls) {
@@ -280,18 +275,21 @@ export function useAllowed(nodeId: NodeId): Set<string> {
     }, [project, nodeId, mode, expertMode]);
 }
 
+/**
+ * ✨ [수정] useEditor Hook을 호출하는 대신 project와 ui 상태를 인자로 받도록 변경
+ */
 export function reasonForKey(
+    project: Project,
+    ui: EditorUI,
     nodeId: NodeId,
     key: string,
     expert: boolean
 ): DisallowReason {
-    const { project, ui } = useEditor();
     const policyInfo = getEffectivePoliciesForNode(project, nodeId);
     if (!policyInfo) return null;
 
     const { tagPolicy, componentPolicy } = policyInfo;
 
-    // ✨ [수정] 페이지 빌드 모드일 때 ComponentPolicy 확인
     if (ui.mode === 'Page' && !expert && componentPolicy?.inspector?.controls?.[key]?.visible === false) {
         return 'component';
     }

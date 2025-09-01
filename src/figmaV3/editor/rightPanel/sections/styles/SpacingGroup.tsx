@@ -37,10 +37,10 @@ export function SpacingGroup(props: {
     componentId: string;
 }) {
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui } = useEditor();
+    const { ui, project } = useEditor();
 
     const allow = useAllowed(nodeId);
-    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
+    const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
     const [linkMargin, setLinkMargin] = React.useState(true);
     const [linkPadding, setLinkPadding] = React.useState(true);
@@ -92,7 +92,6 @@ export function SpacingGroup(props: {
             {open && (
                 <div className="mt-1 space-y-3">
 
-                    {/* ─ margin ─ */}
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
                             <Label>margin</Label>
@@ -137,7 +136,7 @@ export function SpacingGroup(props: {
                                     ['marginRight', 'Right'],
                                     ['marginBottom', 'Bottom'],
                                     ['marginLeft', 'Left'],
-                                ] as [string, string][]).map(([k, label]) => (
+                                ] as const).map(([k, label]) => (
                                     <div key={k} className="flex items-center gap-2">
                                         <Label>{label}</Label>
                                         {renderLock(k)}
@@ -157,7 +156,6 @@ export function SpacingGroup(props: {
                         )}
                     </div>
 
-                    {/* ─ padding ─ */}
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
                             <Label>padding</Label>
@@ -202,7 +200,7 @@ export function SpacingGroup(props: {
                                     ['paddingRight', 'Right'],
                                     ['paddingBottom', 'Bottom'],
                                     ['paddingLeft', 'Left'],
-                                ] as [string, string][]).map(([k, label]) => (
+                                ] as const).map(([k, label]) => (
                                     <div key={k} className="flex items-center gap-2">
                                         <Label>{label}</Label>
                                         {renderLock(k)}

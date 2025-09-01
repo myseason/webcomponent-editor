@@ -236,6 +236,7 @@ type EditorActions = {
     toggleLeftPanelSplit: () => void;
     setLeftPanelSplitPercentage: (percentage: number) => void;
     updateComponentPolicy: (componentId: string, patch: Partial<ComponentPolicy>) => void;
+    saveNodeAsComponent: (nodeId: NodeId, name: string, description: string, isPublic: boolean) => void; // ✨ [추가]
     hydrateDefaults: () => void;
 };
 
@@ -459,15 +460,19 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         s.ui.overlays = fragmentId ? prev.filter(id => id !== fragmentId) : prev.slice(0, -1);
     }, false),
 
-    // ✨ [수정] 새 컴포넌트 생성 시 즉시 편집 상태로 전환하는 로직 추가
     addFragment: (name) => {
         const newId = genId('fragment');
         const rootId = genId('frag_root');
         get().update(s => {
             s.project.nodes[rootId] = buildNodeWithDefaults('box', rootId);
-            s.project.fragments = [...s.project.fragments, { id: newId, name: name ?? `Fragment ${s.project.fragments.length + 1}`, rootId }];
+            const newFragment = { id: newId, name: name ?? `Fragment ${s.project.fragments.length + 1}`, rootId };
+            s.project.fragments = [...s.project.fragments, newFragment];
 
-            // 컴포넌트 생성 후 즉시 편집 모드로 전환
+            if (s.ui.mode === 'Page') {
+                const currentPage = s.project.pages.find(p => p.rootId === s.project.rootId);
+                s.ui.panels.left.lastActivePageId = currentPage?.id ?? null;
+            }
+
             s.ui.mode = 'Component';
             s.ui.editingFragmentId = newId;
             s.ui.panels.left.lastActiveFragmentId = newId;
@@ -485,10 +490,15 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         s.project.nodes = next;
         s.project.fragments = s.project.fragments.filter(f => f.id !== fragmentId);
 
-        // 만약 삭제된 프래그먼트가 현재 편집 중이었다면, 편집 상태를 초기화
         if (s.ui.editingFragmentId === fragmentId) {
-            s.ui.editingFragmentId = null;
-            s.ui.selectedId = null;
+            const nextFragment = s.project.fragments[0];
+            if (nextFragment) {
+                s.ui.editingFragmentId = nextFragment.id;
+                s.ui.selectedId = nextFragment.rootId;
+            } else {
+                s.ui.editingFragmentId = null;
+                s.ui.selectedId = null;
+            }
         }
     }, true),
 
@@ -503,7 +513,7 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
 
         if (s.ui.mode === 'Page') {
             const currentPage = s.project.pages.find(p => p.rootId === s.project.rootId);
-            s.ui.panels.left.lastActivePageId = currentPage?.id ?? null;
+            s.ui.panels.left.lastActivePageId = currentPage?.id ?? s.project.pages[0]?.id ?? null;
         } else {
             s.ui.panels.left.lastActiveFragmentId = s.ui.editingFragmentId;
         }
@@ -518,13 +528,23 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
                 s.ui.selectedId = targetPage.rootId;
             }
         } else {
-            const targetFragment = s.project.fragments.find(f => f.id === s.ui.panels.left.lastActiveFragmentId) ?? s.project.fragments[0];
-            if (targetFragment) {
+            let targetFragment = s.project.fragments.find(f => f.id === s.ui.panels.left.lastActiveFragmentId);
+
+            if (!targetFragment) {
+                targetFragment = s.project.fragments[0];
+            }
+
+            if (!targetFragment) {
+                const newId = genId('fragment');
+                const rootId = genId('frag_root');
+                s.project.nodes[rootId] = buildNodeWithDefaults('box', rootId);
+                const newFragment = { id: newId, name: `New Component`, rootId };
+                s.project.fragments.push(newFragment);
+                s.ui.editingFragmentId = newId;
+                s.ui.selectedId = rootId;
+            } else {
                 s.ui.editingFragmentId = targetFragment.id;
                 s.ui.selectedId = targetFragment.rootId;
-            } else {
-                s.ui.editingFragmentId = null;
-                s.ui.selectedId = null;
             }
         }
     }),
@@ -547,6 +567,39 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
     closeComponentEditor: () => {
         get().setEditorMode('Page');
     },
+
+    // ✨ [추가] 노드를 새 컴포넌트로 저장하는 액션
+    saveNodeAsComponent: (nodeId, name, description, isPublic) => get().update(s => {
+        const originalNode = s.project.nodes[nodeId];
+        if (!originalNode) return;
+
+        const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, nodeId);
+
+        const newFragmentId = genId('fragment');
+        const newFragment: Fragment = {
+            id: newFragmentId,
+            name,
+            description,
+            rootId: newRootId,
+        };
+
+        s.project.nodes = { ...s.project.nodes, ...clonedNodes };
+        s.project.fragments.push(newFragment);
+
+        // 새 컴포넌트에 대한 기본 정책 생성 (공개/비공개 여부 저장)
+        const newPolicy: Partial<ComponentPolicy> = {
+            savePolicy: {
+                allowPublic: isPublic,
+                allowPrivate: !isPublic,
+            }
+        };
+        if (!s.project.policies) s.project.policies = {};
+        if (!s.project.policies.components) s.project.policies.components = {};
+        s.project.policies.components[name] = deepMerge(
+            s.project.policies.components[name] ?? { version: '1.1', component: name, tag: getDefinition(originalNode.componentId)?.capabilities?.defaultTag ?? 'div'},
+            newPolicy
+        );
+    }, true),
 
     // ... (나머지 액션들은 변경 없음)
     addFlowEdge: (edge) => get().update(s => {

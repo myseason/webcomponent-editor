@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useEditor } from '../useEditor';
 import { getDefinition } from '../../core/registry';
 import type { NodeId } from '../../core/types';
@@ -8,6 +8,7 @@ import { CommonSection } from './sections/CommonSection';
 import { PropsAutoSection } from './sections/PropsAutoSection';
 import { StylesSection } from './sections/StylesSection';
 import { SchemaEditor } from './sections/SchemaEditor';
+import { SaveAsComponentDialog } from './sections/SaveAsComponentDialog'; // ✨ [추가]
 
 const InlineDivider: React.FC<{ label: string; className?: string }> = ({ label, className }) => (
     <div className={`flex items-center gap-2 select-none ${className ?? ''}`}>
@@ -16,9 +17,6 @@ const InlineDivider: React.FC<{ label: string; className?: string }> = ({ label,
     </div>
 );
 
-/**
- * 페이지 빌드 모드에서 사용되는 인스펙터 (For Builder)
- */
 function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     const def = getDefinition(defId);
     return (
@@ -44,9 +42,6 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     );
 }
 
-/**
- * 컴포넌트 개발 모드에서 사용되는 정책 편집기 (For Creator)
- */
 function ComponentPolicyEditor({ fragmentId }: { fragmentId: string }) {
     const state = useEditor();
     const fragment = state.project.fragments.find(f => f.id === fragmentId);
@@ -66,7 +61,6 @@ function ComponentPolicyEditor({ fragmentId }: { fragmentId: string }) {
                 </p>
             </div>
 
-            {/* ✨ [수정] 컴포넌트 정책 편집을 위해 모든 섹션을 렌더링합니다. */}
             <CommonSection nodeId={rootNode.id} defId={rootNode.componentId} />
             <div className="mt-4">
                 <InlineDivider label="Props & Permissions" />
@@ -97,6 +91,9 @@ export function Inspector() {
     const { mode, selectedId, editingFragmentId, expertMode } = ui;
     const { rootId, fragments, nodes } = project;
 
+    // ✨ [추가] 저장 다이얼로그 상태
+    const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+
     const targetNodeId = mode === 'Page'
         ? selectedId ?? rootId
         : editingFragmentId ? fragments.find(f => f.id === editingFragmentId)?.rootId : null;
@@ -104,7 +101,6 @@ export function Inspector() {
     const node = targetNodeId ? nodes[targetNodeId] : null;
 
     const modeBorderStyle = mode === 'Page' ? 'border-t-blue-500' : 'border-t-purple-500';
-    const modeTextStyle = mode === 'Page' ? 'text-blue-500' : 'text-purple-500';
 
     const handleToggleExpertMode = () => {
         const nextExpertMode = !expertMode;
@@ -120,8 +116,8 @@ export function Inspector() {
             <div className={`h-full border-t-4 ${modeBorderStyle}`}>
                 <div className="px-2 py-2 border-b bg-white flex items-center gap-2 shrink-0">
                     <div className="font-semibold text-sm">Inspector</div>
-                    <div className={`text-xs font-bold ${modeTextStyle}`}>
-                        {mode === 'Page' ? '( 🚀 Page Build Mode )' : '( 🛠️ Component Dev Mode )'}
+                    <div className="text-xs font-medium text-gray-500">
+                        {mode === 'Page' ? '(🚀 Page Build Mode)' : '(🛠️ Component Dev Mode)'}
                     </div>
                 </div>
                 <div className="p-3 text-sm text-gray-500">{message}</div>
@@ -136,22 +132,32 @@ export function Inspector() {
                 <div className="text-xs font-medium text-gray-500">
                     {mode === 'Page' ? '(🚀 Page Build Mode)' : '(🛠️ Component Dev Mode)'}
                 </div>
-                {mode === 'Page' && (
-                    <div className="ml-auto flex items-center gap-1 p-0.5 bg-gray-100 rounded-md">
+                <div className="ml-auto flex items-center gap-2">
+                    {mode === 'Page' && expertMode && (
                         <button
-                            onClick={() => expertMode && handleToggleExpertMode()}
-                            className={`px-2 py-0.5 text-xs rounded-md ${!expertMode ? 'bg-white shadow-sm font-semibold' : 'text-gray-500'}`}
+                            className="text-xs px-2 py-1 border rounded bg-green-100 text-green-700 hover:bg-green-200"
+                            onClick={() => setIsSaveDialogOpen(true)}
                         >
-                            기본
+                            Save as Component
                         </button>
-                        <button
-                            onClick={() => !expertMode && handleToggleExpertMode()}
-                            className={`px-2 py-0.5 text-xs rounded-md ${expertMode ? 'bg-white shadow-sm font-semibold' : 'text-gray-500'}`}
-                        >
-                            고급
-                        </button>
-                    </div>
-                )}
+                    )}
+                    {mode === 'Page' && (
+                        <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-md">
+                            <button
+                                onClick={() => expertMode && handleToggleExpertMode()}
+                                className={`px-2 py-0.5 text-xs rounded-md ${!expertMode ? 'bg-white shadow-sm font-semibold' : 'text-gray-500'}`}
+                            >
+                                기본
+                            </button>
+                            <button
+                                onClick={() => !expertMode && handleToggleExpertMode()}
+                                className={`px-2 py-0.5 text-xs rounded-md ${expertMode ? 'bg-white shadow-sm font-semibold' : 'text-gray-500'}`}
+                            >
+                                고급
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="flex-1 overflow-auto px-2 pb-4">
@@ -162,6 +168,14 @@ export function Inspector() {
                     <ComponentPolicyEditor fragmentId={editingFragmentId} />
                 )}
             </div>
+
+            {/* ✨ [추가] 저장 다이얼로그 렌더링 */}
+            {isSaveDialogOpen && (
+                <SaveAsComponentDialog
+                    nodeId={node.id}
+                    onClose={() => setIsSaveDialogOpen(false)}
+                />
+            )}
         </div>
     );
 }

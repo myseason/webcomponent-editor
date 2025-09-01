@@ -19,10 +19,10 @@ export function EffectsGroup(props: {
     componentId: string;
 }) {
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui } = useEditor();
+    const { ui, project } = useEditor();
 
     const allow = useAllowed(nodeId);
-    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
+    const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
     const renderLock = (controlKey: string) => {
         if (ui.mode === 'Component') {
@@ -39,7 +39,6 @@ export function EffectsGroup(props: {
     React.useEffect(() => {
         setShadow(parseShadow((el as any).boxShadow) ?? { x: 0, y: 2, blur: 8, spread: 0, color: 'rgba(0,0,0,0.15)' });
         setFvals(parseFilter((el as any).filter));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [(el as any).boxShadow, (el as any).filter]);
 
     const commitShadow = (next: Partial<Shadow>) => {
@@ -96,30 +95,6 @@ export function EffectsGroup(props: {
                                     placeholder="x y blur spread color"
                                     className="w-[280px]"
                                 />
-
-                                {expert && (
-                                    <div className="grid grid-cols-2 gap-2 items-center">
-                                        <Label>x(px)</Label>
-                                        <NumberInput value={shadow.x} onChange={(v) => commitShadow({ x: Number.isFinite(v) ? v : 0 })} step={1} />
-                                        <Label>y(px)</Label>
-                                        <NumberInput value={shadow.y} onChange={(v) => commitShadow({ y: Number.isFinite(v) ? v : 0 })} step={1} />
-                                        <Label>blur(px)</Label>
-                                        <NumberInput
-                                            value={shadow.blur}
-                                            onChange={(v) => commitShadow({ blur: Math.max(0, Number.isFinite(v) ? v : 0) })}
-                                            step={1}
-                                            min={0}
-                                        />
-                                        <Label>spread(px)</Label>
-                                        <NumberInput
-                                            value={shadow.spread}
-                                            onChange={(v) => commitShadow({ spread: Number.isFinite(v) ? v : 0 })}
-                                            step={1}
-                                        />
-                                        <Label>color</Label>
-                                        <ColorField value={shadow.color} onChange={(v) => commitShadow({ color: v })} />
-                                    </div>
-                                )}
                             </>
                         ) : (
                             <span className="text-xs text-neutral-500">제한됨</span>
@@ -149,13 +124,6 @@ export function EffectsGroup(props: {
                                         </ChipBtn>
                                     ))}
                                 </div>
-
-                                <MiniInput
-                                    value={String((el as any).filter ?? '')}
-                                    onChange={(v) => patch({ filter: v })}
-                                    placeholder="blur(4px) brightness(110%) …"
-                                    className="w-[280px]"
-                                />
                             </>
                         ) : (
                             <span className="text-xs text-neutral-500">제한됨</span>

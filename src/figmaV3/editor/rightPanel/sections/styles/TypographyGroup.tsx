@@ -6,7 +6,7 @@ import type {
     InspectorFilter,
     TagPolicy,
     TagPolicyMap,
-    NodeId, // ✨ [추가]
+    NodeId,
 } from '../../../../core/types';
 import {
     ColorField,
@@ -17,7 +17,7 @@ import {
     useAllowed,
     type DisallowReason,
     PermissionLock,
-    reasonForKey, // ✨ [추가]
+    reasonForKey,
 } from './common';
 import { useEditor } from '../../../useEditor';
 
@@ -31,17 +31,17 @@ export function TypographyGroup(props: {
     expert: boolean;
     open: boolean;
     onToggle: () => void;
-    nodeId: NodeId; // ✨ [추가]
+    nodeId: NodeId;
     componentId: string;
 }) {
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui } = useEditor();
+    // ✨ [수정] useEditor를 최상위에서 한 번만 호출합니다.
+    const { ui, project } = useEditor();
 
-    // ✨ [수정] useAllowed 훅이 nodeId를 사용하도록 변경
     const allow = useAllowed(nodeId);
 
-    // ✨ [수정] disallow reason 계산 로직을 새로운 헬퍼 함수로 변경
-    const dis = (k: string): DisallowReason => reasonForKey(nodeId, k, expert);
+    // ✨ [수정] reasonForKey에 project와 ui 상태를 전달합니다.
+    const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
     const fw = String((el as any).fontWeight ?? '');
     const ta = String((el as any).textAlign ?? '');
@@ -64,7 +64,6 @@ export function TypographyGroup(props: {
 
             {open && (
                 <div className="mt-1 space-y-2">
-                    {/* color */}
                     <div className="flex items-center gap-2">
                         <Label>color</Label>
                         {renderLock('color')}
@@ -79,7 +78,6 @@ export function TypographyGroup(props: {
                         )}
                     </div>
 
-                    {/* fontSize */}
                     <div className="flex items-center gap-2">
                         <Label>fontSize</Label>
                         {renderLock('fontSize')}
@@ -95,7 +93,6 @@ export function TypographyGroup(props: {
                         )}
                     </div>
 
-                    {/* fontWeight */}
                     <div className="flex items-center gap-2">
                         <Label>fontWeight</Label>
                         {renderLock('fontWeight')}
@@ -118,7 +115,6 @@ export function TypographyGroup(props: {
                         )}
                     </div>
 
-                    {/* textAlign */}
                     <div className="flex items-center gap-2">
                         <Label>textAlign</Label>
                         {renderLock('textAlign')}
