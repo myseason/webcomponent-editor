@@ -14,7 +14,7 @@
 import React from 'react';
 import { useEditor } from '../../useEditor';
 import { getDefinition } from '../../../core/registry';
-import type { NodeId, PropSchemaEntry } from '../../../core/types';
+import type {EditorState, NodeId, PropSchemaEntry} from '../../../core/types';
 
 type Row = PropSchemaEntry<Record<string, unknown>>;
 type RowText = Extract<Row, { type: 'text' }>;
@@ -167,7 +167,7 @@ export function SchemaEditor({ nodeId }: { nodeId: NodeId }) {
         });
 
     const onSave = () => {
-        state.update((s) => {
+        state.update((s: EditorState) => {
             const map = { ...(s.project.schemaOverrides ?? {}) };
             map[defId] = rows;
             s.project.schemaOverrides = map;
@@ -175,7 +175,7 @@ export function SchemaEditor({ nodeId }: { nodeId: NodeId }) {
     };
 
     const onReset = () => {
-        state.update((s) => {
+        state.update((s: EditorState) => {
             const map = { ...(s.project.schemaOverrides ?? {}) };
             delete map[defId];
             s.project.schemaOverrides = map;

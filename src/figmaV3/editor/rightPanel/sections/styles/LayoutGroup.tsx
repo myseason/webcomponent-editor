@@ -150,7 +150,7 @@ export function LayoutGroup(props: {
                         {renderLock('display')}
                         {!allow.has('display') && <DisabledHint reason={dis('display')!} />}
                         {allow.has('display') ? (
-                            <div className="flex gap-1">
+                            <div className="flex gap-1 flex-wrap">
                                 {(['block', 'inline', 'flex', 'grid'] as const).map((v) => (
                                     <ChipBtn
                                         key={v}
@@ -176,6 +176,7 @@ export function LayoutGroup(props: {
                                 value={(el as any).overflow as string | undefined}
                                 options={['visible', 'hidden', 'scroll', 'auto', 'clip']}
                                 onChange={(v) => patch({ overflow: v })}
+                                className="w-auto"
                             />
                         ) : (
                             <span className="text-[11px] text-neutral-400">제한됨</span>
@@ -193,7 +194,7 @@ export function LayoutGroup(props: {
                                     <MiniInput
                                         value={(el as any)['width'] as string | number | undefined}
                                         onChange={(v) => patch({ width: coerceLen(v) })}
-                                        placeholder="auto | 640 | 50%"
+                                        placeholder="auto"
                                     />
                                 ) : (
                                     <span className="text-[11px] text-neutral-400">제한됨</span>
@@ -203,7 +204,7 @@ export function LayoutGroup(props: {
                                     <MiniInput
                                         value={(el as any)['height'] as string | number | undefined}
                                         onChange={(v) => patch({ height: coerceLen(v) })}
-                                        placeholder="auto | 480 | 50%"
+                                        placeholder="auto"
                                     />
                                 ) : (
                                     <span className="text-[11px] text-neutral-400">제한됨</span>
@@ -211,93 +212,61 @@ export function LayoutGroup(props: {
                             </div>
                         </>
                     ) : (
-                        <div className="text-[11px] text-neutral-500">
-                            display:inline에서는 width/height 설정이 적용되지 않을 수 있습니다.
+                        <div className="text-[11px] text-neutral-500 px-1">
+                            display:inlineでは width/height が適用されません。
                         </div>
                     )}
 
-                    {container && (el as any).display === 'flex' && (
+                    {container && display === 'flex' && (
                         <>
-                            <div className="text-[10px] text-neutral-500 pt-1">Flex Container</div>
-
+                            <div className="text-[10px] text-neutral-500 pt-1 px-1">Flex Container</div>
                             <div className="flex items-center gap-2">
                                 <Label>direction</Label>
                                 {renderLock('flexDirection')}
-                                {!allow.has('flexDirection') && (
-                                    <DisabledHint reason={dis('flexDirection')!} />
-                                )}
-                                <div className="flex gap-1">
+                                {!allow.has('flexDirection') && <DisabledHint reason={dis('flexDirection')!} />}
+                                <div className="flex gap-1 flex-wrap">
                                     {[
                                         { v: 'row', I: GalleryHorizontal, title: 'row' },
                                         { v: 'row-reverse', I: ArrowLeftRight, title: 'row-reverse' },
                                         { v: 'column', I: GalleryVertical, title: 'column' },
                                         { v: 'column-reverse', I: ArrowUpDown, title: 'column-reverse' },
                                     ].map(({ v, I, title }) => (
-                                        <IconBtn
-                                            key={v}
-                                            title={title}
-                                            onClick={() => patch({ flexDirection: v })}
-                                            disabled={!allow.has('flexDirection')}
-                                            active={dir === v}
-                                        >
+                                        <IconBtn key={v} title={title} onClick={() => patch({ flexDirection: v })} disabled={!allow.has('flexDirection')} active={dir === v}>
                                             <I size={16} />
                                         </IconBtn>
                                     ))}
                                 </div>
                             </div>
-
                             <div className="flex items-center gap-2">
                                 <Label>justify</Label>
                                 {renderLock('justifyContent')}
-                                {!allow.has('justifyContent') && (
-                                    <DisabledHint reason={dis('justifyContent')!} />
-                                )}
-                                <div className="flex gap-1">
+                                {!allow.has('justifyContent') && <DisabledHint reason={dis('justifyContent')!} />}
+                                <div className="flex gap-1 flex-wrap">
                                     {justifyIcons.map(({ v, I, title }) => (
-                                        <IconBtn
-                                            key={v}
-                                            title={title}
-                                            onClick={() => patch({ justifyContent: v })}
-                                            disabled={!allow.has('justifyContent')}
-                                            active={(el as any).justifyContent === v}
-                                        >
+                                        <IconBtn key={v} title={title} onClick={() => patch({ justifyContent: v })} disabled={!allow.has('justifyContent')} active={(el as any).justifyContent === v}>
                                             <I size={16} />
                                         </IconBtn>
                                     ))}
                                 </div>
                             </div>
-
                             <div className="flex items-center gap-2">
                                 <Label>align</Label>
                                 {renderLock('alignItems')}
-                                {!allow.has('alignItems') && (
-                                    <DisabledHint reason={dis('alignItems')!} />
-                                )}
-                                <div className="flex gap-1">
+                                {!allow.has('alignItems') && <DisabledHint reason={dis('alignItems')!} />}
+                                <div className="flex gap-1 flex-wrap">
                                     {alignIcons.map(({ v, I, title }) => (
-                                        <IconBtn
-                                            key={v}
-                                            title={title}
-                                            onClick={() => patch({ alignItems: v })}
-                                            disabled={!allow.has('alignItems')}
-                                            active={(el as any).alignItems === v}
-                                        >
+                                        <IconBtn key={v} title={title} onClick={() => patch({ alignItems: v })} disabled={!allow.has('alignItems')} active={(el as any).alignItems === v}>
                                             <I size={16} />
                                         </IconBtn>
                                     ))}
                                 </div>
                             </div>
-
                             <div className="flex items-center gap-2">
                                 <Label>gap</Label>
                                 {renderLock('gap')}
                                 {!allow.has('gap') && <DisabledHint reason={dis('gap')!} />}
                                 {allow.has('gap') ? (
-                                    <MiniInput
-                                        value={(el as any)['gap'] as string | number | undefined}
-                                        onChange={(v) => patch({ gap: coerceLen(v) })}
-                                        placeholder="0 | 8 | 0.5rem"
-                                    />
+                                    <MiniInput value={(el as any)['gap'] as string | number | undefined} onChange={(v) => patch({ gap: coerceLen(v) })} placeholder="8px" />
                                 ) : (
                                     <span className="text-[11px] text-neutral-400">제한됨</span>
                                 )}
@@ -305,129 +274,47 @@ export function LayoutGroup(props: {
                         </>
                     )}
 
-                    {container && (el as any).display === 'grid' && (
+                    {container && display === 'grid' && (
                         <>
-                            <div className="text-[10px] text-neutral-500 pt-1">Grid Container</div>
-
+                            <div className="text-[10px] text-neutral-500 pt-1 px-1">Grid Container</div>
                             <div className="flex items-center gap-2">
                                 <Label>columns</Label>
                                 {renderLock('gridTemplateColumns')}
-                                {!allow.has('gridTemplateColumns') && (
-                                    <DisabledHint reason={dis('gridTemplateColumns')!} />
-                                )}
+                                {!allow.has('gridTemplateColumns') && <DisabledHint reason={dis('gridTemplateColumns')!} />}
                                 {allow.has('gridTemplateColumns') ? (
-                                    <div className="flex gap-1">
-                                        <ChipBtn
-                                            title="Auto"
-                                            onClick={() => setCols('auto')}
-                                            active={cols === null}
-                                        >
-                                            Auto
-                                        </ChipBtn>
+                                    <div className="flex gap-1 flex-wrap">
+                                        <ChipBtn title="Auto" onClick={() => setCols('auto')} active={cols === null}>Auto</ChipBtn>
                                         {[1, 2, 3, 4, 5, 6].map((n) => (
-                                            <ChipBtn
-                                                key={n}
-                                                title={`${n}`}
-                                                onClick={() => setCols(n)}
-                                                active={cols === n}
-                                            >
-                                                {n}
-                                            </ChipBtn>
+                                            <ChipBtn key={n} title={`${n}`} onClick={() => setCols(n)} active={cols === n}>{n}</ChipBtn>
                                         ))}
                                     </div>
                                 ) : (
                                     <span className="text-[11px] text-neutral-400">제한됨</span>
                                 )}
                             </div>
-
                             <div className="flex items-center gap-2">
                                 <Label>rows</Label>
                                 {renderLock('gridTemplateRows')}
-                                {!allow.has('gridTemplateRows') && (
-                                    <DisabledHint reason={dis('gridTemplateRows')!} />
-                                )}
+                                {!allow.has('gridTemplateRows') && <DisabledHint reason={dis('gridTemplateRows')!} />}
                                 {allow.has('gridTemplateRows') ? (
-                                    <div className="flex gap-1">
-                                        <ChipBtn
-                                            title="Auto"
-                                            onClick={() => setRows('auto')}
-                                            active={rows === null}
-                                        >
-                                            Auto
-                                        </ChipBtn>
+                                    <div className="flex gap-1 flex-wrap">
+                                        <ChipBtn title="Auto" onClick={() => setRows('auto')} active={rows === null}>Auto</ChipBtn>
                                         {[1, 2, 3, 4].map((n) => (
-                                            <ChipBtn
-                                                key={n}
-                                                title={`${n}`}
-                                                onClick={() => setRows(n)}
-                                                active={rows === n}
-                                            >
-                                                {n}
-                                            </ChipBtn>
+                                            <ChipBtn key={n} title={`${n}`} onClick={() => setRows(n)} active={rows === n}>{n}</ChipBtn>
                                         ))}
                                     </div>
                                 ) : (
                                     <span className="text-[11px] text-neutral-400">제한됨</span>
                                 )}
                             </div>
-
                             <div className="flex items-center gap-2">
                                 <Label>gap</Label>
                                 {renderLock('gap')}
+                                {renderLock('rowGap')}
+                                {renderLock('columnGap')}
                                 {!allow.has('gap') && <DisabledHint reason={dis('gap')!} />}
                                 {allow.has('gap') ? (
-                                    <MiniInput
-                                        value={(el as any)['gap'] as string | number | undefined}
-                                        onChange={(v) => patch({ gap: coerceLen(v) })}
-                                        placeholder="0 | 8 | 0.5rem"
-                                    />
-                                ) : (
-                                    <span className="text-[11px] text-neutral-400">제한됨</span>
-                                )}
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <Label>rowGap</Label>
-                                {renderLock('rowGap')}
-                                {!allow.has('rowGap') && <DisabledHint reason={dis('rowGap')!} />}
-                                {allow.has('rowGap') ? (
-                                    <MiniInput
-                                        value={(el as any)['rowGap'] as string | number | undefined}
-                                        onChange={(v) => patch({ rowGap: coerceLen(v) })}
-                                        placeholder="0 | 8 | 0.5rem"
-                                    />
-                                ) : (
-                                    <span className="text-[11px] text-neutral-400">제한됨</span>
-                                )}
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <Label>columnGap</Label>
-                                {renderLock('columnGap')}
-                                {!allow.has('columnGap') && <DisabledHint reason={dis('columnGap')!} />}
-                                {allow.has('columnGap') ? (
-                                    <MiniInput
-                                        value={(el as any)['columnGap'] as string | number | undefined}
-                                        onChange={(v) => patch({ columnGap: coerceLen(v) })}
-                                        placeholder="0 | 8 | 0.5rem"
-                                    />
-                                ) : (
-                                    <span className="text-[11px] text-neutral-400">제한됨</span>
-                                )}
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <Label>auto-flow</Label>
-                                {renderLock('gridAutoFlow')}
-                                {!allow.has('gridAutoFlow') && (
-                                    <DisabledHint reason={dis('gridAutoFlow')!} />
-                                )}
-                                {allow.has('gridAutoFlow') ? (
-                                    <MiniSelect
-                                        value={(el as any).gridAutoFlow as string | undefined}
-                                        options={['row', 'column', 'dense', 'row dense', 'column dense']}
-                                        onChange={(v) => patch({ gridAutoFlow: v })}
-                                    />
+                                    <MiniInput value={(el as any)['gap'] as string | number | undefined} onChange={(v) => patch({ gap: coerceLen(v) })} placeholder="8px" />
                                 ) : (
                                     <span className="text-[11px] text-neutral-400">제한됨</span>
                                 )}

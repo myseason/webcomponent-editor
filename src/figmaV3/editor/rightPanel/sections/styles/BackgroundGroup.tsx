@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import type { CSSDict, InspectorFilter, TagPolicy, TagPolicyMap, NodeId } from '../../../../core/types';
-import { ColorField, ChipBtn, Label, MiniInput, MiniSelect, DisabledHint, useAllowed, DisallowReason, PermissionLock, reasonForKey } from './common';
+import { ColorField, ChipBtn, Label, MiniInput, DisabledHint, useAllowed, DisallowReason, PermissionLock, reasonForKey } from './common';
 import { useEditor } from '../../../useEditor';
 
 type BgMode = 'none' | 'color' | 'image' | 'transparent';
@@ -95,7 +95,7 @@ export function BackgroundGroup(props: {
 
             {open && (
                 <div className="mt-2 space-y-3 px-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <Label>mode</Label>
                         {(['none', 'color', 'image', 'transparent'] as BgMode[]).map((m) => (
                             <ChipBtn key={m} onClick={() => setMode(m)} active={mode === m} title={m}>
@@ -129,7 +129,7 @@ export function BackgroundGroup(props: {
 
                     {mode === 'image' && (
                         <div className="space-y-2">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <Label>gradient presets</Label>
                                 {renderLock('backgroundImage')}
                                 {gradients.map((g) => (
@@ -144,13 +144,13 @@ export function BackgroundGroup(props: {
                                 ))}
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <Label>URL / Upload</Label>
                                 {allow.has('backgroundImage') ? (
                                     <>
                                         <MiniInput value={url} onChange={setUrl} placeholder="https://…" className="w-24" />
                                         <ChipBtn title="apply" onClick={applyUrl}>Apply</ChipBtn>
-                                        <input type="file" accept="image/*" onChange={onUpload} className="text-[11px]" />
+                                        <input type="file" accept="image/*" onChange={onUpload} className="text-[11px] max-w-full" />
                                     </>
                                 ) : (
                                     <span className="text-xs text-neutral-500">제한됨</span>

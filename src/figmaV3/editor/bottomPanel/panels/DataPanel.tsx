@@ -6,6 +6,7 @@
  */
 import React, { useState } from 'react';
 import { useEditor } from '../../useEditor';
+import {EditorState} from "@/figmaV3/core/types";
 
 export function DataPanel() {
     const state = useEditor(); // 상태+액션
@@ -14,7 +15,7 @@ export function DataPanel() {
     const onApply = () => {
         try {
             const obj = JSON.parse(text) as Record<string, unknown>;
-            state.update((s) => {
+            state.update((s: EditorState) => {
                 s.data = obj; // 얕은 복사 update() 규약 준수(상위에서 shallow copy 처리)
             });
         } catch {

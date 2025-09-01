@@ -20,7 +20,7 @@ export function Palette({ query = '' }: { query?: string }) {
 
     // ✨ [수정] isPublic이 true인 컴포넌트(Fragment)만 필터링합니다.
     const sharedComponents = React.useMemo<Fragment[]>(() => {
-        return project.fragments.filter(f => f.isPublic);
+        return project.fragments.filter((f: Fragment) => f.isPublic);
     }, [project.fragments]);
 
     const filteredSharedComponents = sharedComponents.filter(c => itemMatch(c.name, c.id, query));

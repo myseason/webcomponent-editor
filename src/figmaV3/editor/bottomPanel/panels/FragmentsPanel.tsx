@@ -6,7 +6,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { useEditor } from '../../useEditor';
-import type { ActionStep, FlowEdge, Fragment } from '../../../core/types';
+import type {ActionStep, EditorState, FlowEdge, Fragment, Node} from '../../../core/types';
 
 export function FragmentsPanel() {
     // 최상위 훅들만 사용
@@ -27,8 +27,8 @@ export function FragmentsPanel() {
         }
 
         // (b) Node actions(__actions)
-        const nodes = state.project.nodes;
-        for (const node of Object.values(nodes)) {
+        const nodes = state.project.nodes ;
+        for (const node of Object.values(nodes) as Node[]) {
             const bag = (node.props as Record<string, unknown>).__actions as
                 | Record<string, { steps: ActionStep[] }>
                 | undefined;
@@ -75,7 +75,7 @@ export function FragmentsPanel() {
     const onRename = (fragmentId: string, name: string) => {
         const next = name.trim();
         if (!next) return;
-        state.update((s) => {
+        state.update((s: EditorState) => {
             s.project.fragments = s.project.fragments.map((f) =>
                 f.id === fragmentId ? { ...f, name: next } : f,
             );

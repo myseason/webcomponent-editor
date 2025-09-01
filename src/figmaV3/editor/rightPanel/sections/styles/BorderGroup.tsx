@@ -20,7 +20,6 @@ import {
     PermissionLock,
 } from './common';
 import { coerceLen } from '../../../../runtime/styleUtils';
-import { Link as LinkIcon, Link2Off as UnlinkIcon } from 'lucide-react';
 import { useEditor } from '../../../useEditor';
 
 export function BorderGroup(props: {
@@ -37,10 +36,9 @@ export function BorderGroup(props: {
     componentId: string;
 }) {
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui, project } = useEditor(); // ✨ [수정] project 상태 가져오기
+    const { ui, project } = useEditor();
 
     const allow = useAllowed(nodeId);
-    // ✨ [수정] reasonForKey에 project와 ui 인자 전달
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
     const borderStyles = ['none', 'solid', 'dashed', 'dotted', 'double'];
@@ -64,7 +62,7 @@ export function BorderGroup(props: {
 
             {open && (
                 <div className="mt-1 space-y-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <Label>border</Label>
                         {renderLock('borderWidth')}
                         {renderLock('borderStyle')}
@@ -98,7 +96,7 @@ export function BorderGroup(props: {
                         ) : <span className="text-[11px] text-neutral-400">제한</span>}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <Label>radius</Label>
                         {renderLock('borderRadius')}
                         {!allow.has('borderRadius') && <DisabledHint reason={dis('borderRadius')!} />}
@@ -109,7 +107,7 @@ export function BorderGroup(props: {
                                     onChange={(v) => patch({ borderRadius: coerceLen(v) })}
                                     placeholder="8px"
                                 />
-                                <div className="flex gap-1">
+                                <div className="flex gap-1 flex-wrap">
                                     {[0, 4, 8, 12, 16, 24].map((n) => (
                                         <ChipBtn
                                             key={n}

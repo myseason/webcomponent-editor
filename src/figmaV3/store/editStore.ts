@@ -47,7 +47,7 @@ const initialState: EditorState = {
                 activeHubTab: 'Pages', widthPx: 320, lastActivePageId: null, lastActiveFragmentId: null,
                 isSplit: false, splitPercentage: 50,
             },
-            right: { widthPx: 420 },
+            right: { widthPx: 320 },
             bottom: { heightPx: 240, isCollapsed: false, advanced: null },
         },
     },

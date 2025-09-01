@@ -3,4 +3,10 @@
 @tailwind utilities;
 
 /* 에디터 기본 바탕(가시성 보강용) */
-html, body, :root { height: 100%; }
+html, body, :root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* 브라우저 기본 스크롤바 비활성화 */
+}

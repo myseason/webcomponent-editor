@@ -119,7 +119,7 @@ function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: Sup
         return bag?.[event]?.steps ?? [];
     };
     const writeSteps = (next: ActionStep[]) => {
-        state.update((s) => {
+        state.update((s: EditorState) => {
             const p = s.project.nodes[nodeId].props as Record<string, unknown>;
             const bag = (p.__actions as ActionsBag | undefined) ?? {};
             bag[event] = { steps: next };

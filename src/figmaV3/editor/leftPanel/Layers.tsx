@@ -1,7 +1,7 @@
 'use client';
 import React, { memo, useCallback, useMemo } from 'react';
 import { useEditor } from '../useEditor';
-import type { NodeId, Node } from '../../core/types';
+import type {NodeId, Node, Fragment} from '../../core/types';
 import { getDefinition } from '../../core/registry';
 import { Lock, Unlock, Eye, EyeOff, Trash2, GripVertical } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -47,7 +47,7 @@ const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
 
     if (!node) return null;
 
-    const isRoot = id === state.project.rootId || id === state.project.fragments.find(f => f.id === state.ui.editingFragmentId)?.rootId;
+    const isRoot = id === state.project.rootId || id === state.project.fragments.find((f: Fragment) => f.id === state.ui.editingFragmentId)?.rootId;
     const selected = state.ui.selectedId === id;
     const name = getDisplayName(node);
 
@@ -111,7 +111,7 @@ export function Layers() {
     const { mode, editingFragmentId } = state.ui;
 
     const rootId = mode === 'Component' && editingFragmentId
-        ? state.project.fragments.find(f => f.id === editingFragmentId)?.rootId
+        ? state.project.fragments.find((f: Fragment) => f.id === editingFragmentId)?.rootId
         : state.project.rootId;
 
     if (!rootId || !state.project.nodes[rootId]) {

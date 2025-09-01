@@ -14,7 +14,7 @@
  */
 import React from 'react';
 import { useEditor } from '../useEditor';
-import type { NodeId } from '../../core/types';
+import type {Fragment, NodeId} from '../../core/types';
 import { editorStore } from '../../store/editStore';
 import { getRenderer } from '../../core/registry';
 
@@ -70,7 +70,7 @@ export function OverlayHost() {
     return (
         <div className="pointer-events-none">
             {overlays.map((fragId: string, i: number) => {
-                const f = frags.find((x) => x.id === fragId);
+                const f = frags.find((x: Fragment) => x.id === fragId);
                 if (!f) return null;
                 return (
                     <div

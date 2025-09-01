@@ -33,9 +33,8 @@ export function ComponentEditor() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [state.undo, state.redo]);
 
-    const { rightW, leftW } = { rightW: state.ui.panels.right.widthPx, leftW: state.ui.panels.left.widthPx };
+    const { leftW } = { leftW: state.ui.panels.left.widthPx };
 
-    const onStartDragRight = (e: React.MouseEvent) => { /* ... */ };
     const onStartDragLeft = (e: React.MouseEvent) => {
         e.preventDefault();
         const el = mainAreaRef.current;
@@ -56,7 +55,6 @@ export function ComponentEditor() {
         window.addEventListener('mouseup', onUp);
     };
 
-    // DND 핸들러
     const onDragStart = (e: DragStartEvent) => setActiveDrag(e.active.data.current as DndDragPayload);
     const onDragOver = (e: DragOverEvent) => setDropTarget(e.over?.data.current as DndDropTarget ?? null);
     const onDragEnd = (e: DragEndEvent) => {
@@ -82,20 +80,23 @@ export function ComponentEditor() {
 
     return (
         <DndContext onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={() => setActiveDrag(null)}>
+            {/* ✅ [수정] 최상위 flex 컨테이너로 높이 문제 해결 */}
             <div className={`${themeClass} h-full w-full bg-[var(--mdt-color-background)] text-[var(--mdt-color-text-primary)] font-[var(--mdt-font-family)] flex flex-col`}>
                 <PageBar />
+                {/* ✅ [수정] 메인 영역이 남은 공간을 모두 차지하도록 flex-1, min-h-0 추가 */}
                 <div className="flex-1 flex flex-col min-h-0">
+                    {/* ✅ [수정] 좌/중앙/우 패널 컨테이너가 남은 공간을 모두 차지하도록 flex-1, min-h-0 추가 */}
                     <div ref={mainAreaRef} className="flex-1 flex min-h-0">
                         <div className="relative" style={{ width: leftW }}>
                             <LeftSidebar />
                             <div role="separator" onMouseDown={onStartDragLeft} className="absolute right-0 top-0 h-full w-1 cursor-col-resize"/>
                         </div>
-                        <div className="flex-1 min-w-0">
+                        {/* ✅ [수정] 중앙 캔버스 영역이 남은 공간을 모두 차지하도록 flex-1, min-w-0 추가 */}
+                        <div className="flex-1 min-w-0 relative">
                             <Canvas dropTarget={dropTarget} />
                             <OverlayHost />
                         </div>
-                        <div role="separator" onMouseDown={onStartDragRight} className="w-1 cursor-col-resize"/>
-                        <div style={{ width: rightW }} className="min-w-[320px] max-w-[720px] overflow-auto bg-white">
+                        <div className="w-[320px] shrink-0 bg-white border-l border-gray-200">
                             <Inspector />
                         </div>
                     </div>

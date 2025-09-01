@@ -56,11 +56,11 @@ export function PagesPanel() {
     const { project, ui, addPage, removePage, selectPage, update, duplicatePage } = state;
 
     const [selectedPageIdForDetails, setSelectedPageIdForDetails] = useState<string | null>(
-        project.pages.find(p => p.rootId === project.rootId)?.id ?? project.pages[0]?.id ?? null
+        project.pages.find((p: Page) => p.rootId === project.rootId)?.id ?? project.pages[0]?.id ?? null
     );
 
     useEffect(() => {
-        const currentPage = project.pages.find(p => p.rootId === project.rootId);
+        const currentPage = project.pages.find((p: Page) => p.rootId === project.rootId);
         if (currentPage) {
             setSelectedPageIdForDetails(currentPage.id);
         }
@@ -71,7 +71,7 @@ export function PagesPanel() {
         return <div className="p-4 text-sm text-gray-500">Page management is available in Page Build Mode.</div>
     }
 
-    const selectedPage = project.pages.find(p => p.id === selectedPageIdForDetails);
+    const selectedPage = project.pages.find((p: Page) => p.id === selectedPageIdForDetails);
 
     const createPage = () => {
         const newPageId = addPage('Untitled Page');
@@ -84,7 +84,7 @@ export function PagesPanel() {
             <div className="flex-1 overflow-auto p-2">
                 <div className="text-xs font-semibold text-gray-700 px-2 py-1">Pages</div>
                 <ul className="space-y-1 mt-2">
-                    {project.pages.map((p) => (
+                    {project.pages.map((p: Page) => (
                         <li key={p.id}>
                             <div
                                 onClick={() => { selectPage(p.id); setSelectedPageIdForDetails(p.id); }}
@@ -121,7 +121,7 @@ export function PagesPanel() {
                 </div>
 
                 <div className="border-t pt-3 space-y-2">
-                    <div className="text-xs font-semibold text-gray-700 px-1">Page Details</div>
+                    {/* <div className="text-xs font-semibold text-gray-700 px-1">Page Details</div> */}
                     {selectedPage ? (
                         <div className="space-y-2">
                             <div>
@@ -129,7 +129,7 @@ export function PagesPanel() {
                                 <input
                                     className="w-full border rounded px-2 py-1 text-sm"
                                     value={selectedPage.name}
-                                    onChange={e => update(s => { s.project.pages.find(p=>p.id===selectedPageIdForDetails)!.name = e.target.value })}
+                                    onChange={e => update(s => { s.project.pages.find((p: Page)=>p.id===selectedPageIdForDetails)!.name = e.target.value })}
                                 />
                             </div>
                             <div>
@@ -137,7 +137,7 @@ export function PagesPanel() {
                                 <textarea
                                     className="w-full border rounded px-2 py-1 text-sm h-16 resize-none"
                                     value={selectedPage.description ?? ''}
-                                    onChange={e => update(s => { s.project.pages.find(p=>p.id===selectedPageIdForDetails)!.description = e.target.value })}
+                                    onChange={e => update(s => { s.project.pages.find((p: Page) =>p.id===selectedPageIdForDetails)!.description = e.target.value })}
                                 />
                             </div>
                             <div>
@@ -145,7 +145,7 @@ export function PagesPanel() {
                                 <input
                                     className="w-full border rounded px-2 py-1 font-mono text-xs"
                                     value={selectedPage.slug ?? ''}
-                                    onChange={e => update(s => { s.project.pages.find(p=>p.id===selectedPageIdForDetails)!.slug = slugify(e.target.value) })}
+                                    onChange={e => update(s => { s.project.pages.find((p: Page)=>p.id===selectedPageIdForDetails)!.slug = slugify(e.target.value) })}
                                 />
                             </div>
                         </div>

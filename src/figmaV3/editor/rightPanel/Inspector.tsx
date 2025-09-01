@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useEditor } from '../useEditor';
 import { getDefinition } from '../../core/registry';
-import type { NodeId } from '../../core/types';
+import type { NodeId, Fragment, EditorState } from '../../core/types';
 import { CommonSection } from './sections/CommonSection';
 import { PropsAutoSection } from './sections/PropsAutoSection';
 import { StylesSection } from './sections/StylesSection';
@@ -44,7 +44,7 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
 
 function ComponentPolicyEditor({ fragmentId }: { fragmentId: string }) {
     const state = useEditor();
-    const fragment = state.project.fragments.find(f => f.id === fragmentId);
+    const fragment = state.project.fragments.find((f: Fragment) => f.id === fragmentId);
     if (!fragment) return <div className="p-3 text-sm text-gray-500">Cannot find component definition.</div>;
 
     const rootNode = state.project.nodes[fragment.rootId];
@@ -62,7 +62,6 @@ function ComponentPolicyEditor({ fragmentId }: { fragmentId: string }) {
                             Defining policies for: <strong>{def?.title ?? rootNode.componentId}</strong>
                         </p>
                     </div>
-                    {/* ✨ [제거] 발행 버튼을 ComponentsPanel로 이동 */}
                 </div>
             </div>
 
@@ -100,7 +99,7 @@ export function Inspector() {
 
     const targetNodeId = mode === 'Page'
         ? selectedId ?? rootId
-        : editingFragmentId ? fragments.find(f => f.id === editingFragmentId)?.rootId : null;
+        : editingFragmentId ? fragments.find((f: Fragment) => f.id === editingFragmentId)?.rootId : null;
 
     const node = targetNodeId ? nodes[targetNodeId] : null;
 
@@ -108,30 +107,14 @@ export function Inspector() {
 
     const handleToggleExpertMode = () => {
         const nextExpertMode = !expertMode;
-        update(s => { s.ui.expertMode = nextExpertMode; });
+        update((s: EditorState) => { s.ui.expertMode = nextExpertMode; });
         setNotification(`고급 모드: ${nextExpertMode ? 'ON' : 'OFF'}`);
     };
 
-    if (!node) {
-        const message = mode === 'Page'
-            ? "Select a node to inspect."
-            : "Select a component from the left panel to define its policies.";
-        return (
-            <div className={`h-full border-t-4 ${modeBorderStyle}`}>
-                <div className="px-2 py-2 border-b bg-white flex items-center gap-2 shrink-0">
-                    <div className="font-semibold text-sm">Inspector</div>
-                    <div className="text-xs font-medium text-gray-500">
-                        {mode === 'Page' ? '(🚀 Page Build Mode)' : '(🛠️ Component Dev Mode)'}
-                    </div>
-                </div>
-                <div className="p-3 text-sm text-gray-500">{message}</div>
-            </div>
-        );
-    }
-
     return (
         <div className={`h-full flex flex-col border-t-4 ${modeBorderStyle}`}>
-            <div className="px-2 py-2 border-b bg-white flex items-center gap-2 shrink-0">
+            {/* Header: sticky로 상단에 고정 */}
+            <div className="sticky top-0 px-2 py-2 border-b bg-white flex items-center gap-2 shrink-0 z-10">
                 <div className="font-semibold text-sm">Inspector</div>
                 <div className="text-xs font-medium text-gray-500">
                     {mode === 'Page' ? '(🚀 Page Build Mode)' : '(🛠️ Component Dev Mode)'}
@@ -164,18 +147,26 @@ export function Inspector() {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-auto px-2 pb-4">
-                {mode === 'Page' && (
-                    <PageInspector nodeId={node.id} defId={node.componentId} />
-                )}
-                {mode === 'Component' && editingFragmentId && (
-                    <ComponentPolicyEditor fragmentId={editingFragmentId} />
+            {/* 스크롤이 필요한 Content 영역 */}
+            <div className="flex-1 overflow-y-auto">
+                {!node ? (
+                    <div className="p-3 text-sm text-gray-500">
+                        {mode === 'Page' ? "Select a node to inspect." : "Select a component from the left panel."}
+                    </div>
+                ) : (
+                    <div className="px-2 pb-4">
+                        {mode === 'Page' ? (
+                            <PageInspector nodeId={node.id} defId={node.componentId} />
+                        ) : (
+                            editingFragmentId && <ComponentPolicyEditor fragmentId={editingFragmentId} />
+                        )}
+                    </div>
                 )}
             </div>
 
             {isSaveDialogOpen && (
                 <SaveAsComponentDialog
-                    nodeId={node.id}
+                    nodeId={selectedId!}
                     onClose={() => setIsSaveDialogOpen(false)}
                 />
             )}

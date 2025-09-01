@@ -35,12 +35,9 @@ export function TypographyGroup(props: {
     componentId: string;
 }) {
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    // ✨ [수정] useEditor를 최상위에서 한 번만 호출합니다.
     const { ui, project } = useEditor();
 
     const allow = useAllowed(nodeId);
-
-    // ✨ [수정] reasonForKey에 project와 ui 상태를 전달합니다.
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
     const fw = String((el as any).fontWeight ?? '');
@@ -64,7 +61,7 @@ export function TypographyGroup(props: {
 
             {open && (
                 <div className="mt-1 space-y-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <Label>color</Label>
                         {renderLock('color')}
                         {!allow.has('color') && <DisabledHint reason={dis('color')!} />}
@@ -86,27 +83,27 @@ export function TypographyGroup(props: {
                             <MiniInput
                                 value={(el as any)['fontSize'] as string | number | undefined}
                                 onChange={(v) => patch({ fontSize: v })}
-                                placeholder="14 | 14px | 1rem"
+                                placeholder="14px"
                             />
                         ) : (
                             <span className="text-[11px] text-neutral-400">제한됨</span>
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <Label>fontWeight</Label>
                         {renderLock('fontWeight')}
                         {!allow.has('fontWeight') && <DisabledHint reason={dis('fontWeight')!} />}
                         {allow.has('fontWeight') ? (
-                            <div className="flex gap-1">
-                                {(['400', '700'] as const).map((w) => (
+                            <div className="flex gap-1 flex-wrap">
+                                {(['400', '500', '600', '700'] as const).map((w) => (
                                     <ChipBtn
                                         key={w}
-                                        title={w === '400' ? 'Regular' : 'Bold'}
+                                        title={w}
                                         onClick={() => patch({ fontWeight: w })}
                                         active={fw === w}
                                     >
-                                        {w === '400' ? 'Regular' : 'Bold'}
+                                        {w}
                                     </ChipBtn>
                                 ))}
                             </div>
@@ -115,13 +112,13 @@ export function TypographyGroup(props: {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <Label>textAlign</Label>
                         {renderLock('textAlign')}
                         {!allow.has('textAlign') && <DisabledHint reason={dis('textAlign')!} />}
                         {allow.has('textAlign') ? (
-                            <div className="flex gap-1">
-                                {(['left', 'center', 'right'] as const).map((a) => (
+                            <div className="flex gap-1 flex-wrap">
+                                {(['left', 'center', 'right', 'justify'] as const).map((a) => (
                                     <ChipBtn
                                         key={a}
                                         title={a}

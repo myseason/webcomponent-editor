@@ -11,7 +11,7 @@ export function TemplatesPanel({ query = '' }: { query?: string }) {
 
     // ✨ [수정] isPublic이 false인 컴포넌트(Fragment)만 필터링합니다.
     const privateComponents = React.useMemo<Fragment[]>(() => {
-        return project.fragments.filter(f => !f.isPublic);
+        return project.fragments.filter((f: Fragment) => !f.isPublic);
     }, [project.fragments]);
 
     const filteredComponents = privateComponents.filter((c) => {

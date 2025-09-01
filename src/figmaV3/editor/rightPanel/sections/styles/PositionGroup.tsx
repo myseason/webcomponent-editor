@@ -35,10 +35,9 @@ export function PositionGroup(props: {
     componentId: string;
 }) {
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui, project } = useEditor(); // ✨ [수정] project 상태 가져오기
+    const { ui, project } = useEditor();
 
     const allow = useAllowed(nodeId);
-    // ✨ [수정] reasonForKey에 project와 ui 인자 전달
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
     const pos = ((el as any).position as string) ?? 'static';
@@ -79,28 +78,21 @@ export function PositionGroup(props: {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <Label>offset</Label>
-                        {renderLock('top')}
-                        {renderLock('right')}
-                        {renderLock('bottom')}
-                        {renderLock('left')}
-                        {(['top', 'right', 'bottom', 'left'] as const).map((k) => {
-                            const disabled = !isOffsetEnabled || !allow.has(k);
-                            return (
-                                <div key={k} className="flex items-center gap-1">
-                                    {!allow.has(k) && <DisabledHint reason={dis(k)!} />}
-                                    <MiniInput
-                                        value={(el as any)[k]}
-                                        onChange={(v) => patch({ [k]: coerceLen(v) })}
-                                        placeholder={k}
-                                        disabled={disabled}
-                                        title={isOffsetEnabled ? k : 'position이 static일 때는 사용 불가'}
-                                        className="w-16"
-                                    />
-                                </div>
-                            );
-                        })}
+                    <div className="grid grid-cols-2 gap-2">
+                        {(['top', 'bottom', 'left', 'right'] as const).map((k) => (
+                            <div key={k} className="flex items-center gap-2">
+                                <Label>{k}</Label>
+                                {renderLock(k)}
+                                {!allow.has(k) && <DisabledHint reason={dis(k)!} />}
+                                <MiniInput
+                                    value={(el as any)[k]}
+                                    onChange={(v) => patch({ [k]: coerceLen(v) })}
+                                    placeholder="auto"
+                                    disabled={!isOffsetEnabled || !allow.has(k)}
+                                    title={isOffsetEnabled ? k : 'position이 static일 때는 사용 불가'}
+                                />
+                            </div>
+                        ))}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -114,34 +106,11 @@ export function PositionGroup(props: {
                                     const n = Number(v);
                                     patch({ zIndex: Number.isFinite(n) ? n : v });
                                 }}
-                                placeholder="auto | 10"
+                                placeholder="auto"
                             />
                         ) : (
                             <span className="text-[11px] text-neutral-400">제한됨</span>
                         )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <Label>overflow-x / y</Label>
-                        {renderLock('overflowX')}
-                        {renderLock('overflowY')}
-                        {!allow.has('overflowX') && <DisabledHint reason={dis('overflowX')!} />}
-                        {allow.has('overflowX') ? (
-                            <MiniSelect
-                                value={(el as any).overflowX as string | undefined}
-                                options={overflowOptions}
-                                onChange={(v) => patch({ overflowX: v })}
-                            />
-                        ) : <span className="text-[11px] text-neutral-400">제한</span>}
-
-                        {!allow.has('overflowY') && <DisabledHint reason={dis('overflowY')!} />}
-                        {allow.has('overflowY') ? (
-                            <MiniSelect
-                                value={(el as any).overflowY as string | undefined}
-                                options={overflowOptions}
-                                onChange={(v) => patch({ overflowY: v })}
-                            />
-                        ) : <span className="text-[11px] text-neutral-400">제한</span>}
                     </div>
                 </div>
             )}

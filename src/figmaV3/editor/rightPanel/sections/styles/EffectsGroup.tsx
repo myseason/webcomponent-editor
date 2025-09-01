@@ -93,7 +93,7 @@ export function EffectsGroup(props: {
                                     value={String((el as any).boxShadow ?? '')}
                                     onChange={(v) => patch({ boxShadow: v })}
                                     placeholder="x y blur spread color"
-                                    className="w-[280px]"
+                                    className="w-full"
                                 />
                             </>
                         ) : (
@@ -109,22 +109,20 @@ export function EffectsGroup(props: {
                         </div>
 
                         {allow.has('filter') ? (
-                            <>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    {[
-                                        { name: 'None', v: '' },
-                                        { name: 'Blur', v: 'blur(4px)' },
-                                        { name: 'Bright+', v: 'brightness(110%)' },
-                                        { name: 'Dark-', v: 'brightness(90%)' },
-                                        { name: 'Gray', v: 'grayscale(100%)' },
-                                        { name: 'Sepia', v: 'sepia(100%)' },
-                                    ].map((p) => (
-                                        <ChipBtn key={p.name} onClick={() => patch({ filter: p.v || undefined })} title={p.name}>
-                                            {p.name}
-                                        </ChipBtn>
-                                    ))}
-                                </div>
-                            </>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {[
+                                    { name: 'None', v: '' },
+                                    { name: 'Blur', v: 'blur(4px)' },
+                                    { name: 'Bright+', v: 'brightness(110%)' },
+                                    { name: 'Dark-', v: 'brightness(90%)' },
+                                    { name: 'Gray', v: 'grayscale(100%)' },
+                                    { name: 'Sepia', v: 'sepia(100%)' },
+                                ].map((p) => (
+                                    <ChipBtn key={p.name} onClick={() => patch({ filter: p.v || undefined })} title={p.name}>
+                                        {p.name}
+                                    </ChipBtn>
+                                ))}
+                            </div>
                         ) : (
                             <span className="text-xs text-neutral-500">제한됨</span>
                         )}
@@ -149,7 +147,7 @@ export function EffectsGroup(props: {
                                         const v = Math.max(0, Math.min(100, pct)) / 100;
                                         patch({ opacity: v });
                                     }}
-                                    className="w-[180px]"
+                                    className="flex-1"
                                 />
                                 <NumberInput
                                     value={Math.round((Number((el as any).opacity ?? 1) || 1) * 100)}
@@ -160,7 +158,7 @@ export function EffectsGroup(props: {
                                     step={1}
                                     min={0}
                                     max={100}
-                                    className="w-[72px]"
+                                    className="w-16"
                                 />
                                 <span className="text-xs text-neutral-500">%</span>
                             </div>

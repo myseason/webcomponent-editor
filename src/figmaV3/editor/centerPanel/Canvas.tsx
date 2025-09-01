@@ -1,10 +1,10 @@
 'use client';
 import React, { useMemo } from 'react';
-import type { NodeId, Node, DndDropTarget, CSSDict } from '../../core/types';
+import type { NodeId, Node, DndDropTarget, CSSDict, Fragment } from '../../core/types';
 import { VOID_TAGS } from '../../core/types';
 import { useEditor } from '../useEditor';
 import { getDefinition, getRenderer } from '../../core/registry';
-import type { EditorStoreState } from '../../store/editStore';
+import type { EditorStoreState } from '../../store/types';
 import { toReactStyle } from '../../runtime/styleUtils';
 import { useDroppable } from '@dnd-kit/core';
 
@@ -22,22 +22,19 @@ function getEffectiveStyle(state: EditorStoreState, id: NodeId): React.CSSProper
 type Renderer = (ctx: { node: Node; fire: (evt: any) => void }) => React.ReactElement<any>;
 
 function RenderNode({ id }: { id: NodeId }) {
-    // 훅 호출을 컴포넌트 최상단으로 이동하여 규칙 위반 오류 해결
     const state = useEditor();
     const node = state.project.nodes[id];
     const { setNodeRef } = useDroppable({ id, data: { current: { kind: 'canvas-node', nodeId: id, position: 'inside' } } });
+    const instanceStyle = useMemo(() => getEffectiveStyle(state, id), [state, id, state.project, state.ui.canvas]);
 
-    // 훅 호출이 모두 끝난 후에 조건부 조기 반환(early return) 실행
     if (!node || node.isVisible === false) return null;
 
-    // 기본 스타일과 인스턴스 스타일을 명확하게 병합하여 스타일 누락 문제 해결
     const def = getDefinition(node.componentId);
     const defaultStyle = toReactStyle(def?.defaults?.styles?.element?.base as CSSDict | undefined);
-    const instanceStyle = useMemo(() => getEffectiveStyle(state, id), [state, id, state.project, state.ui.canvas]);
 
     const selected = state.ui.selectedId === id;
     const selectionStyle: React.CSSProperties = selected
-        ? { outline: '2px solid #3b82f6', outlineOffset: 2, cursor: 'default' }
+        ? { outline: '2px solid var(--mdt-color-border-focus)', outlineOffset: 2, cursor: 'default' }
         : {};
 
     const renderer = getRenderer(node.componentId) as Renderer | undefined;
@@ -49,7 +46,7 @@ function RenderNode({ id }: { id: NodeId }) {
 
     const el = renderer({ node, fire });
     const elProps: any = el?.props ?? {};
-    const kids = (node.children ?? []).map((cid) => <RenderNode key={cid} id={cid} />);
+    const kids = (node.children ?? []).map((cid: NodeId) => <RenderNode key={cid} id={cid} />);
 
     const finalStyle: React.CSSProperties = {
         ...defaultStyle,
@@ -71,15 +68,13 @@ export function Canvas({ dropTarget }: { dropTarget: DndDropTarget | null }) {
     const state = useEditor();
     const { mode, editingFragmentId } = state.ui;
 
-    // ✨ [수정] 모드에 따라 렌더링할 루트 노드를 결정하는 로직 개선
     const rootId = useMemo(() => {
         if (mode === 'Page') {
             return state.project.rootId;
         }
         if (mode === 'Component' && editingFragmentId) {
-            return state.project.fragments.find(f => f.id === editingFragmentId)?.rootId ?? null;
+            return state.project.fragments.find((f: Fragment) => f.id === editingFragmentId)?.rootId ?? null;
         }
-        // 컴포넌트 모드이지만 편집 대상이 없으면 null 반환
         return null;
     }, [mode, editingFragmentId, state.project.rootId, state.project.fragments]);
 
@@ -88,7 +83,6 @@ export function Canvas({ dropTarget }: { dropTarget: DndDropTarget | null }) {
     const scaledW = Math.round(width * zoom);
     const scaledH = Math.round(height * zoom);
 
-    // ✨ [수정] 렌더링할 대상이 없을 경우 안내 메시지 표시
     if (!rootId || !state.project.nodes[rootId]) {
         const message = mode === 'Component'
             ? "Select a component to start editing."
@@ -100,12 +94,15 @@ export function Canvas({ dropTarget }: { dropTarget: DndDropTarget | null }) {
         );
     }
 
+    // ✅ [수정] overflow-y는 auto로, overflow-x는 hidden으로 설정하여 좌우 스크롤을 완전히 제거합니다.
     return (
-        <div style={{ position: 'relative', overflow: 'auto', height: '100%', paddingTop: 40, background: '#f7fafc' }}>
-            <div style={{ width: scaledW, height: scaledH, marginLeft: 'auto', marginRight: 'auto', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, width, height, transform: `scale(${zoom})`, transformOrigin: 'top left', background: 'white', border: '1px solid #e5e7eb', boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
-                    <RenderNode id={rootId} />
-                    {dropTarget && <div className="absolute top-0 left-0 w-full h-full bg-blue-500/20 border-2 border-dashed border-blue-600 pointer-events-none" />}
+        <div style={{ position: 'absolute', inset: 0, overflowY: 'auto', overflowX: 'hidden', background: '#f7fafc' }}>
+            <div style={{ paddingTop: 40, paddingBottom: 40, minHeight: '100%', display: 'flex', justifyContent: 'center' }}>
+                <div style={{ width: scaledW, height: scaledH, position: 'relative', flexShrink: 0 }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, width, height, transform: `scale(${zoom})`, transformOrigin: 'top left', background: 'white', border: '1px solid #e5e7eb', boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
+                        <RenderNode id={rootId} />
+                        {dropTarget && <div className="absolute top-0 left-0 w-full h-full bg-blue-500/20 border-2 border-dashed border-blue-600 pointer-events-none" />}
+                    </div>
                 </div>
             </div>
         </div>

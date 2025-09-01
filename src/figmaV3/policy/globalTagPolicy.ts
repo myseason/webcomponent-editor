@@ -4,7 +4,7 @@
 import type { TagPolicy } from '../core/types';
 
 export const GLOBAL_TAG_POLICIES: Record<string, TagPolicy> = {
-    // 기본 블록/인라인 — 넓게 허용하되 위험 키만 전역에서 걸러짐
+    // ✅ [수정] div 태그가 grid 관련 속성을 포함한 모든 레이아웃 스타일을 사용할 수 있도록 확장했습니다.
     div: {
         version: '1.1',
         tag: 'div',
@@ -14,12 +14,12 @@ export const GLOBAL_TAG_POLICIES: Record<string, TagPolicy> = {
             allow: ['*'],
             deny:  ['content'],
             groups: {
+                layout:     ['display','overflow','width','height','minWidth','minHeight','maxWidth','maxHeight','flexDirection','justifyContent','alignItems','gap','gridTemplateColumns','gridTemplateRows','gridAutoFlow','flexWrap','flexGrow','flexShrink','order'],
                 typography: ['fontSize','fontWeight','lineHeight','fontStyle','textAlign','letterSpacing','textTransform','color'],
-                spacing:    ['margin','padding','gap'],
-                layout:     ['display','flexDirection','justifyContent','alignItems','alignContent','flexWrap','flexGrow','flexShrink','order','width','height','minWidth','minHeight','maxWidth','maxHeight'],
-                position:   ['position','top','right','bottom','left','zIndex'],
-                border:     ['border','borderWidth','borderStyle','borderColor','borderRadius'],
-                background: ['background','backgroundColor','backgroundImage','backgroundSize','backgroundRepeat'],
+                spacing:    ['margin','padding','marginTop','marginRight','marginBottom','marginLeft','paddingTop','paddingRight','paddingBottom','paddingLeft','rowGap','columnGap'],
+                position:   ['position','top','right','bottom','left','zIndex','overflowX','overflowY'],
+                border:     ['border','borderWidth','borderStyle','borderColor','borderRadius','borderTopLeftRadius','borderTopRightRadius','borderBottomRightRadius','borderBottomLeftRadius'],
+                background: ['background','backgroundColor','backgroundImage','backgroundSize','backgroundRepeat','backgroundPosition'],
                 effects:    ['boxShadow','opacity','filter','backdropFilter','mixBlendMode'],
                 custom:     []
             }

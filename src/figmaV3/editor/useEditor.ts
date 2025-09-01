@@ -1,7 +1,8 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { editorStore, type EditorStoreState } from '../store/editStore';
+import { editorStore } from '../store/editStore';
+import type { EditorStoreState } from '../store/types';
 
 // 임시 사용자 정보 (향후 실제 인증 시스템으로 대체)
 const MOCK_USER = {

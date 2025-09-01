@@ -53,29 +53,19 @@ export function SpacingGroup(props: {
     };
 
     const applyMargin = (v: string) => {
-        if (linkMargin) {
-            patch({ margin: coerceLen(v) });
-        } else {
-            patch({
-                marginTop: coerceLen(v),
-                marginRight: coerceLen(v),
-                marginBottom: coerceLen(v),
-                marginLeft: coerceLen(v),
-            });
-        }
+        const value = coerceLen(v);
+        const patchCss: CSSDict = linkMargin
+            ? { margin: value, marginTop: undefined, marginRight: undefined, marginBottom: undefined, marginLeft: undefined }
+            : { margin: undefined, marginTop: value, marginRight: value, marginBottom: value, marginLeft: value };
+        patch(patchCss);
     };
 
     const applyPadding = (v: string) => {
-        if (linkPadding) {
-            patch({ padding: coerceLen(v) });
-        } else {
-            patch({
-                paddingTop: coerceLen(v),
-                paddingRight: coerceLen(v),
-                paddingBottom: coerceLen(v),
-                paddingLeft: coerceLen(v),
-            });
-        }
+        const value = coerceLen(v);
+        const patchCss: CSSDict = linkPadding
+            ? { padding: value, paddingTop: undefined, paddingRight: undefined, paddingBottom: undefined, paddingLeft: undefined }
+            : { padding: undefined, paddingTop: value, paddingRight: value, paddingBottom: value, paddingLeft: value };
+        patch(patchCss);
     };
 
     const presets = ['0', '4', '8', '12', '16', '24'];
@@ -93,7 +83,7 @@ export function SpacingGroup(props: {
                 <div className="mt-1 space-y-3">
 
                     <div className="space-y-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <Label>margin</Label>
                             {renderLock('margin')}
                             <IconBtn
@@ -109,14 +99,14 @@ export function SpacingGroup(props: {
                                 <MiniInput
                                     value={(el as any).margin ?? ''}
                                     onChange={applyMargin}
-                                    placeholder={linkMargin ? 'e.g. 8 | 1rem' : 'all sides'}
-                                    className="w-40"
+                                    placeholder={linkMargin ? 'e.g. 8px' : 'all sides'}
+                                    className="w-24"
                                 />
                             ) : (
                                 <span className="text-[11px] text-neutral-400">제한됨</span>
                             )}
 
-                            <div className="ml-2 flex gap-1">
+                            <div className="flex gap-1 flex-wrap">
                                 {presets.map((p) => (
                                     <ChipBtn
                                         key={`m-${p}`}
@@ -130,7 +120,7 @@ export function SpacingGroup(props: {
                         </div>
 
                         {!linkMargin && (
-                            <div className="pl-24 space-y-1">
+                            <div className="pl-8 grid grid-cols-2 gap-x-2 gap-y-1">
                                 {([
                                     ['marginTop', 'Top'],
                                     ['marginRight', 'Right'],
@@ -145,7 +135,7 @@ export function SpacingGroup(props: {
                                             <MiniInput
                                                 value={(el as any)[k]}
                                                 onChange={(v) => patch({ [k]: coerceLen(v) })}
-                                                placeholder={k}
+                                                placeholder="auto"
                                             />
                                         ) : (
                                             <span className="text-[11px] text-neutral-400">제한</span>
@@ -157,7 +147,7 @@ export function SpacingGroup(props: {
                     </div>
 
                     <div className="space-y-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <Label>padding</Label>
                             {renderLock('padding')}
                             <IconBtn
@@ -173,14 +163,14 @@ export function SpacingGroup(props: {
                                 <MiniInput
                                     value={(el as any).padding ?? ''}
                                     onChange={applyPadding}
-                                    placeholder={linkPadding ? 'e.g. 8 | 1rem' : 'all sides'}
-                                    className="w-40"
+                                    placeholder={linkPadding ? 'e.g. 8px' : 'all sides'}
+                                    className="w-24"
                                 />
                             ) : (
                                 <span className="text-[11px] text-neutral-400">제한됨</span>
                             )}
 
-                            <div className="ml-2 flex gap-1">
+                            <div className="flex gap-1 flex-wrap">
                                 {presets.map((p) => (
                                     <ChipBtn
                                         key={`p-${p}`}
@@ -194,7 +184,7 @@ export function SpacingGroup(props: {
                         </div>
 
                         {!linkPadding && (
-                            <div className="pl-24 space-y-1">
+                            <div className="pl-8 grid grid-cols-2 gap-x-2 gap-y-1">
                                 {([
                                     ['paddingTop', 'Top'],
                                     ['paddingRight', 'Right'],
@@ -209,7 +199,7 @@ export function SpacingGroup(props: {
                                             <MiniInput
                                                 value={(el as any)[k]}
                                                 onChange={(v) => patch({ [k]: coerceLen(v) })}
-                                                placeholder={k}
+                                                placeholder="auto"
                                             />
                                         ) : (
                                             <span className="text-[11px] text-neutral-400">제한</span>

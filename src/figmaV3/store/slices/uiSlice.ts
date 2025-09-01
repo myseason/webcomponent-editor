@@ -1,45 +1,38 @@
 import { StateCreator } from 'zustand';
-import { EditorStoreState } from '../types';
-import { NodeId, EditorMode, Viewport, ViewportMode, ProjectHubTab } from '../../core/types';
-
-export interface UiSlice {
-    select: (id: NodeId | null) => void;
-    setEditorMode: (mode: EditorMode) => void;
-    setCanvasSize: (size: { width: number, height: number }) => void;
-    setCanvasZoom: (zoom: number) => void;
-    toggleCanvasOrientation: () => void;
-    toggleBottomDock: () => void;
-    setActiveViewport: (viewport: Viewport) => void;
-    setBaseViewport: (viewport: Viewport) => void;
-    setViewportMode: (viewport: Viewport, mode: ViewportMode) => void;
-    setActiveHubTab: (tab: ProjectHubTab) => void;
-    openComponentEditor: (fragmentId: string) => void;
-    closeComponentEditor: () => void;
-    setNotification: (message: string) => void;
-    toggleLeftPanelSplit: () => void;
-    setLeftPanelSplitPercentage: (percentage: number) => void;
-}
+import { EditorStoreState, UiSlice } from '../types';
+import { EditorMode, NodeId, ProjectHubTab, Viewport, ViewportMode } from '../../core/types';
 
 export const createUiSlice: StateCreator<EditorStoreState, [], [], UiSlice> = (set, get, _api) => ({
     select: (id) => get().update(s => { s.ui.selectedId = id; }),
+
     setEditorMode: (mode) => get().update(s => {
         if (s.ui.mode === mode) return;
+
+        // --- 이전 모드 상태 저장 ---
         if (s.ui.mode === 'Page') {
             const currentPage = s.project.pages.find(p => p.rootId === s.project.rootId);
             s.ui.panels.left.lastActivePageId = currentPage?.id ?? s.project.pages[0]?.id ?? null;
         } else {
             s.ui.panels.left.lastActiveFragmentId = s.ui.editingFragmentId;
         }
+
         s.ui.mode = mode;
+
+        // --- 새 모드 진입 로직 ---
         if (mode === 'Page') {
+            // ✅ [수정] Page 모드 진입 시 Pages 탭을 활성화합니다.
+            s.ui.panels.left.activeHubTab = 'Pages';
             s.ui.editingFragmentId = null;
             const targetPage = s.project.pages.find(p => p.id === s.ui.panels.left.lastActivePageId) ?? s.project.pages[0];
             if (targetPage) {
                 s.project.rootId = targetPage.rootId;
                 s.ui.selectedId = targetPage.rootId;
             }
-        } else {
+        } else { // Component 모드
+            // ✅ [수정] Component 모드 진입 시 Components 탭을 활성화합니다.
+            s.ui.panels.left.activeHubTab = 'Components';
             let targetFragment = s.project.fragments.find(f => f.id === s.ui.panels.left.lastActiveFragmentId) ?? s.project.fragments[0];
+
             if (!targetFragment) {
                 const newId = get().addFragment('New Component');
                 const newFrag = get().project.fragments.find(f => f.id === newId);
@@ -53,6 +46,7 @@ export const createUiSlice: StateCreator<EditorStoreState, [], [], UiSlice> = (s
             }
         }
     }),
+
     setCanvasSize: (size) => get().update(s => { s.ui.canvas.width = size.width; s.ui.canvas.height = size.height; }),
     setCanvasZoom: (z) => get().update(s => { s.ui.canvas.zoom = z; }),
     toggleCanvasOrientation: () => get().update(s => {
@@ -76,6 +70,8 @@ export const createUiSlice: StateCreator<EditorStoreState, [], [], UiSlice> = (s
                 s.ui.panels.left.lastActivePageId = currentPage?.id ?? null;
             }
             s.ui.mode = 'Component';
+            // ✅ [수정] 컴포넌트 편집기 진입 시 Components 탭을 활성화합니다.
+            s.ui.panels.left.activeHubTab = 'Components';
             s.ui.editingFragmentId = fragmentId;
             s.ui.panels.left.lastActiveFragmentId = fragmentId;
             s.ui.selectedId = frag.rootId;

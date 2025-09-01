@@ -12,7 +12,6 @@ export const BoxDef: ComponentDefinition = {
     defaults: {
         props: {},
         styles: {
-            // ✅ [수정] 기본 스타일을 'base' 뷰포트 객체로 감쌌습니다.
             element: {
                 base: {
                     display: 'flex',
@@ -24,6 +23,12 @@ export const BoxDef: ComponentDefinition = {
         },
     },
     propsSchema: [],
+    // ✅ [수정] capabilities 속성을 추가하여 컨테이너임을 명시합니다.
+    capabilities: {
+        canHaveChildren: true,
+        defaultTag: 'div',
+        allowedTags: ['div', 'section', 'article', 'nav', 'header', 'footer', 'form'],
+    },
 };
 
 function toReactDomAttrs(raw?: Record<string, unknown>): Record<string, unknown> {
