@@ -1,0 +1,225 @@
+
+Actionable Web Editor — Inspector 고도화 기획서 (v5.3, 2025-08-31 10:13)
+================================================================
+
+본 문서는 v3 UI를 유지하면서 내부에 V4 StyleGraph/Policy 기반을 도입하는 목표로 작성되었습니다.
+특히 **Inspector 고도화**(모드별 정책 UI, Visible 권한, 데이터/액션 연계)와 **스타일 프리셋/아이콘**,
+**Actionable 컴포넌트 액션 구성**, **SVG/프로젝트 CSS 통합**까지 포함합니다.
+
+I. 목표
+-------
+1) **컴포넌트 개발 모드**: TagPolicy/StylePolicy를 기반으로 허용 항목만 노출, 항목별 Visible 제어 및 기본값 설정.
+2) **페이지 빌드 모드**: 제작자가 허용한 항목만 기본 노출(Builder 친화 UI); 전문가 모드에서 정책 우회 및 사용자 컴포넌트 저장.
+3) **스타일 경험 강화**: 자주 쓰는 스타일은 **아이콘/프리셋**으로 빠르게 적용, 필요 시 세부값을 수동 설정.
+4) **Actionable 컴포넌트**: 이벤트→액션 시퀀스 구성(Inspector 진입점 + Bottom Dock 연동).
+5) **에셋/테마 확장**: SVG 인라인/링크 편집, 프로젝트 전역 CSS 사용(adoptedStyleSheets)과 StyleGraph 병행.
+
+II. 핵심 개념
+-------------
+A. 정책 모델
+- **TagPolicy**: 태그별 허용 **속성** 목록. 예) `img` → `src, alt, decoding, loading`.
+- **StylePolicy**: 태그별 허용/제한 **스타일** 목록. 예) `span` → 레이아웃 관련(width/height/flex*) 제한.
+- **ComponentPolicy**: 제작자가 항목 **Visible/Invisible** 및 기본값 지정.
+- **Visibility**: `'Visible' | 'Invisible'` (Builder 기본 UI에서 보임/숨김; Expert에선 모두 보임).
+
+B. 모드별 Inspector
+- **컴포넌트 개발 모드**: 정책으로 필터된 Props/Styles + 항목별 Visible 토글 + 기본값 저장. 저장 시 **공개**가 기본.
+- **페이지 빌드 모드**: 기본은 Visible 항목만. **Expert** 전환 시 정책 우회 편집 및 **사용자 컴포넌트로 저장(공개/비공개)**.
+- 두 모드 모두 각 필드 옆에 **데이터 바인딩(</>)**, **이벤트(⚡)** 진입점 제공.
+
+C. StyleGraph(V4) + v3 UI
+- PageBar의 Base/Unified/Independent 규칙을 따르되, Inspector는 항상 **효과 스타일**을 표시.
+- 편집 시 {{base-only 또는 base+viewport}} 규칙을 반영해 해당 룰을 수정.
+
+III. 스타일 프리셋 & 아이콘
+---------------------------
+A. UX 원칙
+- 상단에 **Quick Presets(아이콘 버튼)**, 하단에 **세부값**(수치/컬러/셀렉트) 편집.
+- 프리셋 적용 시 StyleGraph에 **일괄 패치**; 세부값 변경은 프리셋과 독립적으로 반영.
+
+B. 예시 (초안)
+- **Typography**: Text Size(S, M, L, XL), Weight(Regular/Bold), Leading, Letter Spacing → 아이콘/토글 + 상세 수치.
+- **Spacing**: Stack Gap(0/4/8/12/16), Padding/ Margin 프리셋(Compact/Comfortable) + 4변 개별 입력.
+- **Border**: Radius(0/4/8/12/9999), Width(0/1/2), Style(solid/dashed), Quick Palette(brand/neutral).
+- **Effects**: Shadow(Level 1~4), Opacity, Blur.
+- **Background**: Theme 색상칩(brand/primary/secondary) + ColorPicker/Gradient Editor.
+- **Layout**: Flex row/col, justify, align, wrap, gap 프리셋.
+
+C. 확장
+- 프로젝트 **Theme Token**(semantic color, spacing scale, radius scale)과 연결.
+- 프리셋은 `PresetId → CSS patch` 맵으로 저장; 사용자 정의 프리셋 저장/삭제 지원.
+
+IV. Actionable 컴포넌트(이벤트/액션)
+------------------------------------
+A. 개요
+- 모든 컴포넌트는 **이벤트(예: onClick, onChange, onLoad)** 에 **액션 시퀀스**를 연결 가능.
+- 액션은 `Navigate, OpenFragment, CloseFragment, SetData, Eval, CallAPI, ShowToast` 등 구성.
+
+B. Inspector 연계
+- 각 필드 옆 **⚡ 버튼**으로 현재 노드의 이벤트 매핑 팝오버 진입 → 간단 편집.
+- 상세 구성은 Bottom Dock의 **Actions** 탭에서 시퀀싱/조건/지연 등 고급 옵션 편집.
+
+C. 타입 초안
+```ts
+type EventName = 'onClick' | 'onChange' | 'onLoad' | 'onSubmit' | 'onHover' | 'onFocus' | 'onBlur';
+type ActionType = 'Navigate' | 'OpenFragment' | 'CloseFragment' | 'SetData' | 'Eval' | 'CallAPI' | 'ShowToast';
+
+interface ActionStep {
+  id: string;
+  type: ActionType;
+  params: Record<string, unknown>;
+}
+interface EventBinding {
+  event: EventName;
+  steps: ActionStep[];
+}
+```
+
+V. SVG & 프로젝트 CSS
+----------------------
+A. SVG
+- **Inline SVG**(XML 편집 + 속성/색상 바인딩), **Linked SVG**(URL/Assets 참조) 지원.
+- Path Fill/Stroke 컬러를 **Theme Token** 또는 **바인딩**에 연결 가능.
+- React 렌더 시 `dangerouslySetInnerHTML` 대신 **SVGO**로 sanitize 후 마운트(보안/성능).
+
+B. 프로젝트 CSS 통합
+- 프로젝트 전역 CSS를 **adoptedStyleSheets** 로 캔버스 ShadowRoot에 주입.
+- Inspector의 스타일 편집은 StyleGraph 룰; 전역 CSS는 **기본 베이스**로 공존.
+- 충돌 시 **우선순위**: (1) 인라인 StyleGraph 룰 > (2) 프로젝트 CSS 규칙. 필요 시 `!important` 제어.
+
+VI. 타입/스토어 변경(초안)
+--------------------------
+A. types.ts
+```ts
+type TagName = 'div' | 'span' | 'button' | 'img' | 'a' | 'svg' | 'input' | 'textarea' | 'label' | 'ul' | 'li';
+type Visibility = 'Visible' | 'Invisible';
+type ViewportMode = 'Unified' | 'Independent';
+type Viewport = 'desktop' | 'tablet' | 'mobile';
+
+interface TagPolicy { allowProps: string[]; denyProps?: string[]; }
+interface StylePolicy { allow: string[]; deny?: string[]; }
+interface PolicyMap { [tag in TagName]?: { props: TagPolicy; styles: StylePolicy; }; }
+
+interface ComponentPolicy {
+  props: Record<string, Visibility>;
+  styles: Record<string, Visibility>;
+}
+
+interface Preset { id: string; label: string; css: Record<string, string | number>; group: 'typo'|'spacing'|'border'|'effects'|'background'|'layout'; }
+```
+
+B. store/editStore.ts (추가 액션/셀렉터)
+```ts
+// UI
+toggleInspectorExpert(): void;
+setComponentPolicy(id: string, patch: Partial<ComponentPolicy>): void;
+applyPreset(nodeId: string, presetId: string): void; // preset → CSS patch → StyleGraph 적용
+
+// Policies
+getEffectivePolicy(tag: TagName, componentId?: string): { props: Set<string>; styles: Set<string>; visibleProps: Set<string>; visibleStyles: Set<string>; };
+
+// Styles
+getEffectiveStyles(nodeId: string, vp: Viewport): Record<string, any>;
+patchStyles(nodeId: string, css: Record<string, any>, scope: 'base' | Viewport): void;
+
+// Events/Actions
+bindEvent(nodeId: string, binding: EventBinding): void;
+getEventBindings(nodeId: string): EventBinding[];
+
+// SVG
+setSvgSource(nodeId: string, xml: string): void;
+setSvgFill(nodeId: string, tokenOrValue: string): void;
+setSvgStroke(nodeId: string, tokenOrValue: string): void;
+
+// Project CSS
+setProjectStylesheets(urls: string[]): void;    // adoptedStyleSheets 관리
+```
+
+VII. Inspector UI 구성(초안)
+----------------------------
+A. 공통 헤더
+- [노드명/태그] [Expert 토글] [저장] (페이지 모드에서 사용자 컴포넌트 저장 시 표시)
+- [도움말] [에러/제한 사유 표시]
+
+B. 섹션
+1) **Common Section**: 태그 선택, 이름/설명, 접근성(aria-*), role.
+2) **Props Section**: 정책 허용 + Visible 필터 → 리스트; 각 항목 옆 [</>] [⚡] [🔒].
+3) **Styles Section**: 상단 **Quick Presets(아이콘)** + 하단 상세 입력(그룹별).
+4) **Data Section**: 노드 스코프 데이터 상태/포맷 미리보기(선택).
+5) **Events Section**: 바인딩 요약(이벤트별 Step 수), 편집 버튼(⚡) → Bottom Dock 이동 안내.
+
+C. 프리셋 UI 예
+- 타이포: A- / A / A+ / A++ 아이콘으로 size 단계 적용.
+- 스페이싱: Stack gap 칩들(0/4/8/12/16).
+- 보더: 둥근 정도 칩(□, ◧, ◯).
+- 배경: 토큰 칩(brand/primary/neutral) + 컬러피커 버튼.
+
+VIII. 개발 계획
+---------------
+Phase 1) 타입/스토어 토대 (D+2)
+- types.ts: Policy/ComponentPolicy/Preset 정의, SVG/Project CSS 타입 추가.
+- editStore: inspector.expert, policies, componentPolicies, presets, 이벤트/액션 바인딩, projectStylesheets 상태 & 액션.
+- StyleGraph: preset → CSS patch 적용 유틸.
+
+Phase 2) Inspector UI (D+4)
+- 공통 헤더/행 컴포넌트 제작(라벨, 입력, Visible 🔒, </>, ⚡ 포함).
+- PropsAutoSection/StylesSection 정책/Visible 반영, 프리셋 바 적용.
+- SVG 에디트 UI(인라인/링크, 색상 토큰 연결 기본).
+
+Phase 3) Bottom Dock 연계 (D+5)
+- Actions/Data 탭과 Inspector 팝오버 연동, 선택 노드 컨텍스트 공유.
+- 액션 시퀀스 템플릿(Toast/Navigate/SetData).
+
+Phase 4) Project CSS 주입 (D+6)
+- adoptedStyleSheets 주입/해제, 우선순위 테스트(StyleGraph > Project CSS).
+- 대규모 스타일 변경 시 부분 재컴파일.
+
+Phase 5) 저장/마이그레이션/QA (D+8)
+- 사용자 컴포넌트 저장(공개/비공개) 모달 & persistence.
+- 정책 테이블 확정(W3C/WHATWG/React DOM 검수).
+- E2E 시나리오: 프리셋→세부값 변경→데이터 바인딩→액션→저장.
+
+IX. 마이그레이션 가이드
+-----------------------
+- v3 프로젝트 로드 시 기존 노출 필드는 `Visible`로 초기화.
+- 기존 SchemaEditor 필수 기능은 Inspector Props로 흡수, 중복 UI는 단계적으로 제거.
+
+X. 품질/성능
+------------
+- 메모이즈 셀렉터로 Inspector 재렌더 최소화.
+- StyleGraph diff + partial CSSOM 업데이트.
+- SVG Sanitization(SVGO) 파이프 도입.
+- 액션/바인딩 Validation(누락 파라미터, 순환 참조) 경고.
+
+(끝)
+
+
+
+
+
+개발 모드에 따른 Inspector 
+1 컴포넌트 개발 모드 
+      - TagPolicy, StylePolicy에 따라 속성과 스타일을 편집할 수 있는 패널들이 보여집니다.
+      - 현재 CommonSection, PropsAutoSection, StyleSection 및 style/*Group.tsx 참고
+      - 예를 들어 
+            - 컴포넌트가 버튼이고 Tag가 button인데 설정할 수 없는 속성이나 스타일은 보여주지 않습니니다.
+            - 컴포넌트가 이미지이고 Tag가 img 인데 설정할 수 없는 속성이나 스타일은 보여주지 않습니다.
+      - (*) Tag에 따른 설정 가능/불가능 속성과 스타일에 대한 조사가 필요 합니다.
+      - 속성이나 스타일 설정창 옆에 컴포넌트를 등록하고 사용할 때 사용자들에게 설정 가능 여부를 설정할 수 있는 visible(기본) / inVisible 
+            - 기존 SchemaEditor는 이 기능과 동일한 역할을 하려고 했었습니다. 필요 없을 시 삭제 가능
+      - 컴포넌트를 저장할 때는 무조건 공개 상태 
+      - 컴포넌트의 이름, 설명등을 설정할 수 있어야 함
+      - data binding, event handler 설정할 수 있는 interface도 제공되어야 함 
+            
+2 Page 개발 모드 
+      - 에디터 및 사용자가 생성한 컴포넌트가 Component Panel에 노출됨 
+      - Page 개발 모드에서 컴포넌트를 추가 했을 때 Inspector 창에는 컴포넌트 작성 시 TagPolicy, StylePolicy 와 visible로 설정된 속성과 스타일만 노출 및 편집 가능 
+      - 만약 Inspector을 "고급 사용(전문가)"으로 변경 했을 때는 TagPolicy, StylePolicy에 의한 편집창 구성
+      - "고급 사용" 상태에서 속성이나 스타일을 변경한 후 컴포넌트를 저장할 수 있는 기능을 제공하며 저장 했을 때는 사용자의 컴포넌트로 신규 등록됨
+      - 컴포넌트를 저장할 때는 공개/비공개 설정이 가능해야 하며.. 공개는 모든 사용자에게 노출, 비공개는 자신만 사용 가능 해야 함  
+      - 컴포넌트의 이름, 설명등을 설정할 수 있어야 함
+      - data binding, event handler 설정할 수 있는 interface도 제공되어야 함 
+
+스타일 설정에는 최대한 자주 사용하는 옵션에 대해 icon이나 preset으로 제공해야 하고 preset외 추가 설정할 수 있는 방법도 제공 되어햐 합니다. 
+또한 우리의 목표인 Actionable Web Component 작성을 위한 컴포넌트 자체의 액션등을 설정할 수 있는 방법도 제공 해야 합니다.
+SVG을 추가 하거나 설정할 수 있어야 하고  프로젝트의 css을 사용 할 수도 있어야 합니다.      
