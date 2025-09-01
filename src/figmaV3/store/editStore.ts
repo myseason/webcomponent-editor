@@ -236,7 +236,9 @@ type EditorActions = {
     toggleLeftPanelSplit: () => void;
     setLeftPanelSplitPercentage: (percentage: number) => void;
     updateComponentPolicy: (componentId: string, patch: Partial<ComponentPolicy>) => void;
-    saveNodeAsComponent: (nodeId: NodeId, name: string, description: string, isPublic: boolean) => void; // ✨ [추가]
+    saveNodeAsComponent: (nodeId: NodeId, name: string, description: string, isPublic: boolean) => void;
+    publishComponent: () => void;
+    insertComponent: (fragmentId: string, parentId?: NodeId) => void;
     hydrateDefaults: () => void;
 };
 
@@ -411,7 +413,7 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
 
     addPage: (name) => {
         const pageId = genId('page');
-        const rootId = genId('node_root');
+        const rootId = genId('node');
         get().update(s => {
             s.project.nodes[rootId] = buildNodeWithDefaults('box', rootId);
             s.project.pages = [...s.project.pages, { id: pageId, name: name ?? `Page ${s.project.pages.length + 1}`, rootId }];
@@ -461,11 +463,11 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
     }, false),
 
     addFragment: (name) => {
-        const newId = genId('fragment');
-        const rootId = genId('frag_root');
+        const newId = genId('comp');
+        const rootId = genId('node');
         get().update(s => {
             s.project.nodes[rootId] = buildNodeWithDefaults('box', rootId);
-            const newFragment = { id: newId, name: name ?? `Fragment ${s.project.fragments.length + 1}`, rootId };
+            const newFragment = { id: newId, name: name ?? `Component ${s.project.fragments.length + 1}`, rootId, isPublic: false };
             s.project.fragments = [...s.project.fragments, newFragment];
 
             if (s.ui.mode === 'Page') {
@@ -485,20 +487,15 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         const frag = s.project.fragments.find(f => f.id === fragmentId);
         if (!frag) return;
         const toDel = collectSubtreeIds(s.project.nodes, frag.rootId);
-        const next = { ...s.project.nodes };
-        toDel.forEach(id => delete next[id]);
-        s.project.nodes = next;
+        const nextNodes = { ...s.project.nodes };
+        toDel.forEach(id => delete nextNodes[id]);
+        s.project.nodes = nextNodes;
         s.project.fragments = s.project.fragments.filter(f => f.id !== fragmentId);
 
         if (s.ui.editingFragmentId === fragmentId) {
             const nextFragment = s.project.fragments[0];
-            if (nextFragment) {
-                s.ui.editingFragmentId = nextFragment.id;
-                s.ui.selectedId = nextFragment.rootId;
-            } else {
-                s.ui.editingFragmentId = null;
-                s.ui.selectedId = null;
-            }
+            s.ui.editingFragmentId = nextFragment?.id ?? null;
+            s.ui.selectedId = nextFragment?.rootId ?? null;
         }
     }, true),
 
@@ -535,13 +532,10 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
             }
 
             if (!targetFragment) {
-                const newId = genId('fragment');
-                const rootId = genId('frag_root');
-                s.project.nodes[rootId] = buildNodeWithDefaults('box', rootId);
-                const newFragment = { id: newId, name: `New Component`, rootId };
-                s.project.fragments.push(newFragment);
-                s.ui.editingFragmentId = newId;
-                s.ui.selectedId = rootId;
+                const newId = get().addFragment('New Component');
+                const newFrag = get().project.fragments.find(f => f.id === newId);
+                s.ui.editingFragmentId = newFrag!.id;
+                s.ui.selectedId = newFrag!.rootId;
             } else {
                 s.ui.editingFragmentId = targetFragment.id;
                 s.ui.selectedId = targetFragment.rootId;
@@ -568,37 +562,46 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         get().setEditorMode('Page');
     },
 
-    // ✨ [추가] 노드를 새 컴포넌트로 저장하는 액션
+    // ✨ [수정] saveNodeAsComponent 로직: Fragment 생성
     saveNodeAsComponent: (nodeId, name, description, isPublic) => get().update(s => {
-        const originalNode = s.project.nodes[nodeId];
-        if (!originalNode) return;
-
         const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, nodeId);
-
-        const newFragmentId = genId('fragment');
         const newFragment: Fragment = {
-            id: newFragmentId,
+            id: genId('comp'),
             name,
             description,
             rootId: newRootId,
+            isPublic,
         };
-
         s.project.nodes = { ...s.project.nodes, ...clonedNodes };
         s.project.fragments.push(newFragment);
+    }, true),
 
-        // 새 컴포넌트에 대한 기본 정책 생성 (공개/비공개 여부 저장)
-        const newPolicy: Partial<ComponentPolicy> = {
-            savePolicy: {
-                allowPublic: isPublic,
-                allowPrivate: !isPublic,
-            }
-        };
-        if (!s.project.policies) s.project.policies = {};
-        if (!s.project.policies.components) s.project.policies.components = {};
-        s.project.policies.components[name] = deepMerge(
-            s.project.policies.components[name] ?? { version: '1.1', component: name, tag: getDefinition(originalNode.componentId)?.capabilities?.defaultTag ?? 'div'},
-            newPolicy
+    // ✨ [수정] publishComponent 로직: isPublic 플래그 설정
+    publishComponent: () => get().update(s => {
+        const fragId = s.ui.editingFragmentId;
+        if (!fragId) return;
+
+        const fragments = s.project.fragments.map(f =>
+            f.id === fragId ? { ...f, isPublic: true } : f
         );
+        s.project.fragments = fragments;
+    }, true),
+
+    // ✨ [추가] insertComponent 액션 구현
+    insertComponent: (fragmentId, parentId) => get().update(s => {
+        const fragment = s.project.fragments.find(f => f.id === fragmentId);
+        if (!fragment) return;
+
+        const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, fragment.rootId);
+        s.project.nodes = { ...s.project.nodes, ...clonedNodes };
+
+        const targetParentId = parentId ?? s.ui.selectedId ?? s.project.rootId;
+        const parentNode = s.project.nodes[targetParentId];
+        if (parentNode) {
+            if (!parentNode.children) parentNode.children = [];
+            parentNode.children.push(newRootId);
+            s.ui.selectedId = newRootId;
+        }
     }, true),
 
     // ... (나머지 액션들은 변경 없음)

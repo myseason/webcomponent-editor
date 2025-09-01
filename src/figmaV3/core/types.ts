@@ -43,6 +43,7 @@ export interface Fragment {
     name: string;
     description?: string;
     rootId: NodeId;
+    isPublic?: boolean; // ✨ [추가] 공개/비공개 여부 플래그
 }
 
 /** 외부/인라인 스타일시트(프로젝트 수준) */
@@ -313,7 +314,7 @@ export interface EditorUI {
             activeHubTab: ProjectHubTab;
             widthPx: number;
             lastActivePageId: string | null;
-            lastActiveFragmentId: string | null; // ✨ [추가] 마지막 활성 컴포넌트 ID
+            lastActiveFragmentId: string | null;
             isSplit: boolean;
             splitPercentage: number;
         };
@@ -340,7 +341,6 @@ export interface EditorState {
 /* =============================================================================
    6. Utility & Meta Types
 ============================================================================= */
-// ... (기존 타입들은 변경 없음)
 export interface PropVisibilityOverride {
     whenExpr?: string;
 }

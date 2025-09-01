@@ -30,6 +30,12 @@ export const ImageDef: ComponentDefinition = {
         { key: 'src', type: 'text', label: 'Src', placeholder: 'https://...' },
         { key: 'alt', type: 'text', label: 'Alt', placeholder: 'Image description' },
     ],
+    capabilities: {
+        // ✨ [수정] 이미지는 자식 노드를 가질 수 없도록 명시적으로 설정합니다.
+        canHaveChildren: false,
+        defaultTag: 'img',
+        allowedTags: ['img', 'div'],
+    },
 };
 
 function toReactDomAttrs(raw?: Record<string, unknown>): Record<string, unknown> {

@@ -71,6 +71,13 @@ export function SaveAsComponentDialog({ nodeId, onClose }: SaveAsComponentDialog
                         </button>
                     </div>
                 </div>
+                {/* ✨ [추가] 공개/비공개 선택에 따른 안내 메시지 */}
+                <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded-md">
+                    {isPublic
+                        ? "This component will be saved to the shared Library and will be available in all your projects."
+                        : "This component will be saved to Project Components and will only be available in this project."
+                    }
+                </div>
                 <div className="flex justify-end gap-2 pt-4">
                     <button
                         onClick={onClose}

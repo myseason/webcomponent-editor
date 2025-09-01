@@ -8,7 +8,7 @@ import { CommonSection } from './sections/CommonSection';
 import { PropsAutoSection } from './sections/PropsAutoSection';
 import { StylesSection } from './sections/StylesSection';
 import { SchemaEditor } from './sections/SchemaEditor';
-import { SaveAsComponentDialog } from './sections/SaveAsComponentDialog'; // ✨ [추가]
+import { SaveAsComponentDialog } from './sections/SaveAsComponentDialog';
 
 const InlineDivider: React.FC<{ label: string; className?: string }> = ({ label, className }) => (
     <div className={`flex items-center gap-2 select-none ${className ?? ''}`}>
@@ -55,10 +55,15 @@ function ComponentPolicyEditor({ fragmentId }: { fragmentId: string }) {
     return (
         <div>
             <div className="p-3">
-                <h3 className="text-sm font-semibold">Component Policy Editor</h3>
-                <p className="text-xs text-gray-500">
-                    Defining policies for: <strong>{def?.title ?? rootNode.componentId}</strong>
-                </p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-sm font-semibold">Component Policy Editor</h3>
+                        <p className="text-xs text-gray-500">
+                            Defining policies for: <strong>{def?.title ?? rootNode.componentId}</strong>
+                        </p>
+                    </div>
+                    {/* ✨ [제거] 발행 버튼을 ComponentsPanel로 이동 */}
+                </div>
             </div>
 
             <CommonSection nodeId={rootNode.id} defId={rootNode.componentId} />
@@ -91,7 +96,6 @@ export function Inspector() {
     const { mode, selectedId, editingFragmentId, expertMode } = ui;
     const { rootId, fragments, nodes } = project;
 
-    // ✨ [추가] 저장 다이얼로그 상태
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
 
     const targetNodeId = mode === 'Page'
@@ -169,7 +173,6 @@ export function Inspector() {
                 )}
             </div>
 
-            {/* ✨ [추가] 저장 다이얼로그 렌더링 */}
             {isSaveDialogOpen && (
                 <SaveAsComponentDialog
                     nodeId={node.id}

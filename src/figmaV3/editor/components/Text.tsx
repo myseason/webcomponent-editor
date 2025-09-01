@@ -24,6 +24,12 @@ export const TextDef: ComponentDefinition = {
         }
     },
     propsSchema: [{ key: 'content', type: 'text', label: 'Text', placeholder: 'Enter content' }],
+    capabilities: {
+        // ✨ [수정] 텍스트는 자식 노드를 가질 수 없도록 명시적으로 설정합니다.
+        canHaveChildren: false,
+        defaultTag: 'p',
+        allowedTags: ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'label'],
+    },
 };
 
 function toReactDomAttrs(raw?: Record<string, unknown>): Record<string, unknown> {

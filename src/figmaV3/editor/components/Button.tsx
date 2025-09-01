@@ -43,6 +43,12 @@ export const ButtonDef: ComponentDefinition = {
         { key: 'content', type: 'text', label: 'Text', placeholder: 'Button', default: 'Button' },
         { key: 'href', type: 'text', label: 'Href', placeholder: 'https://', when: { as: 'a' } },
     ],
+    capabilities: {
+        // ✨ [수정] 버튼은 자식 노드를 가질 수 없도록 명시적으로 설정합니다.
+        canHaveChildren: false,
+        defaultTag: 'button',
+        allowedTags: ['button', 'a', 'div'],
+    },
 };
 
 function toReactDomAttrs(raw?: Record<string, unknown>): Record<string, unknown> {
