@@ -1,0 +1,171 @@
+액셔너블 웹 컴포넌트 에디터 — 정책 사양서 (v1.1, 2025-09-01)
+==============================================================
+
+개요
+----
+이 문서는 Inspector(우측 속성 패널), 런타임, Export(정적 HTML/CSS/JS) 단계에서
+"무엇을 보여주고/허용하며/제한할지"를 일관되게 결정하는 정책 체계를 정의한다.
+
+정책 계층
+---------
+1) TagPolicy (태그별)
+   - HTML 태그가 원칙적으로 가질 수 있는 속성/이벤트/스타일 키를 정의한다. (W3C/WHATWG 기준)
+   - 예: <img>는 children 금지, src/alt 허용, objectFit 허용 등
+
+2) StylePolicy (전역 스타일/토큰/값 제약)
+   - 디자인 토큰(색상/간격/폰트 등), 전역 허용/금지 스타일 키, 값 제약(범위/단계),
+     값의 소스(token/raw/css-var)를 정의한다.
+   - TagPolicy가 "가능한 키"를 규정하고, StylePolicy는 "그 키의 값"에 대한 제약을 규정한다.
+
+3) ComponentPolicy (컴포넌트별 UX)
+   - Inspector에서 노출할 그룹/컨트롤, 프리셋, 기본값, 저장 정책(공개/비공개) 등을 정의한다.
+   - TagPolicy/StylePolicy 위에 UX를 다듬는 레이어다.
+
+역할 분리의 의의
+----------------
+- TagPolicy: 스펙/구조 중심의 허용 범위(태그 capability) 정의
+- StylePolicy: 디자인 시스템/토큰/값 제약의 전역 통제
+- ComponentPolicy: Inspector UX 단순화/프리셋/기본값
+- StyleGraph(반응형/상태별 스타일 병합)는 "키와 값"만 취급하므로,
+  태그 무관 전역 제약(StylePolicy)이 별도로 필요하다.
+
+버전/호환성
+-----------
+- PolicyVersion: "Major.Minor" (예: "1.1"). 기존 키를 깨지 않도록 추가/확장 위주로 변경.
+- 플래그:
+  - INSPECTOR_POLICY_V1 (기본 false): Inspector 필터링 활성화
+  - RUNTIME_POLICY_V1   (기본 false): 런타임 강제 활성화
+- 기본값: 정책이 없으면 기존 동작(모두 허용)에 가깝게 유지
+- 엄격도:
+  - inspector-only: Inspector에서 숨기거나 비활성화 (런타임은 허용)
+  - runtime-enforced: 런타임/Export에서도 거부/삭제
+
+데이터 모델(요약)
+-----------------
+- TagPolicy
+  - tag: string
+  - attributes: { allow?: string[]; deny?: string[] }
+  - events:     { allow?: string[]; deny?: string[] }
+  - styles:     { allow?: string[]; deny?: string[]; groups?: Record<string,string[]> }
+
+- StylePolicy
+  - tokens: 디자인 토큰(색상/간격/반지름/폰트 등)
+  - defaults: 전역 기본값(예: fontSize, lineHeight)
+  - allow/deny: 전역 허용/금지 스타일 키
+  - constraints: 키별 값 제약 (min/max/step)
+  - valueSources: 키군 별 허용 소스(token/raw/css-var)
+
+- ComponentPolicy
+  - component, tag
+  - inspector.groups/controls: Inspector 노출/프리셋/확장 여부
+  - defaults.props/styles
+  - runtime.strict
+  - savePolicy(공개/비공개 허용)
+
+정책 파일의 위치(권장)
+----------------------
+- src/figmaV3/policy/globalTagPolicy.ts     ← GlobalTagPolicy 기본값 정의
+- src/figmaV3/policy/globalStylePolicy.ts   ← GlobalStylePolicy 기본값 정의
+- src/figmaV3/policy/componentPolicies.ts   ← (선택) 컴포넌트별 기본 정책
+- src/figmaV3/runtime/capabilities.ts       ← 정책 조회/병합/검증 유틸
+- src/figmaV3/runtime/styleGraphV4.ts       ← 스타일 적용 시 정책 검사 훅
+- src/figmaV3/runtime/persistenceV4.ts      ← Project.settings.policies 직렬화/역직렬화
+- src/figmaV3/editor/bootstrap.ts           ← 부팅 시 정책 주입
+- Inspector.tsx/StylesSection.tsx           ← capabilities 호출로 필터/그룹 반영
+
+프로젝트 오버라이드
+-------------------
+- Project.settings.policies(tag/style/components)에 "부분 오버라이드" 저장
+- 부팅 시 buildEffectivePolicies(overrides, componentDefaults)로 병합
+- 팀/워크스페이스 전역 기본치를 바꾸려면 global*.ts를 수정(빌드 필요)
+
+Inspector/런타임/Export 적용 순서
+--------------------------------
+1) 요청된 키 후보 집합 생성
+2) TagPolicy로 1차 필터 (태그 capability)
+3) StylePolicy로 전역 제약/금지 적용 (값 제약 포함)
+4) ComponentPolicy로 Inspector 노출/프리셋/초기값 결정
+5) ExpertMode가 켜지면 Inspector에서 hide만 해제 가능(단 runtime-enforced는 불가)
+6) 런타임/Export에서도 동일 유틸로 최종 검증 → 위반 키/값 제거 또는 정규화
+
+StyleGraph와의 관계
+-------------------
+- StyleGraph는 viewport/state별 규칙을 병합한다.
+- 병합된 "최종 스타일 객체"에 대해 정책 유틸로 검증/정규화한다.
+- 따라서 viewport 통합/독립 모드와 무관하게 일관된 정책 결과를 보장한다.
+
+에러 리포팅
+-----------
+- Inspector: 비활성화 + 툴팁(차단 사유)
+- 런타임: 개발 콘솔 warn
+- Export: 리포트(JSON/HTML) 생성(차단/정규화 목록)
+
+예시(발췌)
+----------
+- <img>: attributes(src,alt,loading), events(onLoad,onError), styles(width,height,objectFit,...) 허용, children 금지
+- 전역: opacity 0~1, borderRadius 0~64, 위험 키(content/behavior) 금지
+- Button 컴포넌트: spacing 그룹 열림, width preset ["auto","100%"]
+
+부록 — 에러 코드
+-----------------
+POLICY/E001  Unknown tag in TagPolicy
+POLICY/E002  Unknown style group reference
+POLICY/E003  Value constraint violation
+POLICY/E004  Removed by runtime strict mode
+POLICY/E005  Token resolve failed
+POLICY/E006  Attribute/Event not allowed by TagPolicy
+
+
+---------------------------------------------------------------
+-- Policy type
+---------------------------------------------------------------
+
+// 핵심 타입 (필요한 최소 속성; 기존 타입과 충돌 없게 접두사 사용)
+export type PolicyVersion = `${number}.${number}`;
+
+export interface TagPolicy {
+  version: PolicyVersion;
+  tag: string; // 'div' | 'button' | ...
+  attributes?: { allow?: string[]; deny?: string[] };
+  events?:     { allow?: string[]; deny?: string[] };
+  styles?: {
+    allow?: string[]; deny?: string[];
+    groups?: Record<string, string[]>; // typography, spacing, ...
+  };
+}
+
+export interface StylePolicy {
+  version: PolicyVersion;
+  tokens?: Record<string, Record<string, string | number>>;
+  defaults?: Record<string, string | number>;
+  allow?: string[]; // ['*'] 권장
+  deny?: string[];
+  constraints?: Record<string, { min?: number; max?: number; step?: number }>;
+  valueSources?: Record<string, ('token' | 'raw' | 'css-var')[]>;
+}
+
+export interface ComponentPolicy {
+  version: PolicyVersion;
+  component: string;    // 'Button'
+  tag: string;          // 'button'
+  inspector?: {
+    groups?: Record<string, { visible?: boolean; expanded?: boolean }>;
+    controls?: Record<string, { visible?: boolean; preset?: (string | number)[] }>;
+  };
+  defaults?: { props?: Record<string, unknown>; styles?: Record<string, string | number> };
+  runtime?: { strict?: boolean };
+  savePolicy?: { allowPrivate?: boolean; allowPublic?: boolean };
+}
+
+export interface EffectivePolicies {
+  tag: Record<string, TagPolicy>;                 // by tag
+  style: StylePolicy;                             // global
+  components?: Record<string, ComponentPolicy>;   // by component name
+}
+
+// Project.settings에 사용자 오버라이드 보관 (없으면 undefined)
+export interface ProjectSettingsPoliciesOverride {
+  tag?: Partial<EffectivePolicies['tag']>;
+  style?: Partial<StylePolicy>;
+  components?: Partial<EffectivePolicies['components']>;
+}

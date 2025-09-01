@@ -1,0 +1,12 @@
+export interface ComponentPolicy {
+  version: PolicyVersion;
+  component: string;    // 'Button'
+  tag: string;          // 'button'
+  inspector?: {
+    groups?: Record<string, { visible?: boolean; expanded?: boolean }>;
+    controls?: Record<string, { visible?: boolean; preset?: (string | number)[] }>;
+  };
+  defaults?: { props?: Record<string, unknown>; styles?: Record<string, string | number> };
+  runtime?: { strict?: boolean };
+  savePolicy?: { allowPrivate?: boolean; allowPublic?: boolean };
+}
