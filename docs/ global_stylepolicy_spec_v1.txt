@@ -1,0 +1,100 @@
+Global StylePolicy 상세 설명
+============================
+
+0) 개념
+--------
+StylePolicy는 “어떤 스타일 키를 허용하고, 어떤 형태/범위의 값을 쓸 수 있는가?”를 전역 규칙으로 정의하는 레이어이다.
+- TagPolicy는 키 후보(허용/금지)를 정의한다.
+- StylePolicy는 값과 토큰/범위/출처를 통제한다.
+- 두 정책이 합쳐져 최종 Inspector 및 런타임/Export에 일관성을 보장한다.
+
+1) 역할 구분
+-------------
+- TagPolicy: HTML 태그 스펙 관점에서 허용되는 속성과 스타일 키를 정의.
+- StylePolicy: 디자인 시스템 관점에서 값과 표기법을 제한·표준화.
+
+2) 데이터 모델
+---------------
+(A) version
+    정책 버전. 예: "1.0"
+
+(B) tokens
+    색상, 간격, 반지름, 폰트 등 디자인 토큰 정의.
+    예: color.primary, spacing.sm 등.
+
+(C) defaults
+    특정 스타일 키의 전역 기본값.
+    예: fontSize=token:font.base, lineHeight=1.45
+
+(D) allow/deny
+    전역 허용/금지 키 목록.
+    예: allow: ["*"], deny: ["content","behavior"]
+
+(E) constraints
+    값 범위 제약. min/max/step.
+    예: opacity 0~1, borderRadius 0~64
+
+(F) valueSources
+    값의 출처.
+    - token (토큰 참조)
+    - raw (숫자/문자 값)
+    - css-var (CSS 변수)
+
+3) 동작 순서
+--------------
+- Inspector
+  1. TagPolicy로 허용 스타일 키 결정
+  2. StylePolicy로 값 소스와 제약 결정
+  3. ComponentPolicy로 UX/프리셋 적용
+- 저장
+  - validateStyleEntry로 검증 후 저장
+- 런타임/Export
+  - StyleGraph 병합 후 StylePolicy로 검증/정규화
+
+4) 알고리즘 개요
+-----------------
+- classifyKey(key): color/length/font 등 분류
+- resolveValue(value): 토큰 해석, css-var 패스, raw 유지
+- applyConstraints: 숫자 범위 clamp, step 반영
+- validateStyleEntry: 키 허용 + 값 소스 + 토큰 해석 + 제약 검증
+
+5) 사용 예시
+-------------
+- color는 토큰만 허용 → valueSources.color = ["token"]
+- fontSize 12~24, 2px step → constraints.fontSize
+- width/height 0~4096px 범위 clamp
+
+6) 운영 전략
+--------------
+- 전역 기본값은 globalStylePolicy.ts에 정의
+- 프로젝트 오버라이드는 Project.settings.policies.style에 저장
+- ComponentPolicy는 UX 차별화만 적용
+- 버전 관리: Minor=비파괴, Major=마이그레이션 필요
+
+7) Inspector 반영
+------------------
+- isStyleKeyAllowed(tag,key,effectivePolicies)로 키 확인
+- constraints로 UI 컴포넌트(min/max/step) 세팅
+- valueSources에 따라 token picker, raw input, css-var input 제어
+
+8) FAQ
+-------
+Q. TagPolicy만으로 충분하지 않나?
+A. 값 제한/토큰 시스템 통제를 위해 StylePolicy 필요.
+
+Q. CSS var과 토큰 병용 가능한가?
+A. valueSources에 둘 다 포함시키면 된다.
+
+Q. 숫자/문자 혼용 값은?
+A. resolveValue/applyConstraints에서 정규화한다.
+
+Q. 프로젝트마다 토큰이 다른데?
+A. globalStylePolicy는 최소 세트, 프로젝트가 overrides로 확장.
+
+9) 적용 단계
+--------------
+1. globalStylePolicy.ts 생성 (전역 정의)
+2. runtime/capabilities.ts에 validateStyleEntry 등 유틸 구현
+3. editor/bootstrap.ts에서 store에 정책 주입
+4. Inspector 그룹 컴포넌트에서 정책 반영
+5. StyleGraph 최종 병합 후 validateStyleMap으로 검증
