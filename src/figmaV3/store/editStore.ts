@@ -15,10 +15,11 @@ import type {
     Page,
     Fragment,
     ComponentPolicy,
+    ComponentDefinition,
 } from '../core/types';
 import { deepMerge } from '../runtime/deepMerge';
 
-// ... (초기 상태 및 대부분의 유틸리티 함수는 이전과 동일)
+// ... (초기 상태 및 일부 유틸리티는 이전과 동일)
 const initialProject: Project = {
     pages: [{ id: 'page_home', name: 'Home', rootId: 'node_root_home', slug: '/' }],
     fragments: [],
@@ -123,39 +124,6 @@ function collectSubtreeIds(nodes: Record<NodeId, Node>, rootId: NodeId): NodeId[
     return ids;
 }
 
-function findParentId(p: Project, childId: NodeId): NodeId | null {
-    for (const nid of Object.keys(p.nodes)) {
-        const n = p.nodes[nid]!;
-        if (n.children && n.children.includes(childId)) return nid;
-    }
-    return null;
-}
-
-function isContainerDef(defId: string): boolean {
-    const def = getDefinition(defId);
-    return def?.capabilities?.canHaveChildren === true || defId === 'box';
-}
-
-function chooseValidParentId(
-    p: Project,
-    desiredParent: NodeId | null | undefined,
-    fallbackRoot: NodeId
-): NodeId {
-    let cur: NodeId =
-        desiredParent && p.nodes[desiredParent] ? desiredParent : fallbackRoot;
-
-    if (isContainerDef(p.nodes[cur]!.componentId)) return cur;
-
-    let guard = 0;
-    while (guard++ < 1024) {
-        const parent = findParentId(p, cur);
-        if (!parent) break;
-        if (isContainerDef(p.nodes[parent]!.componentId)) return parent;
-        cur = parent;
-    }
-    return fallbackRoot;
-}
-
 function cloneSubtree(nodes: Record<NodeId, Node>, srcRootId: NodeId): { nodes: Record<NodeId, Node>; newRootId: NodeId } {
     const newNodes: Record<NodeId, Node> = {};
     const idMap = new Map<NodeId, NodeId>();
@@ -187,6 +155,52 @@ function cloneSubtree(nodes: Record<NodeId, Node>, srcRootId: NodeId): { nodes: 
 
     return { nodes: newNodes, newRootId };
 }
+
+
+// ✨ [수정] 스토어 외부 헬퍼 함수로 재정의하여 명확성 확보
+function findParentId(nodes: Record<NodeId, Node>, childId: NodeId): NodeId | null {
+    for (const nid of Object.keys(nodes)) {
+        const n = nodes[nid]!;
+        if (n.children && n.children.includes(childId)) return nid;
+    }
+    return null;
+}
+
+function isContainer(def: ComponentDefinition | undefined): boolean {
+    if (!def)
+        return false;
+
+    // Box만 가능
+    if (def.id === 'box')
+        return true;
+    //return def.capabilities?.canHaveChildren === true;
+    return false
+}
+
+function chooseValidParentId(
+    project: Project,
+    desiredParentId: NodeId
+): NodeId {
+    let currentId: NodeId | null = desiredParentId;
+
+    // 100회 이상 탐색하면 무한 루프 방지를 위해 최상위로 이동
+    for (let i = 0; i < 100; i++) {
+        if (!currentId) break;
+
+        const node = project.nodes[currentId];
+        if (node) {
+            const def = getDefinition(node.componentId);
+            if (isContainer(def)) {
+                return currentId;
+            }
+        }
+        currentId = findParentId(project.nodes, currentId);
+    }
+
+    // 적합한 부모를 찾지 못하면, 현재 페이지의 최상위 루트 노드를 반환
+    return project.rootId;
+}
+
 
 type EditorActions = {
     update: (fn: (draft: EditorState) => void, recordHistory?: boolean) => void;
@@ -321,20 +335,22 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
             (node.styles.element as any)[vp] = { ...prev, ...styles };
         }, true),
 
+    // ✨ [수정] addByDef 액션이 새로운 chooseValidParentId 함수를 사용하도록 수정
     addByDef : (defId, parentId) => {
         const newId = genId(`node_${defId}`);
         get().update((s: EditorState) => {
             const p = s.project;
-            const nodes = { ...p.nodes };
-            nodes[newId] = buildNodeWithDefaults(defId, newId);
-            const desired = parentId ?? s.ui.selectedId ?? p.rootId;
-            const parentKey = chooseValidParentId(p, desired, p.rootId);
-            const parent = nodes[parentKey]!;
-            const nextChildren = [...(parent.children ?? []), newId];
-            nodes[parentKey] = { ...parent, children: nextChildren };
-            s.project = { ...p, nodes };
-            s.ui = { ...s.ui, selectedId: newId };
-        });
+            s.project.nodes[newId] = buildNodeWithDefaults(defId, newId);
+
+            const desiredParentId = parentId ?? s.ui.selectedId ?? p.rootId;
+            const finalParentId = chooseValidParentId(p, desiredParentId);
+
+            const parentNode = s.project.nodes[finalParentId]!;
+            if (!parentNode.children) parentNode.children = [];
+            parentNode.children.push(newId);
+
+            s.ui.selectedId = newId;
+        }, true);
         return newId;
     },
 
@@ -342,65 +358,54 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         const newId = genId(`node_${defId}`);
         get().update((s: EditorState) => {
             const p = s.project;
-            const nodes = { ...p.nodes };
-            nodes[newId] = buildNodeWithDefaults(defId, newId);
-            const desired = parentId ?? s.ui.selectedId ?? p.rootId;
-            const parentKey = chooseValidParentId(p, desired, p.rootId);
-            const parent = nodes[parentKey]!;
-            const children = [...(parent.children ?? [])];
-            const clamped = Math.max(0, Math.min(index, children.length));
-            children.splice(clamped, 0, newId);
-            nodes[parentKey] = { ...parent, children };
-            s.project = { ...p, nodes };
-            s.ui = { ...s.ui, selectedId: newId };
-        });
+            s.project.nodes[newId] = buildNodeWithDefaults(defId, newId);
+
+            // at index는 항상 컨테이너를 부모로 가정
+            const parentNode = s.project.nodes[parentId]!;
+            if (!parentNode.children) parentNode.children = [];
+
+            const clamped = Math.max(0, Math.min(index, parentNode.children.length));
+            parentNode.children.splice(clamped, 0, newId);
+
+            s.ui.selectedId = newId;
+        }, true);
         return newId;
     },
 
-    moveNode: (nodeId, desiredParentId, newIndex) => get().update(s => {
+    moveNode: (nodeId, newParentId, newIndex) => get().update(s => {
         if (nodeId === s.project.rootId) return;
-        const nodes = { ...s.project.nodes };
-        const oldParentId = findParentId(s.project, nodeId);
+
+        const oldParentId = findParentId(s.project.nodes, nodeId);
         if (oldParentId) {
-            const oldP = { ...nodes[oldParentId]! };
-            oldP.children = (oldP.children ?? []).filter(c => c !== nodeId);
-            nodes[oldParentId] = oldP;
+            s.project.nodes[oldParentId]!.children = (s.project.nodes[oldParentId]!.children ?? []).filter(c => c !== nodeId);
         }
-        const desired = desiredParentId ?? s.ui.selectedId ?? s.project.rootId;
-        const newParentId = chooseValidParentId(s.project, desired, s.project.rootId);
-        const np = { ...nodes[newParentId]! };
-        const arr = [...(np.children ?? [])];
-        const idx = Math.max(0, Math.min(newIndex ?? arr.length, arr.length));
-        arr.splice(idx, 0, nodeId);
-        np.children = arr;
-        nodes[newParentId] = np;
-        s.project.nodes = nodes;
+
+        const parentNode = s.project.nodes[newParentId]!;
+        if (!parentNode.children) parentNode.children = [];
+        const idx = Math.max(0, Math.min(newIndex ?? parentNode.children.length, parentNode.children.length));
+        parentNode.children.splice(idx, 0, nodeId);
     }, true),
 
     removeNodeCascade: (nodeId) => get().update((s) => {
         if (nodeId === s.project.rootId) return;
-        const nodes = { ...s.project.nodes };
-        const parentId = (Object.keys(nodes).find(pid => nodes[pid]?.children?.includes(nodeId)) ?? null) as string | null;
+        const nodes = s.project.nodes;
+        const parentId = findParentId(nodes, nodeId);
         if (parentId) {
-            const parent = { ...nodes[parentId]! };
-            parent.children = (parent.children ?? []).filter(cid => cid !== nodeId);
-            nodes[parentId] = parent;
+            nodes[parentId]!.children = (nodes[parentId]!.children ?? []).filter(cid => cid !== nodeId);
         }
-        const toDelete = collectSubtreeIds(nodes as any, nodeId);
+        const toDelete = collectSubtreeIds(nodes, nodeId);
         for (const id of toDelete) delete nodes[id];
-        const nextSelected = nodes[s.ui.selectedId ?? ''] ? s.ui.selectedId : s.project.rootId;
-        s.project.nodes = nodes;
-        s.ui.selectedId = nextSelected;
+        s.ui.selectedId = nodes[s.ui.selectedId ?? ''] ? s.ui.selectedId : parentId ?? s.project.rootId;
     }, true),
 
     toggleNodeVisibility: (nodeId) => get().update((s) => {
         const n = s.project.nodes[nodeId]; if (!n) return;
-        s.project.nodes[nodeId] = { ...n, isVisible: !n.isVisible };
+        n.isVisible = !n.isVisible;
     }, true),
 
     toggleNodeLock: (nodeId) => get().update((s) => {
         const n = s.project.nodes[nodeId]; if (!n) return;
-        s.project.nodes[nodeId] = { ...n, locked: !n.locked };
+        n.locked = !n.locked;
     }, true),
 
     selectPage: (pageId) => get().update((s) => {
@@ -425,9 +430,9 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         const page = s.project.pages.find(p => p.id === pageId);
         if (!page) return;
         const toDel = collectSubtreeIds(s.project.nodes, page.rootId);
-        const next = { ...s.project.nodes };
-        toDel.forEach(id => delete next[id]);
-        s.project.nodes = next;
+        const nextNodes = { ...s.project.nodes };
+        toDel.forEach(id => delete nextNodes[id]);
+        s.project.nodes = nextNodes;
         s.project.pages = s.project.pages.filter(p => p.id !== pageId);
         if (s.project.rootId === page.rootId && s.project.pages[0]) {
             s.project.rootId = s.project.pages[0].rootId;
@@ -562,7 +567,6 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         get().setEditorMode('Page');
     },
 
-    // ✨ [수정] saveNodeAsComponent 로직: Fragment 생성
     saveNodeAsComponent: (nodeId, name, description, isPublic) => get().update(s => {
         const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, nodeId);
         const newFragment: Fragment = {
@@ -576,7 +580,6 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         s.project.fragments.push(newFragment);
     }, true),
 
-    // ✨ [수정] publishComponent 로직: isPublic 플래그 설정
     publishComponent: () => get().update(s => {
         const fragId = s.ui.editingFragmentId;
         if (!fragId) return;
@@ -587,7 +590,6 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         s.project.fragments = fragments;
     }, true),
 
-    // ✨ [추가] insertComponent 액션 구현
     insertComponent: (fragmentId, parentId) => get().update(s => {
         const fragment = s.project.fragments.find(f => f.id === fragmentId);
         if (!fragment) return;
@@ -595,16 +597,15 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, fragment.rootId);
         s.project.nodes = { ...s.project.nodes, ...clonedNodes };
 
-        const targetParentId = parentId ?? s.ui.selectedId ?? s.project.rootId;
-        const parentNode = s.project.nodes[targetParentId];
-        if (parentNode) {
-            if (!parentNode.children) parentNode.children = [];
-            parentNode.children.push(newRootId);
-            s.ui.selectedId = newRootId;
-        }
+        const desiredParentId = parentId ?? s.ui.selectedId ?? s.project.rootId;
+        const finalParentId = chooseValidParentId(s.project, desiredParentId);
+
+        const parentNode = s.project.nodes[finalParentId]!;
+        if (!parentNode.children) parentNode.children = [];
+        parentNode.children.push(newRootId);
+        s.ui.selectedId = newRootId;
     }, true),
 
-    // ... (나머지 액션들은 변경 없음)
     addFlowEdge: (edge) => get().update(s => {
         const id = genId('edge');
         s.flowEdges[id] = { ...edge, id };
