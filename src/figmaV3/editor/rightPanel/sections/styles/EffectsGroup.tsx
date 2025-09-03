@@ -20,7 +20,6 @@ import {
 
 import { useEditor } from '../../../useEditor';
 
-// 공통 레이아웃
 import {
     SectionShellV1,
     RowV1,
@@ -34,6 +33,7 @@ import {
 import { ShadowStack } from './ShadowStack';
 import { FilterStack } from './FilterStack';
 
+/* utils */
 function s(v: unknown): string {
     if (v === undefined || v === null) return '';
     return String(v).trim();
@@ -50,15 +50,12 @@ type Stop = { color: string; pos: string };
 function detectGradient(img: string): { has: boolean; type: GradType; angle: string; stops: Stop[] } {
     const str = s(img);
     if (!/gradient\(/i.test(str)) return { has: false, type: 'linear', angle: '180deg', stops: [] };
-
     const isLinear = /^linear-gradient/i.test(str);
     const type: GradType = isLinear ? 'linear' : 'radial';
-
     let angle = '180deg';
     let body = str.replace(/^[a-z-]+-gradient\s*\(/i, '').replace(/\)\s*$/, '');
     const parts = body.split(',');
     const first = s(parts[0]);
-
     const stopStartIdx = (() => {
         if (isLinear && /^[\d.]+deg$/i.test(first)) {
             angle = first;
@@ -66,7 +63,6 @@ function detectGradient(img: string): { has: boolean; type: GradType; angle: str
         }
         return 0;
     })();
-
     const stops: Stop[] = parts.slice(stopStartIdx).map((token) => {
         const t = s(token);
         const m = t.match(
@@ -76,7 +72,6 @@ function detectGradient(img: string): { has: boolean; type: GradType; angle: str
         const pos = m?.[2] ?? '';
         return { color, pos };
     });
-
     return { has: true, type, angle, stops: stops.filter(Boolean).slice(0, 5) };
 }
 function buildGradient(g: { type: GradType; angle?: string; stops: Stop[] }) {
@@ -107,13 +102,21 @@ export function EffectsGroup(props: {
     const allow = useAllowed(nodeId);
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
-    // current values
+    /* 🔐 마운트-세이프 패치 */
+    const mountedRef = React.useRef(false);
+    React.useEffect(() => {
+        mountedRef.current = true;
+    }, []);
+    const safePatch = React.useCallback((css: CSSDict) => {
+        if (!mountedRef.current) return; // 렌더/마운트 중 호출 방지
+        patch(css);
+    }, [patch]);
+
+    /* current */
     const opacity = s((el as any).opacity);
-    const boxShadow = s((el as any).boxShadow);
-    const filter = s((el as any).filter);
     const backgroundImage = s((el as any).backgroundImage);
 
-    // gradient state
+    /* gradient state */
     const parsed = React.useMemo(() => detectGradient(backgroundImage), [backgroundImage]);
     const [gType, setGType] = React.useState<GradType>(parsed.type);
     const [gAngle, setGAngle] = React.useState<string>(parsed.angle || '180deg');
@@ -147,35 +150,45 @@ export function EffectsGroup(props: {
         return null;
     };
 
+    /* handlers — safePatch 사용 */
     const applyGradient = (next?: { type?: GradType; angle?: string; stops?: Stop[] }) => {
         const nt = next?.type ?? gType;
         const na = nt === 'linear' ? (next?.angle ?? gAngle) : undefined;
         const ns = next?.stops ?? stops;
         const val = buildGradient({ type: nt, angle: na, stops: ns });
-        patch({ backgroundImage: val });
+        safePatch({ backgroundImage: val });
     };
     const updateStop = (idx: number, key: keyof Stop, val: string) => {
         setStops((prev) => {
             const arr = prev.slice();
             arr[idx] = { ...arr[idx], [key]: val };
             const nt = { type: gType, angle: gAngle, stops: arr };
-            patch({ backgroundImage: buildGradient(nt) });
+            safePatch({ backgroundImage: buildGradient(nt) });
             return arr;
         });
     };
     const addStop = () => {
         setStops((prev) => {
             const next = prev.length >= 5 ? prev : [...prev, { color: '#888888', pos: '50%' }];
-            patch({ backgroundImage: buildGradient({ type: gType, angle: gAngle, stops: next }) });
+            safePatch({ backgroundImage: buildGradient({ type: gType, angle: gAngle, stops: next }) });
             return next;
         });
     };
     const removeStop = (idx: number) => {
         setStops((prev) => {
             const next = prev.filter((_, i) => i !== idx);
-            patch({ backgroundImage: buildGradient({ type: gType, angle: gAngle, stops: next }) });
+            safePatch({ backgroundImage: buildGradient({ type: gType, angle: gAngle, stops: next }) });
             return next;
         });
+    };
+    const resetGradient = () => {
+        safePatch({ backgroundImage: undefined });
+        setGType('linear');
+        setGAngle('180deg');
+        setStops([
+            { color: '#000000', pos: '0%' },
+            { color: '#ffffff', pos: '100%' },
+        ]);
     };
 
     const anglePresets = ['0deg', '45deg', '90deg', '180deg', '270deg'];
@@ -183,7 +196,7 @@ export function EffectsGroup(props: {
     return (
         <div className="mt-4">
             <SectionShellV1 title="Effects" open={open} onToggle={onToggle}>
-                {/* Opacity */}
+                {/* opacity */}
                 <RowV1>
                     <RowLeftV1 title="opacity" />
                     <RowRightGridV1>
@@ -192,9 +205,9 @@ export function EffectsGroup(props: {
                             {!allow.has('opacity') && <DisabledHint reason={dis('opacity') ?? 'template'} />}
                             {allow.has('opacity') ? (
                                 <>
-                                    <ChipBtnV1 title="0"   active={opacity === '0'}                   onClick={() => patch({ opacity: '0' })}>0</ChipBtnV1>
-                                    <ChipBtnV1 title="0.5" active={opacity === '0.5'}                 onClick={() => patch({ opacity: '0.5' })}>0.5</ChipBtnV1>
-                                    <ChipBtnV1 title="1"   active={opacity === '1' || opacity === ''} onClick={() => patch({ opacity: '1' })}>1</ChipBtnV1>
+                                    <ChipBtnV1 title="0"   active={opacity === '0'}                   onClick={() => safePatch({ opacity: '0' })}>0</ChipBtnV1>
+                                    <ChipBtnV1 title="0.5" active={opacity === '0.5'}                 onClick={() => safePatch({ opacity: '0.5' })}>0.5</ChipBtnV1>
+                                    <ChipBtnV1 title="1"   active={opacity === '1' || opacity === ''} onClick={() => safePatch({ opacity: '1' })}>1</ChipBtnV1>
                                 </>
                             ) : (
                                 <span className="text-[11px] text-gray-500">제한됨</span>
@@ -206,7 +219,7 @@ export function EffectsGroup(props: {
                                     value={opacity}
                                     onChange={(v) => {
                                         const n = clamp01(Number(v));
-                                        patch({ opacity: String(n) });
+                                        safePatch({ opacity: String(n) });
                                     }}
                                     placeholder="0~1"
                                     size="auto"
@@ -217,8 +230,7 @@ export function EffectsGroup(props: {
                     </RowRightGridV1>
                 </RowV1>
 
-                {/* Gradient — 요구사항 반영 */}
-                {/* 1행: linear => type|angle preset, radial => type|+add */}
+                {/* gradient */}
                 <RowV1>
                     <RowLeftV1 title="gradient" />
                     <RowRightGridV1>
@@ -283,22 +295,38 @@ export function EffectsGroup(props: {
                             ):''}
                         </div>
                         {gType === 'linear' ? (
-                        <div className="col-span-3 min-w-0">
+                            <div className="col-span-3 min-w-0">
+                                <button
+                                    className="h-[28px] w-full rounded border border-gray-300 text-[12px]"
+                                    onClick={addStop}
+                                    title="add color stop"
+                                >
+                                    + add stops
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="col-span-6 min-w-0">
+                                <div className="text-[11px] text-amber-600 h-[28px] flex items-center">
+                                    radial 그라디언트는 중심/반경 기반이며 각도 입력을 지원하지 않습니다.
+                                </div>
+                            </div>
+                        )}
+                    </RowRightGridV1>
+                </RowV1>
+
+                {/* reset gradient */}
+                <RowV1>
+                    <RowLeftV1 title="" />
+                    <RowRightGridV1>
+                        <div className="col-span-6 min-w-0">
                             <button
-                                className="h-[28px] w-full rounded border border-gray-300 text-[12px]"
-                                onClick={addStop}
-                                title="add color stop"
+                                className="h-[24px] w-full rounded border border-gray-300 text-[12px]"
+                                onClick={resetGradient}
+                                title="clear gradient"
                             >
-                                + add stops
+                                reset gradient
                             </button>
                         </div>
-                        ) : (
-                        <div className="col-span-6 min-w-0">
-                            <div className="text-[11px] text-amber-600 h-[28px] flex items-center">
-                                radial 그라디언트는 중심/반경 기반이며 각도 입력을 지원하지 않습니다.
-                            </div>
-                        </div>
-                        )}
                     </RowRightGridV1>
                 </RowV1>
 
@@ -345,10 +373,10 @@ export function EffectsGroup(props: {
                     );
                 })}
 
-                {/* 목록형 Shadow / Filter */}
+                {/* stacks */}
                 <ShadowStack
                     el={el}
-                    patch={patch}
+                    patch={safePatch}       // ← 안전 패치 전달
                     nodeId={nodeId}
                     componentId={componentId}
                     allow={allow}
@@ -357,7 +385,7 @@ export function EffectsGroup(props: {
                 />
                 <FilterStack
                     el={el}
-                    patch={patch}
+                    patch={safePatch}       // ← 안전 패치 전달
                     nodeId={nodeId}
                     componentId={componentId}
                     allow={allow}
