@@ -4,90 +4,72 @@ import React, { useState } from 'react';
 import { useEditor } from '../useEditor';
 import { getDefinition } from '../../core/registry';
 import type { NodeId, Fragment, EditorState } from '../../core/types';
+
 import { CommonSection } from './sections/CommonSection';
 import { PropsAutoSection } from './sections/PropsAutoSection';
 import { StylesSection } from './sections/StylesSection';
 import { SchemaEditor } from './sections/SchemaEditor';
 import { SaveAsComponentDialog } from './sections/SaveAsComponentDialog';
+import { modeBorderClass } from '../rightPanel/sections/styles/common';
 
 const InlineDivider: React.FC<{ label: string; className?: string }> = ({ label, className }) => (
-    <div className={`flex items-center gap-2 select-none ${className ?? ''}`}>
-        <span className="text-[12px] font-semibold text-gray-700">{label}</span>
-        <div className="h-[1px] bg-gray-200 flex-1" />
+    <div className={['mt-3 mb-1 text-[11px] text-gray-500', className ?? ''].join(' ')}>
+        {label}
     </div>
 );
 
+/** Page 모드용 섹션 묶음 */
 function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
-    const def = getDefinition(defId);
+    // def는 필요 시 참조만, propsSchema 유무와 무관하게 PropsAutoSection을 항상 렌더
+    const _def = getDefinition(defId);
+
     return (
         <>
-            <CommonSection nodeId={nodeId} defId={defId} />
-            <div className="mt-4">
-                {/*<InlineDivider label="Props" />*/}
-                {def?.propsSchema?.length ? (
-                    <div className="mt-2">
-                        <PropsAutoSection nodeId={nodeId} defId={defId} />
-                    </div>
-                ) : (
-                    <div className="mt-2 text-[12px] text-gray-500 px-1">No component props to edit.</div>
-                )}
+            {/* Common */}
+            <div className="mt-0">
+                <CommonSection nodeId={nodeId} defId={defId} />
             </div>
+
+            {/* Props — ✅ 항상 렌더: 스키마 없어도 내부에서 As(Tag)/Tag Attrs UI 표시 */}
             <div className="mt-4">
-                {/*<InlineDivider label="Styles" />*/}
-                <div className="mt-2">
-                    <StylesSection />
-                </div>
+                <PropsAutoSection nodeId={nodeId} defId={defId} />
+            </div>
+
+            {/* Styles — 베이스 시그니처는 props 없음 */}
+            <div className="mt-4">
+                <StylesSection />
+            </div>
+
+            {/* Schema — 베이스 시그니처는 { nodeId } */}
+            <div className="mt-4">
+                <SchemaEditor nodeId={nodeId} />
             </div>
         </>
     );
 }
 
-function ComponentPolicyEditor({ fragmentId }: { fragmentId: string }) {
-    const state = useEditor();
-    const fragment = state.project.fragments.find((f: Fragment) => f.id === fragmentId);
-    if (!fragment) return <div className="p-3 text-sm text-gray-500">Cannot find component definition.</div>;
-
-    const rootNode = state.project.nodes[fragment.rootId];
-    if (!rootNode) return null;
-
-    const def = getDefinition(rootNode.componentId);
-
+/** Component 모드용 섹션 묶음 */
+function ComponentInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     return (
-        <div>
-            <div className="p-3">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h3 className="text-sm font-semibold">Component Policy Editor</h3>
-                        <p className="text-xs text-gray-500">
-                            Defining policies for: <strong>{def?.title ?? rootNode.componentId}</strong>
-                        </p>
-                    </div>
-                </div>
+        <>
+            <div className="mt-4">
+                <CommonSection nodeId={nodeId} defId={defId} />
             </div>
 
-            <CommonSection nodeId={rootNode.id} defId={rootNode.componentId} />
             <div className="mt-4">
-                <InlineDivider label="Props & Permissions" />
-                <div className="mt-2">
-                    <PropsAutoSection nodeId={rootNode.id} defId={rootNode.componentId} />
-                </div>
+                <PropsAutoSection nodeId={nodeId} defId={defId} />
             </div>
+
             <div className="mt-4">
-                <InlineDivider label="Styles & Permissions" />
-                <div className="mt-2">
-                    <StylesSection />
-                </div>
+                <StylesSection />
             </div>
+
             <div className="mt-4">
-                <InlineDivider label="Schema Editor (Add Custom Props)" className="px-3" />
-                <div className="p-2">
-                    <SchemaEditor nodeId={rootNode.id} />
-                </div>
+                <SchemaEditor nodeId={nodeId} />
             </div>
-        </div>
+        </>
     );
 }
-
 
 export function Inspector() {
     const state = useEditor();
@@ -97,78 +79,110 @@ export function Inspector() {
 
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
 
-    const targetNodeId = mode === 'Page'
-        ? selectedId ?? rootId
-        : editingFragmentId ? fragments.find((f: Fragment) => f.id === editingFragmentId)?.rootId : null;
+    // 대상 노드 선택: Page 모드면 현재 선택(or 루트), Component 모드면 편집 중 프래그먼트 루트
+    const targetNodeId: NodeId | null =
+        mode === 'Page'
+            ? (selectedId ?? rootId)
+            : editingFragmentId
+                ? (fragments.find((f: Fragment) => f.id === editingFragmentId)?.rootId ?? null)
+                : null;
 
     const node = targetNodeId ? nodes[targetNodeId] : null;
 
-    const modeBorderStyle = mode === 'Page' ? 'border-t-blue-500' : 'border-t-purple-500';
+    // 상단 border 컬러(기존 규칙 유지): Page=blue, Component=purple
+    const modeBorderStyle = modeBorderClass(ui?.mode);
 
     const handleToggleExpertMode = () => {
         const nextExpertMode = !expertMode;
-        update((s: EditorState) => { s.ui.expertMode = nextExpertMode; });
+        update((s: EditorState) => {
+            s.ui.expertMode = nextExpertMode;
+        });
         setNotification(`고급 모드: ${nextExpertMode ? 'ON' : 'OFF'}`);
     };
 
+    // SaveAsComponentDialog에 전달할 nodeId (열렸을 때만 사용)
+    const dialogNodeId: NodeId | null = node?.id ?? null;
+
     return (
-        <div className={`h-full flex flex-col border-t-4 ${modeBorderStyle}`}>
+        <div className="flex h-full flex-col">
             {/* Header: sticky로 상단에 고정 */}
-            <div className="sticky top-0 px-2 py-2 border-b bg-white flex items-center gap-2 shrink-0 z-10">
-                <div className="font-semibold text-sm">Inspector</div>
-                <div className="text-xs font-medium text-gray-500">
-                    {mode === 'Page' ? '(🚀 Page Build Mode)' : '(🛠️ Component Dev Mode)'}
-                </div>
-                <div className="ml-auto flex items-center gap-2">
-                    {mode === 'Page' && expertMode && (
-                        <button
-                            className="text-xs px-2 py-1 border rounded bg-green-100 text-green-700 hover:bg-green-200"
-                            onClick={() => setIsSaveDialogOpen(true)}
-                        >
-                            Save as Component
-                        </button>
-                    )}
-                    {mode === 'Page' && (
-                        <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-md">
+            <div
+                className={[
+                    'sticky top-0 z-10 bg-white',
+                    'border-t-2 border-x border-b border-gray-200 px-2 py-2',
+                    modeBorderStyle, // 개발 모드에 따른 보더 색
+                ].join(' ')}
+            >
+                <div className="flex items-center justify-between">
+                    <div className="text-[13px] font-semibold">Inspector</div>
+                    <div className="ml-2 text-[11px] text-gray-500">
+                        {mode === 'Page' ? '( Page Build Mode)' : '(️ Component Dev Mode)'}
+                    </div>
+
+                    <div className="ml-auto flex items-center gap-2">
+                        {/* Save as Component: Page 모드 + 고급 모드일 때만 노출 (베이스 UX 유지) */}
+                        {mode === 'Page' && expertMode && (
                             <button
-                                onClick={() => expertMode && handleToggleExpertMode()}
-                                className={`px-2 py-0.5 text-xs rounded-md ${!expertMode ? 'bg-white shadow-sm font-semibold' : 'text-gray-500'}`}
+                                className="rounded border border-gray-300 px-2 py-1 text-xs"
+                                onClick={() => setIsSaveDialogOpen(true)}
                             >
-                                기본
+                                Save as Component
                             </button>
-                            <button
-                                onClick={() => !expertMode && handleToggleExpertMode()}
-                                className={`px-2 py-0.5 text-xs rounded-md ${expertMode ? 'bg-white shadow-sm font-semibold' : 'text-gray-500'}`}
-                            >
-                                고급
-                            </button>
-                        </div>
-                    )}
+                        )}
+
+                        {/* 기본/고급 토글: Page 모드에서만 노출 (베이스 UX 유지) */}
+                        {mode === 'Page' && (
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => {
+                                        if (expertMode) handleToggleExpertMode();
+                                    }}
+                                    className={[
+                                        'px-2 py-0.5 text-xs rounded-md',
+                                        !expertMode ? 'bg-white shadow-sm font-semibold' : 'text-gray-500',
+                                    ].join(' ')}
+                                >
+                                    기본
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (!expertMode) handleToggleExpertMode();
+                                    }}
+                                    className={[
+                                        'px-2 py-0.5 text-xs rounded-md',
+                                        expertMode ? 'bg-white shadow-sm font-semibold' : 'text-gray-500',
+                                    ].join(' ')}
+                                >
+                                    고급
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* 스크롤이 필요한 Content 영역 */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">
                 {!node ? (
-                    <div className="p-3 text-sm text-gray-500">
-                        {mode === 'Page' ? "Select a node to inspect." : "Select a component from the left panel."}
+                    <div className="px-1 text-[12px] text-gray-500">
+                        {mode === 'Page' ? 'Select a node to inspect.' : 'Select a component from the left panel.'}
                     </div>
                 ) : (
-                    <div className="px-2 pb-4">
+                    <>
                         {mode === 'Page' ? (
-                            <PageInspector nodeId={node.id} defId={node.componentId} />
+                            <PageInspector nodeId={node.id as NodeId} defId={node.componentId as string} />
                         ) : (
-                            editingFragmentId && <ComponentPolicyEditor fragmentId={editingFragmentId} />
+                            editingFragmentId && (
+                                <ComponentInspector nodeId={node.id as NodeId} defId={node.componentId as string} />
+                            )
                         )}
-                    </div>
+                    </>
                 )}
             </div>
 
-            {isSaveDialogOpen && (
-                <SaveAsComponentDialog
-                    nodeId={selectedId!}
-                    onClose={() => setIsSaveDialogOpen(false)}
-                />
+            {/* ✅ SaveAsComponentDialog는 nodeId가 필요합니다 */}
+            {isSaveDialogOpen && dialogNodeId && (
+                <SaveAsComponentDialog nodeId={dialogNodeId} onClose={() => setIsSaveDialogOpen(false)} />
             )}
         </div>
     );

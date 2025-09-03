@@ -268,3 +268,10 @@ export function reasonForKey(
 
     return null;
 }
+
+// 🔹 개발 모드에 따른 상단 보더 색상 클래스 (공통 유틸)
+// Page Build Mode  -> 'border-t-blue-500'
+// Component Dev Mode -> 'border-t-purple-500'
+export function modeBorderClass(mode?: string) {
+    return mode === 'Page' ? 'border-t-blue-500' : 'border-t-purple-500';
+}

@@ -1,8 +1,21 @@
-// src/figmaV3/editor/rightPanel/sections/styles/layoutV1.tsx
 'use client';
 
 import React from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+
+import { useEditor } from '../../../useEditor';
+import { modeBorderClass } from './common';
+
+// 나머지 MiniInputV1, MiniSelectV1 등 기존 export 들은 그대로 두세요.
+// 아래는 SectionShellV1만 교체/갱신한 것입니다.
+
+type SectionShellV1Props = {
+    title: string;
+    open: boolean;
+    onToggle: () => void;
+    children: React.ReactNode;
+    className?: string;
+};
 
 /**
  * V1 레이아웃 프리미티브 (비침투성)
@@ -16,32 +29,33 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
  * - 칩/아이콘 5개 초과 시 마지막 칸은 수동입력(또는 Select+입력)
  */
 
-/* ───────── Panel/Section ───────── */
+export function SectionShellV1({ title, open, onToggle, children, className }: SectionShellV1Props) {
+    const { ui } = useEditor();
+    const borderColor = modeBorderClass(ui?.mode); // 🔹 모드별 상단 보더 색상 결정
 
-export const SectionShellV1: React.FC<{
-    title: React.ReactNode;
-    icon?: React.ReactNode;
-    open: boolean;
-    onToggle: () => void;
-    children?: React.ReactNode;
-}> = ({ title, icon, open, onToggle, children }) => {
     return (
-        <div className="border-t border-[var(--mdt-color-border)]">
-            <button
-                type="button"
+        <section
+            className={[
+                'rounded-sm bg-white',
+                'mt-1',
+                'overflow-hidden',
+                'border-t-2', // 상단 보더는 2px로
+                borderColor, // 🔹 모드별 컬러 적용
+                className || '',
+            ].join(' ')}
+        >
+            <header
+                className="flex h-8 items-center justify-between px-2 text-[12px] font-medium cursor-pointer select-none"
                 onClick={onToggle}
-                className="w-full flex items-center justify-between px-[2px] py-1.5 text-[12px] font-semibold bg-[var(--mdt-color-surface-1)] hover:bg-[var(--mdt-color-surface-2)]"
             >
-        <span className="inline-flex items-center gap-1">
-          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            {icon ? <span className="inline-flex items-center">{icon}</span> : null}
-            <span className="ml-[2px]">{title}</span>
-        </span>
-            </button>
-            {open && <div className="pb-1">{children}</div>}
-        </div>
+                <div className="truncate">{title}</div>
+                <div className="text-gray-400">{open ? '▾' : '▸'}</div>
+            </header>
+
+            {open && <div className="px-2 pb-2 pt-1">{children}</div>}
+        </section>
     );
-};
+}
 
 /* ───────── Row & Columns ───────── */
 

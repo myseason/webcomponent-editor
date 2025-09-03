@@ -10,6 +10,8 @@ import { AssetsPanel } from './panels/AssetsPanel';
 import { ComponentsPanel } from './panels/ComponentsPanel';
 import { Layers as LayersPanel } from './Layers';
 
+import { modeBorderClass } from '../rightPanel/sections/styles/common';
+
 // 아이콘 (lucide-react)
 import {
     Component as ComponentIcon,
@@ -172,9 +174,7 @@ export function LeftSidebar() {
     }, [ui.mode, setEditorMode, setNotification]);
 
     // 모드별 상단 테두리 색상 (기존 유지)
-    const modeBorderStyle =
-        mode === 'Page' ? 'border-t-blue-500' : 'border-t-purple-500';
-
+    const modeBorderStyle = modeBorderClass(ui?.mode);
     // ── 좌측 패널 상태(기존 + Split) ─────────────────────────────────────
     const leftUI = ui?.panels?.left ?? {
         activeHubTab: 'Pages' as HubTab,
