@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, {JSX, useMemo, useState} from 'react';
 import { useEditor } from '../../useEditor';
 import type { CSSDict, Viewport } from '../../../core/types';
 import { getEffectivePoliciesForNode } from '../../../runtime/capabilities';
@@ -26,7 +26,7 @@ type OpenState = {
     custom: boolean;
 };
 
-export function StylesSection() {
+export function StylesSection(): JSX.Element {
     const state = useEditor();
     const expert = state.ui.expertMode;
 
@@ -41,7 +41,7 @@ export function StylesSection() {
     );
 
     if (!node || !policyInfo) {
-        return <div className="text-[12px] text-gray-500 px-2 py-2">Select a node to edit styles.</div>;
+        return <div className="text-[12px] text-gray-500 px-1">Select a node to edit styles.</div>;
     }
 
     const { tag, tagPolicy, def } = policyInfo;
@@ -77,7 +77,9 @@ export function StylesSection() {
         effects: false,
         custom: false,
     });
-    const toggle = (k: keyof OpenState) => setOpen(prev => ({ ...prev, [k]: !prev[k] }));
+
+    const toggle = (k: keyof OpenState) =>
+        setOpen((prev) => ({ ...prev, [k]: !prev[k] }));
 
     // 각 그룹에 공통 props 전달 (베이스와 동일)
     const groupProps = {
@@ -93,11 +95,12 @@ export function StylesSection() {
     };
 
     return (
-        // 상단 "Styles" 타이틀을 없애고, 좌우 패딩 상쇄(-mx-2)로 그룹 헤더의 좌측 기준을 맞춤
-        <div className="mt-4">
+        // 상단 "Styles" 타이틀 없이, 좌우 패딩 상쇄(-mx-2)로 그룹 헤더의 좌측 기준을 맞춤
+        <section className="mx-0">
+            {/* 뷰포트 개별 스타일 모드 안내 */}
             {mode === 'Independent' && (
-                <div className="px-2 py-1 text-[11px] text-gray-600 bg-[var(--mdt-color-surface-1)] border-b border-[var(--mdt-color-border)]">
-                    현재 뷰포트는 개별 스타일 모드입니다. Base 위에 이 뷰포트의 수정 항목만 덮어씁니다.
+                <div className="mx-2 mb-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-700 border border-amber-200">
+                    현재 뷰포트는 <b>개별 스타일</b> 모드입니다. Base 위에 이 뷰포트의 수정 항목만 덮어씁니다.
                 </div>
             )}
 
@@ -156,6 +159,6 @@ export function StylesSection() {
                 open={open.custom}
                 onToggle={() => toggle('custom')}
             />
-        </div>
+        </section>
     );
 }

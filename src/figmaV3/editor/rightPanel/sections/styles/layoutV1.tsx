@@ -37,7 +37,6 @@ export function SectionShellV1({ title, open, onToggle, children, className }: S
         <section
             className={[
                 'rounded-sm bg-white',
-                'mt-1',
                 'overflow-hidden',
                 'border-t-2', // 상단 보더는 2px로
                 borderColor, // 🔹 모드별 컬러 적용

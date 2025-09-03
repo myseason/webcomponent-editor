@@ -217,7 +217,6 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
                                 </RowV1>
                             );
                         }
-
                         return null;
                     })}
                 </div>

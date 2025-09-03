@@ -10,25 +10,15 @@ import { PropsAutoSection } from './sections/PropsAutoSection';
 import { StylesSection } from './sections/StylesSection';
 import { SchemaEditor } from './sections/SchemaEditor';
 import { SaveAsComponentDialog } from './sections/SaveAsComponentDialog';
-import { modeBorderClass } from '../rightPanel/sections/styles/common';
 
-const InlineDivider: React.FC<{ label: string; className?: string }> = ({ label, className }) => (
-    <div className={['mt-3 mb-1 text-[11px] text-gray-500', className ?? ''].join(' ')}>
-        {label}
-    </div>
-);
-
-/** Page 모드용 섹션 묶음 */
 function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     // def는 필요 시 참조만, propsSchema 유무와 무관하게 PropsAutoSection을 항상 렌더
     const _def = getDefinition(defId);
 
     return (
         <>
-            {/* Common */}
-            <div className="mt-0">
-                <CommonSection nodeId={nodeId} defId={defId} />
-            </div>
+            {/* Common: 헤더와 바로 붙도록 첫 섹션은 여백 제거 */}
+            <CommonSection nodeId={nodeId} defId={defId} />
 
             {/* Props — ✅ 항상 렌더: 스키마 없어도 내부에서 As(Tag)/Tag Attrs UI 표시 */}
             <div className="mt-4">
@@ -48,14 +38,10 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     );
 }
 
-/** Component 모드용 섹션 묶음 */
 function ComponentInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     return (
         <>
-            <div className="mt-4">
-                <CommonSection nodeId={nodeId} defId={defId} />
-            </div>
-
+            <CommonSection nodeId={nodeId} defId={defId} />
             <div className="mt-4">
                 <PropsAutoSection nodeId={nodeId} defId={defId} />
             </div>
@@ -90,7 +76,7 @@ export function Inspector() {
     const node = targetNodeId ? nodes[targetNodeId] : null;
 
     // 상단 border 컬러(기존 규칙 유지): Page=blue, Component=purple
-    const modeBorderStyle = modeBorderClass(ui?.mode);
+    const modeBorderStyle = mode === 'Page' ? 'border-t-blue-500' : 'border-t-purple-500';
 
     const handleToggleExpertMode = () => {
         const nextExpertMode = !expertMode;
@@ -100,7 +86,7 @@ export function Inspector() {
         setNotification(`고급 모드: ${nextExpertMode ? 'ON' : 'OFF'}`);
     };
 
-    // SaveAsComponentDialog에 전달할 nodeId (열렸을 때만 사용)
+    // SaveAsComponentDialog에 전달할 nodeId
     const dialogNodeId: NodeId | null = node?.id ?? null;
 
     return (
@@ -162,7 +148,7 @@ export function Inspector() {
             </div>
 
             {/* 스크롤이 필요한 Content 영역 */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            <div className="min-h-0 flex-1 overflow-y-auto">
                 {!node ? (
                     <div className="px-1 text-[12px] text-gray-500">
                         {mode === 'Page' ? 'Select a node to inspect.' : 'Select a component from the left panel.'}
