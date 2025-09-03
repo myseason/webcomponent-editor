@@ -23,7 +23,7 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
         <>
             <CommonSection nodeId={nodeId} defId={defId} />
             <div className="mt-4">
-                <InlineDivider label="Props" />
+                {/*<InlineDivider label="Props" />*/}
                 {def?.propsSchema?.length ? (
                     <div className="mt-2">
                         <PropsAutoSection nodeId={nodeId} defId={defId} />
@@ -33,7 +33,7 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
                 )}
             </div>
             <div className="mt-4">
-                <InlineDivider label="Styles" />
+                {/*<InlineDivider label="Styles" />*/}
                 <div className="mt-2">
                     <StylesSection />
                 </div>

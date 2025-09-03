@@ -1,13 +1,50 @@
 'use client';
+
 import React from 'react';
-import type { CSSDict, InspectorFilter, TagPolicy, TagPolicyMap, NodeId } from '../../../../core/types';
-import { ColorField, ChipBtn, Label, MiniInput, DisabledHint, useAllowed, DisallowReason, PermissionLock, reasonForKey } from './common';
+import type {
+    CSSDict,
+    InspectorFilter,
+    TagPolicy,
+    TagPolicyMap,
+    NodeId,
+} from '../../../../core/types';
+
+import {
+    useAllowed,
+    DisabledHint,
+    type DisallowReason,
+    PermissionLock,
+    reasonForKey,
+    ColorField,
+} from './common';
+
 import { useEditor } from '../../../useEditor';
 
-type BgMode = 'none' | 'color' | 'image' | 'transparent';
+// 인스펙터 공통 레이아웃 프리미티브 (라벨 80px + 우측 6그리드)
+import {
+    SectionShellV1,
+    RowV1,
+    RowLeftV1,
+    RowRightGridV1,
+    MiniInputV1,
+    MiniSelectV1,
+} from './layoutV1';
+
+// 안전 문자열 헬퍼
+function s(v: unknown): string {
+    if (v === undefined || v === null) return '';
+    return String(v).trim();
+}
+
+type BGMode = 'color' | 'image';
+
+function detectMode(img: string): BGMode {
+    if (img && /url\(/i.test(img)) return 'image';
+    return 'color';
+}
 
 export function BackgroundGroup(props: {
-    el: Record<string, unknown>;
+    el: Record<string, any>;
     patch: (css: CSSDict) => void;
     tag: string;
     tagPolicy: TagPolicy | undefined;
@@ -21,187 +58,206 @@ export function BackgroundGroup(props: {
 }) {
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
     const { ui, project } = useEditor();
-
     const allow = useAllowed(nodeId);
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
+    // 현재값
+    const backgroundColor = s((el as any).backgroundColor);
+    const backgroundImage = s((el as any).backgroundImage);
+    const backgroundRepeat = s((el as any).backgroundRepeat);
+    const backgroundSize = s((el as any).backgroundSize);
+    const backgroundPosition = s((el as any).backgroundPosition);
+
+    const initialMode: BGMode = detectMode(backgroundImage);
+    const [mode, setMode] = React.useState<BGMode>(initialMode);
+
     const renderLock = (controlKey: string) => {
         if (ui.mode === 'Component') {
-            return <PermissionLock componentId={componentId} controlKey={controlKey} />;
+            return <PermissionLock controlKey={`styles:${controlKey}`} componentId={componentId} />;
         }
         return null;
     };
 
-    const mode: BgMode = (() => {
-        if (typeof (el as any).backgroundImage === 'string' && String((el as any).backgroundImage).trim() !== '') return 'image';
-        if ((el as any).backgroundColor === 'transparent') return 'transparent';
-        if (typeof (el as any).backgroundColor === 'string') return 'color';
-        return 'none';
-    })();
+    // placeholder 옵션(더미)을 포함한 배열. 더미 선택 시 undefined로 패치
+    const sizeOptions = ['- size -', 'auto', 'cover', 'contain'] as const;
+    const repeatOptions = ['- repeat -', 'no-repeat', 'repeat', 'repeat-x', 'repeat-y', 'space', 'round'] as const;
+    const positionOptions = ['- position -', 'center', 'top left', 'top', 'right', 'bottom'] as const;
 
-    const setMode = (m: BgMode) => {
-        const css: CSSDict = {};
-        if (m === 'none') {
-            css.backgroundColor = undefined;
-            css.backgroundImage = undefined;
-        } else if (m === 'color') {
-            css.backgroundImage = undefined;
-            if (typeof (el as any).backgroundColor !== 'string' || (el as any).backgroundColor === 'transparent') css.backgroundColor = '#ffffff';
+    const onChangeMode = (m: BGMode) => {
+        setMode(m);
+        if (m === 'color') {
+            // 이미지 관련 속성 정리
+            patch({
+                backgroundImage: undefined,
+                backgroundRepeat: undefined,
+                backgroundSize: undefined,
+                backgroundPosition: undefined,
+            });
         } else if (m === 'image') {
-            css.backgroundColor = undefined;
-            if (typeof (el as any).backgroundImage !== 'string') css.backgroundImage = 'url("")';
-        } else if (m === 'transparent') {
-            css.backgroundImage = undefined;
-            css.backgroundColor = 'transparent';
+            // color는 그대로 두되 필요한 값만 채움
+            // (별도 초기화는 하지 않음: 사용자가 바로 URL을 입력)
         }
-        patch(css);
     };
 
-    const [url, setUrl] = React.useState('');
-    const applyUrl = () => {
-        const v = url.trim();
-        if (!v) return;
-        patch({ backgroundImage: `url("${v}")` });
-        setUrl('');
+    const setSize = (v: string) => {
+        const next = v.startsWith('--') ? undefined : v || undefined;
+        patch({ backgroundSize: next });
     };
 
-    const onUpload: React.ChangeEventHandler<HTMLInputElement> = (e) => {
-        const f = e.target.files?.[0];
-        if (!f) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-            const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-            if (dataUrl) patch({ backgroundImage: `url("${dataUrl}")` });
-        };
-        reader.readAsDataURL(f);
-        e.currentTarget.value = '';
+    const setRepeat = (v: string) => {
+        const next = v.startsWith('--') ? undefined : v || undefined;
+        patch({ backgroundRepeat: next });
     };
 
-    const gradients = [
-        { name: 'Sunset', css: 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%)' },
-        { name: 'Ocean', css: 'linear-gradient(135deg, #00c6ff 0%, #0072ff 100%)' },
-        { name: 'Midnight', css: 'linear-gradient(135deg, #232526 0%, #414345 100%)' },
-        { name: 'Candy', css: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)' },
-    ] as const;
+    const setPosition = (v: string) => {
+        const next = v.startsWith('--') ? undefined : v || undefined;
+        patch({ backgroundPosition: next });
+    };
 
     return (
-        <div>
-            <div
-                className="flex items-center justify-between text-xs font-semibold text-neutral-700 cursor-pointer select-none px-1 py-1 mt-2"
-                onClick={onToggle}
-            >
-                <span>{open ? '▾' : '▸'} Background</span>
-            </div>
+        <div className="mt-4">
+            <SectionShellV1 title="Background" open={open} onToggle={onToggle}>
+                {/* ── Mode: select (3칸) ───────────────────────────────────── */}
+                <RowV1>
+                    <RowLeftV1 title="mode" />
+                    <RowRightGridV1>
+                        <div className="col-span-3 min-w-0">
+                            {/* 모드 자체는 정책 키가 아니므로 DisabledHint 생략 */}
+                            <MiniSelectV1
+                                value={mode}
+                                options={['color', 'image']}
+                                onChange={(v) => onChangeMode((v as BGMode) || 'color')}
+                                title="background mode"
+                            />
+                        </div>
+                        {/* 나머지 3칸은 정렬 유지용 비움 */}
+                        <div className="col-span-3" />
+                    </RowRightGridV1>
+                </RowV1>
 
-            {open && (
-                <div className="mt-2 space-y-3 px-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <Label>mode</Label>
-                        {(['none', 'color', 'image', 'transparent'] as BgMode[]).map((m) => (
-                            <ChipBtn key={m} onClick={() => setMode(m)} active={mode === m} title={m}>
-                                {m}
-                            </ChipBtn>
-                        ))}
-                    </div>
-
-                    {mode === 'color' && (
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <Label>backgroundColor</Label>
+                {/* ── COLOR MODE ───────────────────────────────────────────── */}
+                {mode === 'color' && (
+                    <RowV1>
+                        <RowLeftV1 title="color" />
+                        <RowRightGridV1>
+                            {/* color-picker (1칸) */}
+                            <div className="col-span-6 min-w-0 flex items-center">
                                 {renderLock('backgroundColor')}
-                                {!allow.has('backgroundColor') && <DisabledHint reason={dis('backgroundColor')!} />}
-                                {allow.has('backgroundColor') ? (
-                                    <>
+                                {!allow.has('backgroundColor') && (
+                                    <DisabledHint reason={dis('backgroundColor') ?? 'template'} />
+                                )}
+                                <div className="origin-left scale-90">
+                                    {allow.has('backgroundColor') ? (
                                         <ColorField
-                                            value={(el as any).backgroundColor as string | undefined}
+                                            value={backgroundColor || '#000000'}
                                             onChange={(v) => patch({ backgroundColor: v })}
                                         />
-                                        <ChipBtn title="clear" onClick={() => patch({ backgroundColor: undefined })}>
-                                            Clear
-                                        </ChipBtn>
-                                    </>
-                                ) : (
-                                    <span className="text-xs text-neutral-500">제한됨</span>
-                                )}
+                                    ) : (
+                                        <span className="text-[11px] text-gray-500">제한됨</span>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        </RowRightGridV1>
+                    </RowV1>
+                )}
 
-                    {mode === 'image' && (
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <Label>gradient presets</Label>
-                                {renderLock('backgroundImage')}
-                                {gradients.map((g) => (
-                                    <ChipBtn
-                                        key={g.name}
-                                        onClick={() => patch({ backgroundImage: g.css })}
-                                        disabled={!allow.has('backgroundImage')}
-                                        title={g.name}
-                                    >
-                                        {g.name}
-                                    </ChipBtn>
-                                ))}
-                            </div>
+                {/* ── IMAGE MODE ───────────────────────────────────────────── */}
+                {mode === 'image' && (
+                    <>
+                        {/* url: textfield (6칸) */}
+                        <RowV1>
+                            <RowLeftV1 title="url" />
+                            <RowRightGridV1>
+                                <div className="col-span-6 min-w-0">
+                                    {renderLock('backgroundImage')}
+                                    {!allow.has('backgroundImage') && (
+                                        <DisabledHint reason={dis('backgroundImage') ?? 'template'} />
+                                    )}
+                                    {allow.has('backgroundImage') ? (
+                                        <MiniInputV1
+                                            value={
+                                                backgroundImage
+                                                    ? backgroundImage.replace(/^url\((.*)\)$/i, '$1')
+                                                    : ''
+                                            }
+                                            onChange={(v) => {
+                                                const trimmed = s(v);
+                                                const next = trimmed ? `url(${trimmed})` : undefined;
+                                                patch({ backgroundImage: next });
+                                            }}
+                                            placeholder="/image.png"
+                                            size="auto"
+                                            title="background-image url"
+                                        />
+                                    ) : (
+                                        <span className="text-[11px] text-gray-500">제한됨</span>
+                                    )}
+                                </div>
+                            </RowRightGridV1>
+                        </RowV1>
 
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <Label>URL / Upload</Label>
-                                {allow.has('backgroundImage') ? (
-                                    <>
-                                        <MiniInput value={url} onChange={setUrl} placeholder="https://…" className="w-24" />
-                                        <ChipBtn title="apply" onClick={applyUrl}>Apply</ChipBtn>
-                                        <input type="file" accept="image/*" onChange={onUpload} className="text-[11px] max-w-full" />
-                                    </>
-                                ) : (
-                                    <span className="text-xs text-neutral-500">제한됨</span>
-                                )}
-                            </div>
+                        {/* opt: size(2칸, placeholder) | repeat(2칸, placeholder) | position(2칸, placeholder) */}
+                        <RowV1>
+                            <RowLeftV1 title="opt" />
+                            <RowRightGridV1>
+                                {/* size */}
+                                <div className="col-span-2 min-w-0">
+                                    {renderLock('backgroundSize')}
+                                    {!allow.has('backgroundSize') && (
+                                        <DisabledHint reason={dis('backgroundSize') ?? 'template'} />
+                                    )}
+                                    {allow.has('backgroundSize') ? (
+                                        <MiniSelectV1
+                                            value={backgroundSize || sizeOptions[0]}
+                                            options={sizeOptions as unknown as string[]}
+                                            onChange={(v) => setSize(v as string)}
+                                            title="background-size"
+                                        />
+                                    ) : (
+                                        <span className="text-[11px] text-gray-500">제한됨</span>
+                                    )}
+                                </div>
 
-                            <div className="flex items-center gap-2">
-                                <Label>backgroundSize</Label>
-                                {renderLock('backgroundSize')}
-                                {!allow.has('backgroundSize') && <DisabledHint reason={dis('backgroundSize')!} />}
-                                {allow.has('backgroundSize') ? (
-                                    <MiniInput
-                                        value={(el as any).backgroundSize as string | undefined}
-                                        onChange={(v) => patch({ backgroundSize: v })}
-                                    />
-                                ) : (
-                                    <span className="text-xs text-neutral-500">제한됨</span>
-                                )}
-                            </div>
+                                {/* repeat */}
+                                <div className="col-span-2 min-w-0">
+                                    {renderLock('backgroundRepeat')}
+                                    {!allow.has('backgroundRepeat') && (
+                                        <DisabledHint reason={dis('backgroundRepeat') ?? 'template'} />
+                                    )}
+                                    {allow.has('backgroundRepeat') ? (
+                                        <MiniSelectV1
+                                            value={backgroundRepeat || repeatOptions[0]}
+                                            options={repeatOptions as unknown as string[]}
+                                            onChange={(v) => setRepeat(v as string)}
+                                            title="background-repeat"
+                                        />
+                                    ) : (
+                                        <span className="text-[11px] text-gray-500">제한됨</span>
+                                    )}
+                                </div>
 
-                            <div className="flex items-center gap-2">
-                                <Label>backgroundRepeat</Label>
-                                {renderLock('backgroundRepeat')}
-                                {!allow.has('backgroundRepeat') && <DisabledHint reason={dis('backgroundRepeat')!} />}
-                                {allow.has('backgroundRepeat') ? (
-                                    <MiniInput
-                                        value={(el as any).backgroundRepeat as string | undefined}
-                                        onChange={(v) => patch({ backgroundRepeat: v })}
-                                    />
-                                ) : (
-                                    <span className="text-xs text-neutral-500">제한됨</span>
-                                )}
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <Label>backgroundPosition</Label>
-                                {renderLock('backgroundPosition')}
-                                {!allow.has('backgroundPosition') && <DisabledHint reason={dis('backgroundPosition')!} />}
-                                {allow.has('backgroundPosition') ? (
-                                    <MiniInput
-                                        value={(el as any).backgroundPosition as string | undefined}
-                                        onChange={(v) => patch({ backgroundPosition: v })}
-                                    />
-                                ) : (
-                                    <span className="text-xs text-neutral-500">제한됨</span>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
+                                {/* position */}
+                                <div className="col-span-2 min-w-0">
+                                    {renderLock('backgroundPosition')}
+                                    {!allow.has('backgroundPosition') && (
+                                        <DisabledHint reason={dis('backgroundPosition') ?? 'template'} />
+                                    )}
+                                    {allow.has('backgroundPosition') ? (
+                                        <MiniSelectV1
+                                            value={backgroundPosition || positionOptions[0]}
+                                            options={positionOptions as unknown as string[]}
+                                            onChange={(v) => setPosition(v as string)}
+                                            title="background-position"
+                                        />
+                                    ) : (
+                                        <span className="text-[11px] text-gray-500">제한됨</span>
+                                    )}
+                                </div>
+                            </RowRightGridV1>
+                        </RowV1>
+                    </>
+                )}
+            </SectionShellV1>
         </div>
     );
 }

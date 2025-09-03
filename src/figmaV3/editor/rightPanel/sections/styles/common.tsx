@@ -201,7 +201,7 @@ export const ColorField: React.FC<{
                 onChange={(e) => onChange(e.target.value)}
                 disabled={disabled}
                 title={title}
-                className="w-8 h-8 p-1 border rounded-md border-[var(--mdt-color-border)] cursor-pointer"
+                className="w-6 h-6 border rounded-md border-[var(--mdt-color-border)] cursor-pointer"
                 style={{ backgroundColor: 'transparent' }}
             />
             <MiniInput
@@ -210,7 +210,7 @@ export const ColorField: React.FC<{
                 placeholder="#000000 or var(--name)"
                 disabled={disabled}
                 title={title}
-                className="w-32"
+                className="w-20"
             />
         </div>
     );
