@@ -118,6 +118,45 @@ export function chooseValidParentId(
         }
         currentId = findParentId(project.nodes, currentId);
     }
-
     return project.rootId;
+}
+
+// === Inspector Target Utilities ===
+export function isDescendant(project: any, candidateId: NodeId | null, rootId: NodeId | null): boolean {
+    if (!candidateId || !rootId) return false;
+    let cur: NodeId | null = candidateId;
+    while (cur) {
+        if (cur === rootId) return true;
+        const parent = project.nodes[cur]?.parent as NodeId | null | undefined; // parentId 아님, parent 맞음
+        cur = (parent ?? null) as NodeId | null;
+    }
+    return false;
+}
+
+export function getFragmentRootId(project: any, fragments: any[], editingFragmentId: string | null): NodeId | null {
+    if (!editingFragmentId) return null;
+    const f = fragments.find((x) => x.id === editingFragmentId);
+    return (f?.rootId ?? null) as NodeId | null;
+}
+
+/**
+ * Inspector가 실제로 편집해야 할 타깃 노드 계산
+ * - Page 모드: selectedId ?? rootId
+ * - Component 모드: selectedId가 fragmentRoot의 하위면 selectedId, 아니면 fragmentRoot
+ */
+export function getInspectorTargetNodeId(state: any): NodeId | null {
+    const { project, ui } = state;
+    const { mode, selectedId } = ui;
+    const rootId = project.rootId as NodeId;
+    if (mode === 'Page') {
+        return (selectedId ?? rootId) as NodeId;
+    }
+    // Component Dev Mode
+    const fragmentRootId = getFragmentRootId(project, project.fragments ?? [], ui.editingFragmentId ?? null);
+    if (!fragmentRootId)
+        return null;
+
+    return isDescendant(project, (selectedId ?? null) as NodeId | null, fragmentRootId)
+        ? (selectedId as NodeId)
+        : fragmentRootId;
 }

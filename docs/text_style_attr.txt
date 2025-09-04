@@ -1,0 +1,19 @@
+속성명	설명	값 타입 및 예시
+color	텍스트 색상 지정	색상코드, 색상명, rgb(), rgba(), hsl(), hsla() 등
+font-family	글꼴 종류 지정	글꼴 이름 문자열 (복수 가능, 쉼표 구분)
+font-size	글자 크기 지정	길이단위(px, em, rem, %, pt 등) 혹은 키워드 (small, medium, large 등)
+font-weight	글자 굵기	normal, bold, 숫자(100~900)
+font-style	글자 스타일 (이탤릭)	normal, italic, oblique
+font-variant	스몰캡스 등 글자 변형	normal, small-caps
+font-stretch	글꼴 너비	normal, condensed, expanded 등
+text-align	텍스트 정렬	left, right, center, justify, start, end
+text-decoration	텍스트 장식 (밑줄, 취소선 등)	none, underline, overline, line-through, blink
+text-transform	대소문자 변환	none, capitalize, uppercase, lowercase, full-width
+text-indent	텍스트 들여쓰기	길이 단위(px, em, %)
+line-height	행간(줄 간격)	숫자, 길이단위, normal
+letter-spacing	글자 간격	길이 단위(px, em 등)
+word-spacing	단어 간격	길이 단위(px, em 등)
+text-shadow	텍스트 그림자 효과	<가로 거리> <세로 거리> <번짐 정도>? <색상>?
+white-space	공백 처리 방식	normal, nowrap, pre, pre-wrap, pre-line
+direction	텍스트 방향	ltr, rtl
+unicode-bidi	유니코드 텍스트 처리	normal, embed, isolate, bidi-override

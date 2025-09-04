@@ -1,0 +1,169 @@
+INSPECTOR VISIBILITY POLICY (v2) — Proposal for webcomponent-editor (feature/v1.3)
+
+Author: Assistant
+Date: 2025-09-03 (Asia/Seoul)
+
+Scope
+-----
+This document defines how the Inspector decides which sections/fields to SHOW or HIDE in both "기본 (basic)" and "고급 (expert)" modes, without breaking existing behavior. It layers on top of the current repo and keeps source-compatibility by default.
+
+Top-Level Goals
+---------------
+G1) As(Tag) is ALWAYS visible for the selected node, regardless of mode and regardless of whether the component has a propsSchema.
+G2) In BASIC mode, only developer-allowed props/styles are visible and editable.
+G3) In EXPERT mode, everything is visible by default, except when a component opts out; then only the explicitly allowed items are visible.
+G4) Props/Styles that are invalid for the selected tag/component must not be displayed.
+G5) Prefer HIDE over disable/lock: anything a user cannot set should be invisible in the Inspector UI.
+
+Current Behavior (as of feature/v1.3)
+-------------------------------------
+• Inspector.tsx: PropsAutoSection is rendered only if def?.propsSchema?.length is truthy. (This hides As(Tag) for nodes without schema.)
+• PropsAutoSection.tsx: returns null when !def or schema.length === 0 (As(Tag) disappears for Box/root).
+• StylesSection.tsx: consumes no props; uses getEffectivePoliciesForNode() then renders groups.
+
+Gaps vs Goals
+-------------
+• G1 violated: As(Tag) disappears in Page mode for root/Box or any def without propsSchema.
+• G2/G3 not formally encoded: visibility is mainly controlled by inspector.controls + expertMode checks, but there is no per-component "allowAllInExpert" switch and no explicit allow/deny lists.
+• G4 partially handled ad-hoc: e.g., Image when tag is not 'img' (src/alt) is not consistently filtered.
+
+Policy Data Model (v2) [Non-breaking]
+-------------------------------------
+File: src/figmaV3/policy/types.local.ts (NEW)
+- Extend per-component policy with mode-aware "allow" lists and an expert-mode override.
+
+  type InspectorModePolicy = {
+    allowProps?: string[];
+    allowStyles?: string[];
+    denyProps?: string[];
+    denyStyles?: string[];
+    allowAllInExpert?: boolean; // default true
+  };
+
+  export type ComponentInspectorPolicyV2 = {
+    modes?: {
+      basic?: InspectorModePolicy;
+      expert?: InspectorModePolicy; // uses allowAllInExpert
+    };
+    inspector?: { controls?: Record<string, { visible?: boolean }> }; // keep existing v1 for compatibility
+  };
+
+Algorithm — Visibility
+----------------------
+1) Tag-Invalid Filter (must hide)
+   • If def.title === 'Image' and selected tag !== 'img', hide 'src' and 'alt'.
+   • (Future) use TagPolicy to compute legal attributes/props for the concrete tag and hide non-legal items.
+
+2) Mode/Component Filter (v2)
+   • Basic mode:
+       - Only allowProps/allowStyles are visible. If empty/missing, be conservative (hide). 
+       - Still respect inspector.controls (v1) when present (visible=false hides it).
+   • Expert mode:
+       - If allowAllInExpert !== false -> everything visible except deny lists.
+       - If allowAllInExpert === false -> only allow lists are visible (deny still hides).
+
+3) Result:
+   • finalVisible = baseSchema - reservedKeys - tagInvalids - (mode/deny) + (mode/allow when needed).
+
+Integration Points (minimal changes)
+------------------------------------
+A) Inspector.tsx (As(Tag) always)
+   - Remove the def?.propsSchema?.length gate and always render <PropsAutoSection .../>.
+   - This alone ensures As(Tag) is always visible (G1).
+
+B) PropsAutoSection.tsx
+   - Do NOT return null when schema.length === 0; still render the As(Tag) + Tag Attributes block.
+   - Add final visibility filter that plugs into policy-v2:
+       const { isVisibleProp } = usePropVisibility(nodeId, defId);
+       const finalEntries = visibleEntries.filter(e => isVisibleProp(e.key));
+   - Keep/adapt tag-based filter (Image/div → hide src/alt). Externalize into a hook: useTagBasedPropFilter.
+
+C) StylesSection.tsx and each *Group.tsx (TypographyGroup, LayoutGroup, ...)
+   - Before mapping a key, filter with useStyleVisibility(nodeId, defId).isVisibleStyleKey(key).
+   - No signature changes needed for StylesSection (keeps current API).
+
+D) Optional: PermissionLock
+   - Keep icons only if you want an affordance; actual restriction must be handled via visibility filters.
+   - In expert mode, lock icons should be hidden by default (or replaced with a subtle indicator), since visibility decides authority.
+
+New Utilities
+-------------
+File: src/figmaV3/editor/rightPanel/sections/policyVis.ts (NEW)
+
+• usePropVisibility(nodeId, defId):
+   - reads project.policies.components[def.title] (v2) and ui.expertMode.
+   - computes isVisibleProp(key) with the algorithm above.
+   - composes with useTagBasedPropFilter for tag-based invalids.
+
+• useStyleVisibility(nodeId, defId):
+   - computes isVisibleStyleKey(key) with the same v2 logic.
+
+• useTagBasedPropFilter(defTitle, selTag):
+   - returns a function (key) => boolean for immediate invalids (e.g., hide 'src'/'alt' when img not selected).
+
+Reserved Keys (never auto-rendered as props)
+--------------------------------------------
+RESERVED_PROP_KEYS = ['as','href','tag','__tag','__tagAttrs','id','name','slotId']
+
+Backward Compatibility
+----------------------
+• If a component has NO policy.v2, behavior stays as-is:
+   - BASIC: fallback to existing inspector.controls if present; otherwise keep current limited set (or show none for props unless allowed by v1 controls).
+   - EXPERT: allowAllInExpert defaults to true → show all (minus invalids).
+• Existing files and types are untouched unless the project wants the v2 benefits.
+
+Files to Change (minimal touch set)
+-----------------------------------
+1) src/figmaV3/editor/rightPanel/Inspector.tsx
+   - Always render PropsAutoSection (remove propsSchema guard).
+2) src/figmaV3/editor/rightPanel/sections/PropsAutoSection.tsx
+   - Remove early return on empty schema.
+   - Add v2 visibility hook filter.
+   - Keep As(Tag) + Tag Attributes UI always.
+3) src/figmaV3/editor/rightPanel/sections/StylesSection.tsx and styles/*Group.tsx
+   - Filter style keys via v2 visibility hook before rendering.
+4) src/figmaV3/editor/rightPanel/sections/policyVis.ts (NEW)
+   - Add 3 hooks: usePropVisibility, useStyleVisibility, useTagBasedPropFilter.
+5) src/figmaV3/policy/types.local.ts (NEW)
+   - Define ComponentInspectorPolicyV2 and InspectorModePolicy.
+6) (Optional) src/figmaV3/editor/rightPanel/sections/styles/common.tsx
+   - If PermissionLock stays, guard its render with !ui.expertMode.
+
+Examples (Policy Data)
+----------------------
+• Image
+  {
+    modes: {
+      basic: { allowProps: ['src','alt'], allowStyles: ['width','height','display'] },
+      expert: { allowAllInExpert: false, allowProps: ['src','alt','loading','decoding'], allowStyles: ['*'] }
+    }
+  }
+
+• Button
+  {
+    modes: {
+      basic: { allowProps: ['text','variant','onClick'], allowStyles: ['display','padding','fontSize'] },
+      expert: { allowAllInExpert: true }
+    }
+  }
+
+Test Plan
+---------
+T1 As(Tag) is visible for: (a) Box/root (no schema), (b) Button with schema, (c) Image with schema.
+T2 Image: Change As(Tag) from img → div → src/alt disappear immediately; revert to img → src/alt reappear.
+T3 Basic mode: Only allow lists visible; toggling to Expert shows all (unless allowAllInExpert=false).
+T4 Expert mode with allowAllInExpert=false: Only allow lists visible; deny lists hidden.
+T5 Styles groups: keys hidden/visible based on policy-v2; no disabled controls are shown.
+T6 No regressions: SaveAsComponent, toggles, headers remain intact.
+T7 Undo/Redo: Visibility responds to tag/prop changes correctly after history ops.
+
+Citations
+---------
+• Inspector hides PropsAutoSection when def.propsSchema?.length is falsy (causing As(Tag) to disappear):
+  - src/figmaV3/editor/rightPanel/Inspector.tsx (feature/v1.3)
+• PropsAutoSection returns null when schema.length===0 (also hides As(Tag)):
+  - src/figmaV3/editor/rightPanel/sections/PropsAutoSection.tsx (feature/v1.3)
+• StylesSection consumes no props and uses policy utilities:
+  - src/figmaV3/editor/rightPanel/sections/StylesSection.tsx (feature/v1.3)
+
+End of document.

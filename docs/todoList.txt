@@ -1,0 +1,16 @@
+Inspector
+    As(Tag) -> PropsAutoSection으로 이동 (OK)
+    Attr 추가 기능 필요. (OK)
+    기본/고급일 때 구분 필요
+
+
+1. 컴포넌트를 저장할 때.. Box 컨테이너 설정 중 canHaveChildren = false 로 설정 해야 함
+    - 즉 단일 요소로 만들어야 함
+
+2. Inspector 패널에서
+    - Tag을 변경 했을 때 TagPolicy 및 StylePolicy에 따라 Inspector의 구성이 달라져야 함
+
+3. 페이지 전체에 삽입되는 스크립트 와 컴포넌트에 삽입되는 스크립트 혹은 자체 액션을 위한 스크립트 추가 방법
+    - 로깅 추적 등
+
+[중요] 내부 아키텍처 설계를 튼튼하게 해야 함

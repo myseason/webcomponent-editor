@@ -1,0 +1,119 @@
+INSPECTOR 노출 정책 (v2) — webcomponent-editor (feature/v1.3)
+
+
+적용 범위
+---------
+이 문서는 Inspector 패널에서 어떤 속성과 스타일을 노출/숨김 처리할지에 대한 정책을 정의합니다. 
+"기본" / "고급" 두 가지 모드를 지원하며, 기존 레포지토리의 동작을 깨뜨리지 않으면서 확장 가능하도록 설계되었습니다.
+
+주요 목표
+---------
+G1) As(Tag)는 항상 Inspector에 표시되어야 함. (모드와 propsSchema 유무와 관계 없음)
+G2) 기본 모드에서는 개발자가 허용한 속성과 스타일만 노출됨.
+G3) 고급 모드에서는 원칙적으로 모든 속성과 스타일을 노출하되, 컴포넌트 정책에 따라 제한할 수 있음.
+G4) 컴포넌트/태그에서 지원하지 않는 속성과 스타일은 Inspector에서 아예 숨김.
+G5) "숨김"을 기본 원칙으로 하며, 잠금/비활성화는 보조적 시각적 장치로만 사용.
+
+현재 소스 기준 문제점
+-------------------
+• Inspector.tsx: def?.propsSchema?.length 조건 때문에 Box/root 같은 노드는 PropsAutoSection이 렌더되지 않아 As(Tag)도 사라짐.
+• PropsAutoSection.tsx: schema.length === 0이면 null 반환 → As(Tag) 표시 안 됨.
+• StylesSection.tsx: 정책 적용 없이 그룹을 전부 렌더함.
+
+정책 데이터 모델 (v2)
+--------------------
+신규 파일: src/figmaV3/policy/types.local.ts
+
+type InspectorModePolicy = {
+  allowProps?: string[];
+  allowStyles?: string[];
+  denyProps?: string[];
+  denyStyles?: string[];
+  allowAllInExpert?: boolean; // 기본 true
+};
+
+export type ComponentInspectorPolicyV2 = {
+  modes?: {
+    basic?: InspectorModePolicy;
+    expert?: InspectorModePolicy;
+  };
+  inspector?: { controls?: Record<string, { visible?: boolean }> }; // 기존 v1 호환
+};
+
+알고리즘 (Visibility 결정 과정)
+------------------------------
+1) 태그 무효 항목 필터링
+   - 예: Image 컴포넌트인데 tag !== 'img' → src, alt 숨김
+   - (확장 가능) globalTagPolicy를 활용해 태그별 합법 속성만 남김
+
+2) 모드/컴포넌트 정책 필터
+   - 기본 모드: allow 리스트만 표시
+   - 고급 모드: 
+       allowAllInExpert=true → 모두 표시(deny 제외)
+       allowAllInExpert=false → allow 리스트만 표시
+
+3) 최종 표시 항목 = (schema - reservedKeys - tagInvalids) ∩ 정책 허용
+
+적용 방법
+---------
+A) Inspector.tsx
+   - PropsAutoSection을 항상 렌더 (def?.propsSchema?.length 조건 제거)
+
+B) PropsAutoSection.tsx
+   - null 반환 제거
+   - usePropVisibility 훅을 사용해 visibleEntries 필터링
+   - As(Tag) + Tag Attributes는 항상 노출
+
+C) StylesSection.tsx 및 각 *Group.tsx
+   - 스타일 키를 렌더하기 전 useStyleVisibility 훅으로 필터링
+
+D) PermissionLock
+   - expertMode일 때는 기본적으로 숨김
+   - 실제 제약은 visibility 훅에서 처리
+
+신규 유틸리티
+-------------
+파일: src/figmaV3/editor/rightPanel/sections/policyVis.ts
+
+• usePropVisibility(nodeId, defId): 
+   정책 + 모드 + 태그 필터링 후 prop 표시 여부 반환
+
+• useStyleVisibility(nodeId, defId): 
+   정책 + 모드 필터링 후 style key 표시 여부 반환
+
+• useTagBasedPropFilter(defTitle, selTag):
+   태그 기반 무효 속성 필터 (예: img 아닌 경우 src/alt 제거)
+
+예시 정책
+---------
+Image:
+{
+  modes: {
+    basic: { allowProps: ['src','alt'], allowStyles: ['width','height','display'] },
+    expert: { allowAllInExpert: false, allowProps: ['src','alt','loading','decoding'], allowStyles: ['*'] }
+  }
+}
+
+Button:
+{
+  modes: {
+    basic: { allowProps: ['text','variant','onClick'], allowStyles: ['display','padding','fontSize'] },
+    expert: { allowAllInExpert: true }
+  }
+}
+
+테스트 플랜
+-----------
+T1) Box/root 선택 시에도 As(Tag) 항상 보임
+T2) Image: tag 변경 (img → div) 시 src/alt 즉시 숨김, 다시 img 선택 시 복원
+T3) 기본 모드: allow 리스트 항목만 표시
+T4) 고급 모드: 전체 표시, 단 allowAllInExpert=false면 allow 리스트만 표시
+T5) Styles 그룹도 정책에 따라 필터링
+T6) Undo/Redo 이후에도 정책 반영 유지
+T7) 기존 SaveAsComponent, 토글, 헤더 기능은 회귀 없음
+
+참고 (근거)
+-----------
+• Inspector.tsx에서 def?.propsSchema?.length 조건으로 PropsAutoSection 미렌더 (→ As(Tag) 사라짐)
+• PropsAutoSection.tsx에서 schema.length===0 → return null (→ As(Tag) 사라짐)
+• StylesSection.tsx는 정책 훅 적용 없음

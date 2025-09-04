@@ -57,7 +57,7 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
 
     const currentTag = String(((node.props ?? {}) as any).__tag ?? defaultTag);
     const [selTag, setSelTag] = useState(currentTag);
-    React.useEffect(() => setSelTag(currentTag), [currentTag, nodeId]);
+    React.useEffect(() => setSelTag(currentTag), [currentTag, nodeId, defId]);
 
     const canChangeTag = allowedTags.length > 1;
     const applyTag = () => updateNodeProps(nodeId, { __tag: selTag || undefined });
@@ -79,7 +79,7 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
 
     const visibleEntries = useMemo(
         () => filterByTagAndDef(def?.title ?? '', selTag, baseEntries),
-        [def?.title, selTag, baseEntries]
+        [def?.title, defId, selTag, baseEntries]
     );
 
     const getCurrent = (key: string): unknown => (node.props as Record<string, unknown>)?.[key];

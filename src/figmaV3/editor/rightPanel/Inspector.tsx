@@ -11,6 +11,8 @@ import { StylesSection } from './sections/StylesSection';
 import { SchemaEditor } from './sections/SchemaEditor';
 import { SaveAsComponentDialog } from './sections/SaveAsComponentDialog';
 
+import { useInspectorViewModel } from '../../controllers/hooks';
+
 function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     // def는 필요 시 참조만, propsSchema 유무와 무관하게 PropsAutoSection을 항상 렌더
     const _def = getDefinition(defId);
@@ -65,6 +67,7 @@ export function Inspector() {
 
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
 
+
     // 대상 노드 선택: Page 모드면 현재 선택(or 루트), Component 모드면 편집 중 프래그먼트 루트
     const targetNodeId: NodeId | null =
         mode === 'Page'
@@ -74,6 +77,23 @@ export function Inspector() {
                 : null;
 
     const node = targetNodeId ? nodes[targetNodeId] : null;
+
+    //------------------------------------------------------------------------------------------------------------------
+    // 컨트롤러 기반 VM (타깃 노드 단일화)
+    const vm = useInspectorViewModel();
+
+    // 컨트롤러가 계산한 nodeId/defId가 있으면 우선 사용
+    const effectiveNodeId = (vm.target?.nodeId ?? targetNodeId) as NodeId | null;
+    const effectiveDefId =
+        vm.target?.componentId ??
+        (effectiveNodeId ? (nodes[effectiveNodeId]?.componentId as string | undefined) : undefined) ??
+        null as unknown as string | null;
+
+    // node도 effectiveNodeId 기준으로 다시 잡아줍니다.
+    const effectiveNode = effectiveNodeId ? nodes[effectiveNodeId] : null;
+
+    //------------------------------------------------------------------------------------------------------------------
+
 
     // 상단 border 컬러(기존 규칙 유지): Page=blue, Component=purple
     const modeBorderStyle = mode === 'Page' ? 'border-t-blue-500' : 'border-t-purple-500';
@@ -156,10 +176,16 @@ export function Inspector() {
                 ) : (
                     <>
                         {mode === 'Page' ? (
-                            <PageInspector nodeId={node.id as NodeId} defId={node.componentId as string} />
+                            <PageInspector
+                                nodeId={effectiveNodeId as NodeId}       // 기존: nodeId={targetNodeId}
+                                defId={(effectiveDefId as string) ?? ''} // 기존: defId={node.componentId 등}
+                            />
                         ) : (
                             editingFragmentId && (
-                                <ComponentInspector nodeId={node.id as NodeId} defId={node.componentId as string} />
+                                <ComponentInspector
+                                    nodeId={effectiveNodeId as NodeId}
+                                    defId={(effectiveDefId as string) ?? ''}
+                                />
                             )
                         )}
                     </>
