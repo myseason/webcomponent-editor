@@ -1,7 +1,6 @@
 'use client';
 
 import React, {JSX, useMemo, useState} from 'react';
-import { useEditor } from '../../useEditor';
 import type { CSSDict, Viewport } from '../../../core/types';
 import { getEffectivePoliciesForNode } from '../../../runtime/capabilities';
 
@@ -14,6 +13,7 @@ import { BorderGroup } from './styles/BorderGroup';
 import { BackgroundGroup } from './styles/BackgroundGroup';
 import { EffectsGroup } from './styles/EffectsGroup';
 import { CustomGroup } from './styles/CustomGroup';
+import {useInspectorController} from "@/figmaV3/controllers/InspectorController";
 
 type OpenState = {
     layout: boolean;
@@ -27,40 +27,46 @@ type OpenState = {
 };
 
 export function StylesSection(): JSX.Element {
-    const state = useEditor();
-    const expert = state.ui.expertMode;
+    const ctl = useInspectorController();
+    // 전문가 모드
+    const expert = ctl.expertMode;
 
     // 현재 선택 노드 (없으면 루트)
-    const nodeId = state.ui.selectedId ?? state.project.rootId;
-    const node = state.project.nodes[nodeId];
+    const nodeId = ctl.ui.selectedId ?? ctl.project.rootId;
+    const node = ctl.project.nodes[nodeId];
 
     // 정책/정의 정보 (베이스 유틸 사용)
     const policyInfo = useMemo(
-        () => getEffectivePoliciesForNode(state.project, nodeId),
-        [state.project, nodeId]
+        () => getEffectivePoliciesForNode(ctl.project, nodeId),
+        [ctl.project, nodeId]
     );
 
     if (!node || !policyInfo) {
-        return <div className="text-[12px] text-gray-500 px-1">Select a node to edit styles.</div>;
+        return (
+            <section className="space-y-2">
+                <div className="text-sm font-semibold">Styles</div>
+                <div className="text-xs text-muted-foreground">Select a node to edit styles.</div>
+            </section>
+        );
     }
 
     const { tag, tagPolicy, def } = policyInfo;
 
     // 뷰포트/스타일 병합 모드
-    const activeViewport: Viewport = state.ui.canvas.activeViewport;
-    const mode = state.ui.canvas.vpMode[activeViewport];
+    const activeViewport: Viewport = ctl.ui.canvas.activeViewport;
+    const mode = ctl.ui.canvas.vpMode[activeViewport];
 
     // 템플릿/컴포넌트별 인스펙터 필터 (베이스 구조 유지)
-    const tf = state.project.inspectorFilters?.[node.componentId];
+    const tf = ctl.project.inspectorFilters?.[node.componentId];
 
     // 현재 유효 CSS 선언 (베이스의 getEffectiveDecl 사용)
     const el = useMemo(() => {
-        return (state.getEffectiveDecl(nodeId) ?? {}) as CSSDict;
-    }, [state, nodeId]);
+        return (ctl.getEffectiveDecl(nodeId) ?? {}) as CSSDict;
+    }, [ctl, nodeId]);
 
     // 스타일 패치 (뷰포트 모드에 따라 대상 분기)
     const patch = (kv: CSSDict) =>
-        state.updateNodeStyles(
+        ctl.updateNodeStyles(
             nodeId,
             kv,
             mode === 'Independent' ? activeViewport : undefined
@@ -88,7 +94,7 @@ export function StylesSection(): JSX.Element {
         tag,
         tagPolicy,
         tf,
-        map: state.project.tagPolicies, // (기존 호환을 위해 유지)
+        map: ctl.project.tagPolicies, // (기존 호환을 위해 유지)
         expert,
         nodeId,
         componentId: def.id, // ✅ defId가 아니라 def.id 사용

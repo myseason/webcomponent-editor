@@ -1,11 +1,11 @@
 'use client';
 import React, { memo, useCallback, useMemo } from 'react';
-import { useEditor } from '../useEditor';
+import { useEditorLike as useEditor } from '../../controllers/adapters/useEditorLike';
 import type {NodeId, Node, Fragment} from '../../core/types';
 import { getDefinition } from '../../core/registry';
 import { Lock, Unlock, Eye, EyeOff, Trash2, GripVertical } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import {PanelTitle} from "@/figmaV3/editor/common/PanelTitle";
+import {PanelTitle} from "../../editor/common/PanelTitle";
 
 const LINE_COLOR = '#e5e7eb';
 

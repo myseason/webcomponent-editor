@@ -11,7 +11,7 @@
  */
 
 import * as React from 'react';
-import { useEditor } from '../../useEditor';
+import { useEditorLike as useEditor } from '../../../controllers/adapters/useEditorLike';
 import { editorStore } from '../../../store/editStore';
 import { runActions } from '../../../runtime/actions';
 import { getDefinition } from '../../../core/registry';

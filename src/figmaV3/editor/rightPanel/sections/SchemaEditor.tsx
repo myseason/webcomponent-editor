@@ -12,7 +12,7 @@
  */
 
 import React from 'react';
-import { useEditor } from '../../useEditor';
+import { useEditorLike as useEditor } from '../../../controllers/adapters/useEditorLike';
 import { getDefinition } from '../../../core/registry';
 import type {EditorState, NodeId, PropSchemaEntry} from '../../../core/types';
 

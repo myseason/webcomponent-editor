@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { useEditor } from '../../useEditor';
+import { useEditorLike as useEditor } from '../../../controllers/adapters/useEditorLike';
 import type { Page } from '../../../core/types';
 import { MoreHorizontal, Copy, Trash2 } from 'lucide-react';
 

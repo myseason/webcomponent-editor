@@ -1,8 +1,7 @@
-// src/figmaV3/controllers/hooks.ts
 import { useMemo } from 'react';
 import { useEditor } from '../editor/useEditor';
 import { EditorEngine } from '../engine/EditorEngine';
-import { InspectorController } from './InspectorController';
+import { useInspectorController } from './InspectorController';
 import type { NodeId } from '../core/types';
 import { computeInspectorTargetNodeId } from '../engine/selectors/inspector';
 
