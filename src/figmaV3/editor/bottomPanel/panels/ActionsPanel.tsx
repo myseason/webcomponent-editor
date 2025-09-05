@@ -10,7 +10,7 @@
  */
 
 import * as React from 'react';
-import { useEditorLike as useEditor } from '../../../controllers/adapters/useEditorLike';
+import { useActionsController } from '../../../controllers/ActionsController';
 import { editorStore } from '../../../store/editStore';
 import { runActions } from '../../../runtime/actions';
 import { getDefinition } from '../../../core/registry';
@@ -34,7 +34,8 @@ function readDynamicTag(def: any) {
 
 /* ───────────── Component: Tag 전환(동적) ───────────── */
 function TagSwitchRow({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent }) {
-    const state = useEditor();
+    const ctl = useActionsController();
+
     const node = state.project.nodes[nodeId];
 
     const def = getDefinition(node.componentId);
@@ -53,7 +54,7 @@ function TagSwitchRow({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent
     };
 
     const writeSteps = (next: ActionStep[]) => {
-        state.update((s: EditorState) => {
+        actionsAdapter.update((s: EditorState) => {
             const p = s.project.nodes[nodeId].props as Record<string, unknown>;
             const bag = (p.__actions as ActionsBag | undefined) ?? {};
             bag[event] = { steps: next };
@@ -95,8 +96,9 @@ function TagSwitchRow({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent
 
 /* ───────────── Component: Attributes(동적) ───────────── */
 function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent }) {
-    const state = useEditor();
-    const node = state.project.nodes[nodeId];
+    const actionsAdapter = useActionsAdapter();
+
+    const node = actionsAdapter.project.nodes[nodeId];
     const props = (node.props ?? {}) as Record<string, unknown>;
     const tagAttrs = (props.__tagAttrs as Record<string, string> | undefined) ?? {};
 
@@ -116,7 +118,7 @@ function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: Sup
     };
 
     const writeSteps = (next: ActionStep[]) => {
-        state.update((s: EditorState) => {
+        actionsAdapter.update((s: EditorState) => {
             const p = s.project.nodes[nodeId].props as Record<string, unknown>;
             const bag = (p.__actions as ActionsBag | undefined) ?? {};
             bag[event] = { steps: next };
@@ -174,11 +176,11 @@ function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: Sup
 
 /* ───────────── 메인 패널 ───────────── */
 export function ActionsPanel() {
-    const state = useEditor();
+    const actionsAdapter = useActionsAdapter();
     const [scope, setScope] = React.useState<Scope>('Component');
 
     // 선택 컨텍스트
-    const nodeId = state.ui.selectedId ?? null;
+    const nodeId = actionsAdapter.ui.selectedId ?? null;
 
     // Component 스코프만 실동작
     const [evt, setEvt] = React.useState<SupportedEvent>('onClick');
@@ -186,14 +188,14 @@ export function ActionsPanel() {
     // ✅ 메모 제거: 항상 최신 값을 직접 읽음
     const readStepsNow = React.useCallback((): ActionStep[] => {
         if (!nodeId || scope !== 'Component') return [];
-        const node = state.project.nodes[nodeId];
+        const node = actionsAdapter.project.nodes[nodeId];
         const bag = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
         return bag?.[evt]?.steps ?? [];
-    }, [nodeId, scope, evt, state.project.nodes]);
+    }, [nodeId, scope, evt, actionsAdapter.project.nodes]);
 
     const setSteps = (next: ActionStep[]) => {
         if (!nodeId) return;
-        state.update((s: EditorState) => {
+        actionsAdapter.update((s: EditorState) => {
             const p = s.project.nodes[nodeId].props as Record<string, unknown>;
             const bag = (p.__actions as ActionsBag | undefined) ?? {};
             bag[evt] = { steps: next };
@@ -205,13 +207,13 @@ export function ActionsPanel() {
     const addNavigate = () =>
         setSteps([
             ...(readStepsNow() ?? []),
-            { kind: 'Navigate', toPageId: state.project.pages[0]?.id ?? state.project.rootId },
+            { kind: 'Navigate', toPageId: actionsAdapter.project.pages[0]?.id ?? actionsAdapter.project.rootId },
         ]);
 
     const runNow = async () => {
         const steps = readStepsNow(); // ✅ 최신 스텝 즉시 읽기
         if (steps.length === 0) {
-            state.setNotification?.('No steps.');
+            actionsAdapter.setNotification?.('No steps.');
             return;
         }
         await runActions(steps, {

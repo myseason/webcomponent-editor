@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useEngine } from '../engine/Engine';
+import { useEngine } from '../engine/EditorEngine';
 import { policyProvider } from '../domain/policy/PolicyProvider';
 
 export interface ProjectPolicyReader {

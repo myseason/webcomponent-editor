@@ -1,6 +1,5 @@
 'use client';
 import React, { memo, useCallback, useMemo } from 'react';
-import { useEditorLike as useEditor } from '../../controllers/adapters/useEditorLike';
 import { useLayersController } from '../../controllers/LayersController';
 import type {NodeId, Node, Fragment} from '../../core/types';
 import { getDefinition } from '../../core/registry';
@@ -40,9 +39,8 @@ const getDisplayName = (node: Node): string => {
 };
 
 const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
-    const state = useEditor();
-    const layersCtl = useLayersController();
-    const node = state.project.nodes[id];
+    const ctl = useLayersController();
+    const node = ctl.reader().getNode(id);
 
     const { attributes, listeners, setNodeRef: draggableRef, isDragging } = useDraggable({ id, data: { kind: 'layers-node', nodeId: id } });
     const { setNodeRef: droppableRef } = useDroppable({ id, data: { kind: 'layers-node', nodeId: id, position: 'inside' } });
@@ -50,27 +48,27 @@ const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
     if (!node) return null;
 
     const isRoot =
-        id === state.project.rootId ||
-        id === state.project.fragments.find((f: Fragment) => f.id === state.ui.editingFragmentId)?.rootId;
+        id === ctl.reader().getRootId() ||
+        id === ctl.reader().getEditingFragment()?.rootId;
 
-    const selected = state.ui.selectedId === id;
+    const selected = ctl.reader().getSelectedId() === id;
     const name = getDisplayName(node);
 
     // ✅ props.id는 unknown → 문자열일 때만 표시
     const humanId = typeof node.props?.id === 'string' ? node.props.id : undefined;
 
     // ✨ 쓰기 경로만 컨트롤러로 위임 (UI/마크업 불변)
-    const onSelect = useCallback(() => layersCtl.select(id), [layersCtl, id]);
-    const onToggleVisible = useCallback(() => layersCtl.toggleVisibility(id), [layersCtl, id]);
-    const onToggleLock = useCallback(() => layersCtl.toggleLock(id), [layersCtl, id]);
+    const onSelect = useCallback(() => ctl.writer().setSelected(id), [ctl.writer(), id]);
+    const onToggleVisible = useCallback(() => ctl.writer().toggleVisibility(id), [ctl.writer(), id]);
+    const onToggleLock = useCallback(() => ctl.writer().toggleLock(id), [ctl.writer(), id]);
     const onRemove = useCallback(() => {
         if (isRoot) return;
-        layersCtl.removeCascade(id);
-    }, [layersCtl, id, isRoot]);
+        ctl.writer().removeCascade(id);
+    }, [ctl.writer(), id, isRoot]);
 
     const children = useMemo(
-        () => ((node.children ?? []) as NodeId[]).filter((cid) => !!state.project.nodes[cid]),
-        [node.children, state.project.nodes],
+        () => ((node.children ?? []) as NodeId[]).filter((cid) => !!ctl.reader().getNode(cid)),
+        [node.children, ctl.reader().nodesToken()],
     );
 
     return (
@@ -109,12 +107,12 @@ const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
 Row.displayName = 'Row';
 
 function Tree({ id, depth }: { id: NodeId; depth: number }) {
-    const state = useEditor();
-    const node = state.project.nodes[id];
+    const ctl = useLayersController();
+    const node = ctl.reader().getNode(id);
 
     const children = useMemo(
-        () => ((node.children ?? []) as NodeId[]).filter((cid) => !!state.project.nodes[cid]),
-        [node.children, state.project.nodes],
+        () => ((node.children ?? []) as NodeId[]).filter((cid) => !!ctl.reader().getNode(cid)),
+        [node.children, ctl.reader().nodesToken()],
     );
 
     return (
@@ -128,15 +126,17 @@ function Tree({ id, depth }: { id: NodeId; depth: number }) {
 }
 
 export function Layers() {
-    const state = useEditor();
-    const { mode, editingFragmentId } = state.ui;
+    const ctl = useLayersController();
+
+    const mode = ctl.reader().getMode();
+    const editingFragmentId = ctl.reader().getEditingFragmentId();
 
     const rootId =
         mode === 'Component' && editingFragmentId
-            ? state.project.fragments.find((f: Fragment) => f.id === editingFragmentId)?.rootId
-            : state.project.rootId;
+            ? ctl.reader().getEditingFragment()?.rootId as string
+            : ctl.reader().getRootId() as string;
 
-    if (!rootId || !state.project.nodes[rootId]) {
+    if (!rootId || !ctl.reader().getNode(rootId)) {
         return <div className="p-3 text-sm text-gray-500">루트 노드를 찾을 수 없습니다.</div>;
     }
 

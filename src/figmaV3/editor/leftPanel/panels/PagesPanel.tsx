@@ -1,7 +1,6 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { useEditorLike as useEditor } from '../../../controllers/adapters/useEditorLike';
-import { usePagesController } from '../../../controllers/PagesController';
+import { usePagesController } from '@/figmaV3/controllers/PagesController';
 import type { Page } from '../../../core/types';
 import { MoreHorizontal, Copy, Trash2 } from 'lucide-react';
 
@@ -52,11 +51,12 @@ const PageActions = ({ page, onDuplicate, onDelete }: { page: Page; onDuplicate:
 };
 
 export function PagesPanel() {
-    const state = useEditor();
-    const pagesCtl = usePagesController();
+    const pageCtl = usePagesController();
+    const pageReader = pageCtl.reader();
+    const pageWriter = pageCtl.writer();
 
-    const pages = state.project.pages ?? [];
-    const selectedPageId = state.ui.panels?.left?.lastActivePageId ?? pages[0]?.id ?? null;
+    const pages = React.useMemo<ReadonlyArray<Page>>(() => pageReader.list(), [pageReader]);
+    const selectedPageId = pageReader.getCurrentPageId() ?? pages[0]?.id ?? null;
     const [selectedPageIdForDetails, setSelectedPageIdForDetails] = useState<string | null>(selectedPageId);
 
     useEffect(() => {
@@ -65,19 +65,23 @@ export function PagesPanel() {
 
     const onCreate = () => {
         const name = prompt('Page title', 'New Page')?.trim();
-        if (!name) return;
-        const newPageId = pagesCtl.addPage(name);
-        if (newPageId) pagesCtl.selectPage(newPageId);
+        if (!name)
+            return;
+
+        const newPageId = pageWriter.addPage(name);
+        if (newPageId)
+            pageWriter.setCurrentPage(newPageId);
     };
 
     const onDuplicate = (pid: string) => {
-        const id = pagesCtl.duplicatePage(pid);
-        if (id) pagesCtl.selectPage(id);
+        const id = pageWriter.duplicatePage(pid);
+        if (id)
+            pageWriter.setCurrentPage(id);
     };
 
     const onDelete = (pid: string) => {
         if (!confirm('Delete this page?')) return;
-        pagesCtl.removePage(pid);
+        pageWriter.removePage(pid);
     };
 
     const selectedPage = pages.find((x) => x.id === selectedPageIdForDetails!) ?? null;
@@ -99,7 +103,7 @@ export function PagesPanel() {
                             <div key={p.id} className={`flex items-center justify-between px-2 py-1 ${isActive ? 'bg-blue-50' : 'hover:bg-neutral-50'}`}>
                                 <button
                                     className="text-left text-xs flex-1 py-1"
-                                    onClick={() => { pagesCtl.selectPage(p.id); setSelectedPageIdForDetails(p.id); }}
+                                    onClick={() => { pageWriter.setCurrentPage(p.id); setSelectedPageIdForDetails(p.id); }}
                                     aria-pressed={isActive}
                                     title={p.name ?? 'Untitled'}
                                 >
@@ -123,7 +127,7 @@ export function PagesPanel() {
                             <input
                                 className="w-full border rounded px-2 py-1 text-xs"
                                 value={selectedPage.name ?? ''}
-                                onChange={e => pagesCtl.updatePageMeta(selectedPage.id, { name: e.target.value })}
+                                onChange={e => pageWriter.updatePageMeta(selectedPage.id, { name: e.target.value })}
                             />
                         </div>
                         <div>
@@ -131,7 +135,7 @@ export function PagesPanel() {
                             <textarea
                                 className="w-full border rounded px-2 py-1 text-sm h-16 resize-none"
                                 value={selectedPage.description ?? ''}
-                                onChange={e => pagesCtl.updatePageMeta(selectedPage.id, { description: e.target.value })}
+                                onChange={e => pageWriter.updatePageMeta(selectedPage.id, { description: e.target.value })}
                             />
                         </div>
                         <div>
@@ -139,7 +143,7 @@ export function PagesPanel() {
                             <input
                                 className="w-full border rounded px-2 py-1 font-mono text-xs"
                                 value={selectedPage.slug ?? ''}
-                                onChange={e => pagesCtl.updatePageMeta(selectedPage.id, { slug: slugify(e.target.value) })}
+                                onChange={e => pageWriter.updatePageMeta(selectedPage.id, { slug: slugify(e.target.value) })}
                             />
                         </div>
                     </div>

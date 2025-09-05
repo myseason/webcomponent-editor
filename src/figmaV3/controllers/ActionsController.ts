@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useEngine } from '../engine/Engine';
+import { useEngine } from '../engine/EditorEngine';
 import type { NodeId, SupportedEvent, ActionStep } from '../core/types';
 import { runActions } from '../runtime/actions';
 

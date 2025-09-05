@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import type { NodeId } from '../core/types';
-import { useEngine } from '../engine/Engine';
+import { useEngine } from '../engine/EditorEngine';
 import { bindingService } from '../domain/binding/BindingService';
 
 export interface BindingReader {
