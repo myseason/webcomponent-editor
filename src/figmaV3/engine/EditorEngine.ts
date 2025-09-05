@@ -1,4 +1,3 @@
-// src/figmaV3/engine/EditorEngine.ts
 import type { NodeId } from '../core/types';
 
 type AnyRecord = Record<string, unknown>;

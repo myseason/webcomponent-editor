@@ -1,63 +1,102 @@
 'use client';
 
 import * as React from 'react';
-import { useEditor } from '../editor/useEditor';
-import { CommandBus } from '../domain/command/CommandBus';
-import type { Command } from '../domain/command/CommandTypes';
-import { undoService } from '../domain/history/UndoService';
+import { useEditorLike as useEditor } from './adapters/useEditorLike';
+import type { NodeId, SupportedEvent, ActionStep } from '../core/types';
 
-/**
- * 액션 플로우(간단형): 노드나 페이지에 연결된 액션 리스트를 CRUD
- * - 실제 액션 실행/런타임은 기존 runtime/flow.ts 경로를 그대로 유지
- * - 여기서는 편집용 데이터에 한함
- */
-export function useActionsController() {
-    const { project, update, setNotification } = useEditor();
-    const busRef = React.useRef<CommandBus>(null);
-    if (!busRef.current)
-        busRef.current = new CommandBus();
+type ActionsBag = Partial<Record<SupportedEvent, { steps: ActionStep[] }>>;
 
-    const list = React.useCallback((ownerId: string) => {
-        return (project as any)?.actions?.[ownerId] ?? [];
-    }, [project]);
+export interface ActionsController {
+    /** 현재 저장된 스텝 읽기(패널에서 바로 사용) */
+    getSteps(nodeId: NodeId, event: SupportedEvent): ActionStep[];
 
-    const add = React.useCallback((ownerId: string, action: any) => {
-        update((s) => {
-            const map = ((s.project as any).actions ??= {});
-            const arr = (map[ownerId] ??= []);
-            map[ownerId] = [...arr, { id: 'act_' + Math.random().toString(36).slice(2, 8), ...action }];
-        });
-        const cmd: Command = { name: 'action.add', payload: { ownerId, action } } as any;
-        busRef.current?.emit(cmd);
-        undoService.onCommand(cmd);
-        setNotification?.('액션이 추가되었습니다.');
-    }, [update, setNotification]);
+    /** 지정 노드/이벤트의 스텝 배열을 통째로 교체 저장 */
+    writeSteps(nodeId: NodeId, event: SupportedEvent, steps: ActionStep[]): void;
 
-    const updateAction = React.useCallback((ownerId: string, actionId: string, patch: any) => {
-        update((s) => {
-            const arr = ((s.project as any).actions ?? {})[ownerId] ?? [];
-            const idx = arr.findIndex((x: any) => x.id === actionId);
-            if (idx >= 0) arr[idx] = { ...arr[idx], ...patch };
-        });
-        const cmd: Command = { name: 'action.patch', payload: { ownerId, actionId, patch } } as any;
-        busRef.current?.emit(cmd);
-        undoService.onCommand(cmd);
-    }, [update]);
+    /** 지정 노드/이벤트의 액션 실행 (최소 러너 내장) */
+    run(nodeId: NodeId, event: SupportedEvent): void;
+}
 
-    const remove = React.useCallback((ownerId: string, actionId: string) => {
-        update((s) => {
-            const arr = ((s.project as any).actions ?? {})[ownerId] ?? [];
-            ((s.project as any).actions ?? {})[ownerId] = arr.filter((x: any) => x.id !== actionId);
-        });
-        const cmd: Command = { name: 'action.remove', payload: { ownerId, actionId } } as any;
-        busRef.current?.emit(cmd);
-        undoService.onCommand(cmd);
-    }, [update]);
+/** 과거 데이터 호환: {kind:'Console'} → {kind:'Alert'} 로 정규화 */
+function normalizeSteps(steps: any[]): ActionStep[] {
+    return (steps ?? []).map((s) => {
+        if (s && s.kind === 'Console') {
+            return { kind: 'Alert', message: String((s as any).message ?? 'Console') } as ActionStep;
+        }
+        return s as ActionStep;
+    });
+}
 
-    const subscribe = React.useCallback((fn: (cmd: Command) => void) => {
-        const off = busRef.current?.subscribe(fn);
-        return () => { if (off) off(); };
-    }, []);
+export function useActionsController(): ActionsController {
+    const state = useEditor();
 
-    return { list, add, update: updateAction, remove, subscribe };
+    const getSteps = React.useCallback(
+        (nodeId: NodeId, event: SupportedEvent): ActionStep[] => {
+            const node = state.project.nodes[nodeId];
+            if (!node) return [];
+            const bag = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
+            const raw = bag?.[event]?.steps ?? [];
+            return normalizeSteps(raw);
+        },
+        [state.project.nodes]
+    );
+
+    /**
+     * 중요: 렌더를 확실히 트리거하기 위해 state.update로 node.props 재할당
+     */
+    const writeSteps = React.useCallback(
+        (nodeId: NodeId, event: SupportedEvent, steps: ActionStep[]) => {
+            state.update((s: any) => {
+                const node = s.project?.nodes?.[nodeId];
+                if (!node) return;
+
+                const prevBag: ActionsBag = (node.props?.__actions as ActionsBag) ?? {};
+                const nextBag: ActionsBag = { ...prevBag, [event]: { steps } };
+
+                node.props = { ...(node.props ?? {}), __actions: nextBag };
+            });
+
+            if (typeof state.setNotification === 'function') {
+                state.setNotification('Actions updated');
+            }
+        },
+        [state]
+    );
+
+    /** 최소 러너: Alert / SetProps 만 처리 (코어 타입 기준) */
+    const run = React.useCallback(
+        (nodeId: NodeId, event: SupportedEvent) => {
+            const steps = getSteps(nodeId, event);
+            if (!steps.length) {
+                state.setNotification?.('No steps to run.');
+                return;
+            }
+
+            for (const step of steps) {
+                try {
+                    if (step.kind === 'Alert') {
+                        const msg = String(step.message ?? 'Alert');
+                        if (typeof state.setNotification === 'function') state.setNotification(msg);
+                        else if (typeof window !== 'undefined' && typeof window.alert === 'function') window.alert(msg);
+                        else console.info('[Alert]', msg);
+                    } else if (step.kind === 'SetProps') {
+                        const targetId = step.nodeId ?? nodeId;
+                        if (targetId && step.patch && typeof step.patch === 'object') {
+                            state.update((s: any) => {
+                                const n = s.project?.nodes?.[targetId];
+                                if (!n) return;
+                                n.props = { ...(n.props ?? {}), ...(step.patch as any) };
+                            });
+                        }
+                    }
+                    // TODO: 향후 runActions(ActionStep[], deps)로 대체 가능
+                } catch (e) {
+                    console.warn('[ActionsController.run] step failed', step, e);
+                }
+            }
+        },
+        [getSteps, state]
+    );
+
+    return { getSteps, writeSteps, run };
 }

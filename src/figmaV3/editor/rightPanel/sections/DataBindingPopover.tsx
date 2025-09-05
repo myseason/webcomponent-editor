@@ -26,7 +26,7 @@ export type DataBindingPopoverProps = {
  * 레이아웃/마크업은 유지합니다.
  * 내부 저장(onApply)만 컨트롤러의 applyBinding()으로 전환합니다.
  */
-export default function DataBindingPopover(props: DataBindingPopoverProps) {
+export function DataBindingPopover(props: DataBindingPopoverProps) {
     const { anchorEl, onClose, nodeId, propKey, initial, className, style } = props;
     const ctl = useInspectorController();
     const [value, setValue] = React.useState<string>(initial ?? '');

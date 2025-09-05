@@ -1,13 +1,12 @@
 'use client';
 
 /**
- * ActionsPanel (Scope 구조 반영)
- * - 상단 스코프 탭: Page / Fragment / Component
- * - (현 단계) Component 스코프만 실동작:
- *   · 이벤트(onLoad/onClick/onChange/onSubmit) 선택
- *   · Step 목록/추가/삭제
- *   · Tag 전환(동적) + Tag Attributes(동적) → SetProps 스텝으로 추가
- * - Page/Fragment 스코프는 골격만(향후 Flows·FragmentsPanel 연계)
+ * ActionsPanel
+ * - UI/레이아웃/텍스트: 기존 그대로
+ * - 핵심 수정:
+ *   1) steps useMemo 제거 → 매 렌더마다 직접 읽기 (stale 방지)
+ *   2) setSteps는 state.update로 node.props 재할당(렌더 보장)
+ *   3) Run은 항상 최신 steps를 즉시 읽어 실행
  */
 
 import * as React from 'react';
@@ -15,32 +14,34 @@ import { useEditorLike as useEditor } from '../../../controllers/adapters/useEdi
 import { editorStore } from '../../../store/editStore';
 import { runActions } from '../../../runtime/actions';
 import { getDefinition } from '../../../core/registry';
-import type {
-    SupportedEvent,
-    ActionStep,
-    NodeId,
-    EditorState,
-} from '../../../core/types';
+import type { SupportedEvent, ActionStep, NodeId, EditorState } from '../../../core/types';
 
 const EVENTS: SupportedEvent[] = ['onLoad', 'onClick', 'onChange', 'onSubmit'];
-
 type ActionsBag = Partial<Record<SupportedEvent, { steps: ActionStep[] }>>;
 type Scope = 'Page' | 'Fragment' | 'Component';
 
-/* ───────────── 공통 유틸 ───────────── */
 function isSetProps(step: ActionStep): step is Extract<ActionStep, { kind: 'SetProps' }> {
     return step.kind === 'SetProps';
+}
+
+/** 안전한 dynamicTag 읽기 */
+function readDynamicTag(def: any) {
+    const dyn = def?.capabilities;
+    const allowed: string[] = Array.isArray(dyn?.allowedTags) ? dyn!.allowedTags : [];
+    const defaultTag: string = typeof dyn?.defaultTag === 'string' ? dyn!.defaultTag : 'div';
+    return { allowed, defaultTag };
 }
 
 /* ───────────── Component: Tag 전환(동적) ───────────── */
 function TagSwitchRow({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent }) {
     const state = useEditor();
     const node = state.project.nodes[nodeId];
-    const def = getDefinition(node.componentId);
-    const allowed = def?.capabilities?.allowedTags ?? [];
-    const currentTag = String((node.props as Record<string, unknown>).__tag ?? def?.capabilities?.defaultTag ?? '');
 
-    const [sel, setSel] = React.useState<string>(currentTag);
+    const def = getDefinition(node.componentId);
+    const { allowed, defaultTag } = readDynamicTag(def as any);
+
+    const currentTag = String((node.props as Record<string, unknown>).__tag ?? defaultTag);
+    const [sel, setSel] = React.useState(currentTag);
 
     React.useEffect(() => {
         setSel(currentTag);
@@ -50,12 +51,14 @@ function TagSwitchRow({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent
         const bag = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
         return bag?.[event]?.steps ?? [];
     };
+
     const writeSteps = (next: ActionStep[]) => {
         state.update((s: EditorState) => {
             const p = s.project.nodes[nodeId].props as Record<string, unknown>;
             const bag = (p.__actions as ActionsBag | undefined) ?? {};
             bag[event] = { steps: next };
-            p.__actions = bag;
+            // ✅ 명시 재할당(렌더 보장)
+            (s.project.nodes[nodeId] as any).props = { ...p, __actions: bag };
         });
     };
 
@@ -64,7 +67,9 @@ function TagSwitchRow({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent
         const steps = readSteps();
         const patch = { __tag: sel };
         const next: ActionStep = { kind: 'SetProps', nodeId, patch };
-        const dup = steps.some((s) => isSetProps(s) && s.nodeId === nodeId && JSON.stringify(s.patch) === JSON.stringify(patch));
+        const dup = steps.some(
+            (s) => isSetProps(s) && s.nodeId === nodeId && JSON.stringify(s.patch) === JSON.stringify(patch),
+        );
         if (dup) return;
         writeSteps([...steps, next]);
     };
@@ -74,23 +79,14 @@ function TagSwitchRow({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent
     return (
         <div className="flex items-center gap-2 px-1">
             <div className="text-xs w-24 shrink-0 text-neutral-500">Tag</div>
-            <select
-                className="text-[11px] border rounded px-2 py-1"
-                value={sel}
-                onChange={(e) => setSel(e.target.value)}
-            >
+            <select className="text-[11px] border rounded px-2 py-1" value={sel} onChange={(e) => setSel(e.target.value)}>
                 {allowed.map((t) => (
                     <option key={t} value={t}>
                         {t}
                     </option>
                 ))}
             </select>
-            <button
-                type="button"
-                className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50"
-                onClick={add}
-                title="선택한 태그로 SetProps 스텝 추가"
-            >
+            <button className="px-2 py-1 text-[11px] rounded border hover:bg-neutral-50" onClick={add}>
                 Set
             </button>
         </div>
@@ -103,8 +99,8 @@ function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: Sup
     const node = state.project.nodes[nodeId];
     const props = (node.props ?? {}) as Record<string, unknown>;
     const tagAttrs = (props.__tagAttrs as Record<string, string> | undefined) ?? {};
-    const [exprMap, setExprMap] = React.useState<Record<string, string>>({});
 
+    const [exprMap, setExprMap] = React.useState<Record<string, string>>({});
     React.useEffect(() => {
         const init: Record<string, string> = {};
         Object.entries(tagAttrs).forEach(([k, v]) => (init[k] = typeof v === 'string' ? v : ''));
@@ -115,49 +111,46 @@ function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: Sup
     const setExpr = (k: string, v: string) => setExprMap((m) => (m[k] === v ? m : { ...m, [k]: v }));
 
     const readSteps = (): ActionStep[] => {
-        const bag = (props.__actions as ActionsBag | undefined);
+        const bag = (props.__actions as ActionsBag | undefined) ?? undefined;
         return bag?.[event]?.steps ?? [];
     };
+
     const writeSteps = (next: ActionStep[]) => {
         state.update((s: EditorState) => {
             const p = s.project.nodes[nodeId].props as Record<string, unknown>;
             const bag = (p.__actions as ActionsBag | undefined) ?? {};
             bag[event] = { steps: next };
-            p.__actions = bag;
+            (s.project.nodes[nodeId] as any).props = { ...p, __actions: bag };
         });
     };
 
     const addSetAttr = (key: string, value: string) => {
         const steps = readSteps();
-        const patch = { __tagAttrs: { ...(props.__tagAttrs as Record<string, string> ?? {}), [key]: value } };
+        const prev = (props.__tagAttrs as Record<string, string> | undefined) ?? {};
+        const patch = { __tagAttrs: { ...prev, [key]: value } };
         const next: ActionStep = { kind: 'SetProps', nodeId, patch };
-        const dup = steps.some((s) => isSetProps(s) && s.nodeId === nodeId && JSON.stringify(s.patch) === JSON.stringify(patch));
+        const dup = steps.some(
+            (s) => isSetProps(s) && s.nodeId === nodeId && JSON.stringify(s.patch) === JSON.stringify(patch),
+        );
         if (dup) return;
         writeSteps([...steps, next]);
     };
 
     const keys = Object.keys(tagAttrs);
     if (keys.length === 0) {
-        return (
-            <div className="text-[11px] text-neutral-400 px-1">
-                Tag Attributes 없음(정적 속성은 Inspector › props에서 추가)
-            </div>
-        );
+        return <div className="text-[11px] text-neutral-400">Tag Attributes 없음(정적 속성은 Inspector › props에서 추가)</div>;
     }
 
     return (
-        <div className="space-y-2">
-            <div className="text-[11px] font-semibold text-neutral-700 px-1">Attributes (Dynamic)</div>
-            <div className="text-[11px] text-neutral-500 px-1 -mt-1">
+        <div className="space-y-2 px-1">
+            <div className="text-[11px] text-neutral-500 mb-1">
                 값은 일반 문자열 또는 머스태치 <code>{'{{ expr }}'}</code> 사용 가능
             </div>
             {keys.map((k) => {
                 const cur = exprMap[k] ?? '';
                 return (
-                    <div key={k} className="flex items-center gap-2 px-1">
-                        <div className="text-xs w-24 text-neutral-500 truncate" title={k}>
-                            {k}
-                        </div>
+                    <div key={k} className="flex items-center gap-2">
+                        <div className="text-xs w-24 shrink-0 text-neutral-500">{k}</div>
                         <input
                             className="text-[11px] border rounded px-2 py-1 flex-1"
                             value={cur}
@@ -165,7 +158,7 @@ function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: Sup
                             placeholder="e.g. /path or {{ data.link }}"
                         />
                         <button
-                            className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50"
+                            className="px-2 py-1 text-[11px] rounded border hover:bg-neutral-50"
                             onClick={() => addSetAttr(k, cur)}
                             type="button"
                             title="이 값으로 SetProps 스텝 추가"
@@ -189,40 +182,62 @@ export function ActionsPanel() {
 
     // Component 스코프만 실동작
     const [evt, setEvt] = React.useState<SupportedEvent>('onClick');
-    const steps: ActionStep[] = React.useMemo(() => {
+
+    // ✅ 메모 제거: 항상 최신 값을 직접 읽음
+    const readStepsNow = React.useCallback((): ActionStep[] => {
         if (!nodeId || scope !== 'Component') return [];
         const node = state.project.nodes[nodeId];
         const bag = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
         return bag?.[evt]?.steps ?? [];
-    }, [nodeId, evt, scope, state.project.nodes]);
+    }, [nodeId, scope, evt, state.project.nodes]);
 
     const setSteps = (next: ActionStep[]) => {
         if (!nodeId) return;
-        const node = state.project.nodes[nodeId];
-        const bag = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
-        const nextBag: ActionsBag = { ...(bag ?? {}), [evt]: { steps: next } };
-        state.updateNodeProps(nodeId, { __actions: nextBag });
+        state.update((s: EditorState) => {
+            const p = s.project.nodes[nodeId].props as Record<string, unknown>;
+            const bag = (p.__actions as ActionsBag | undefined) ?? {};
+            bag[evt] = { steps: next };
+            (s.project.nodes[nodeId] as any).props = { ...p, __actions: bag };
+        });
     };
 
-    const addAlert = () => setSteps([...(steps ?? []), { kind: 'Alert', message: 'Hello' }]);
+    const addAlert = () => setSteps([...(readStepsNow() ?? []), { kind: 'Alert', message: 'Hello' }]);
     const addNavigate = () =>
-        setSteps([...(steps ?? []), { kind: 'Navigate', toPageId: state.project.pages[0]?.id ?? state.project.rootId }]);
+        setSteps([
+            ...(readStepsNow() ?? []),
+            { kind: 'Navigate', toPageId: state.project.pages[0]?.id ?? state.project.rootId },
+        ]);
 
     const runNow = async () => {
-        await runActions(steps ?? [], {
-            alert: (m) => alert(m),
+        const steps = readStepsNow(); // ✅ 최신 스텝 즉시 읽기
+        if (steps.length === 0) {
+            state.setNotification?.('No steps.');
+            return;
+        }
+        await runActions(steps, {
+            alert: (m) => (typeof window !== 'undefined' && window.alert ? window.alert(m) : console.info('[Alert]', m)),
             setData: (p, v) => editorStore.getState().setData(p, v),
-            setProps: (nid, patch) => editorStore.getState().updateNodeProps(nid, patch),
+            setProps: (nid, patch) => editorStore.getState().updateNodeProps(nid, patch as Record<string, unknown>),
             navigate: (pid) => editorStore.getState().selectPage(pid),
             openFragment: () => {},
             closeFragment: () => {},
             http: async (m, url, body, headers) => {
-                const res = await fetch(url, { method: m, headers, body: body ? JSON.stringify(body) : undefined });
-                try { return await res.json(); } catch { return await res.text(); }
+                const res = await fetch(url, {
+                    method: m,
+                    headers: headers as any,
+                    body: body ? JSON.stringify(body) : undefined,
+                });
+                try {
+                    return await res.json();
+                } catch {
+                    return await res.text();
+                }
             },
             emit: () => {},
         });
     };
+
+    const steps = readStepsNow();
 
     return (
         <div className="p-2 space-y-3">
@@ -241,9 +256,7 @@ export function ActionsPanel() {
 
             {/* Page/Fragment: 이후 단계에서 연결 */}
             {scope !== 'Component' && (
-                <div className="text-[11px] text-neutral-500">
-                    {scope} 액션은 향후 단계에서 Flows/Fragments와 통합됩니다.
-                </div>
+                <div className="text-[11px] text-neutral-500">{scope} 액션은 향후 단계에서 Flows/Fragments와 통합됩니다.</div>
             )}
 
             {/* Component scope */}
@@ -265,42 +278,44 @@ export function ActionsPanel() {
                                         </option>
                                     ))}
                                 </select>
-                                <div className="text-[11px] text-neutral-500">이벤트별 액션을 구성합니다.</div>
+                                <span className="text-[11px] text-neutral-500">이벤트별 액션을 구성합니다.</span>
+
+                                <button className="px-2 py-1 text-[11px] rounded border hover:bg-neutral-50" onClick={runNow} disabled={!nodeId || steps.length === 0}>
+                                    Run Now
+                                </button>
                             </div>
 
                             {/* 스텝 목록 */}
                             {(steps?.length ?? 0) === 0 && (
-                                <div className="text-[11px] text-neutral-400">스텝이 없습니다. 아래 버튼으로 추가하세요.</div>
+                                <div className="p-2 text-[11px] text-neutral-400">스텝이 없습니다. 아래 버튼으로 추가하세요.</div>
                             )}
-                            <div className="space-y-1">
-                                {(steps ?? []).map((s, i) => (
-                                    <div key={i} className="flex items-center justify-between border rounded px-2 py-1 text-[11px]">
-                                        <div className="truncate">
-                                            <span className="font-semibold">{s.kind}</span>{' '}
-                                            {s.kind === 'Alert' && `“${s.message}”`}
-                                            {s.kind === 'Navigate' && `→ ${s.toPageId}`}
-                                            {isSetProps(s) && ` (SetProps ${s.nodeId})`}
-                                        </div>
-                                        <button
-                                            className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50"
-                                            onClick={() => setSteps((steps ?? []).filter((_, idx) => idx !== i))}
-                                            type="button"
-                                        >
-                                            삭제
-                                        </button>
+                            {(steps ?? []).map((s, i) => (
+                                <div key={i} className="flex items-center justify-between px-2 py-1 border rounded mb-1">
+                                    <div className="text-[11px]">
+                                        {s.kind}{' '}
+                                        {s.kind === 'Alert' && `“${(s as Extract<ActionStep, { kind: 'Alert' }>).message}”`}
+                                        {s.kind === 'Navigate' && `→ ${(s as Extract<ActionStep, { kind: 'Navigate' }>).toPageId}`}
+                                        {isSetProps(s) && ` (SetProps ${(s as Extract<ActionStep, { kind: 'SetProps' }>).nodeId})`}
                                     </div>
-                                ))}
-                            </div>
+                                    <button
+                                        className="px-2 py-1 text-[11px] rounded border hover:bg-neutral-50"
+                                        onClick={() => setSteps((steps ?? []).filter((_, idx) => idx !== i))}
+                                        type="button"
+                                    >
+                                        삭제
+                                    </button>
+                                </div>
+                            ))}
 
                             {/* 기본 추가 & 실행 */}
                             <div className="flex items-center gap-2">
-                                <button className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50" onClick={addAlert} type="button">
+                                <button className="px-2 py-1 text-[11px] rounded border hover:bg-neutral-50" onClick={addAlert}>
                                     + Alert
                                 </button>
-                                <button className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50" onClick={addNavigate} type="button">
+                                <button className="px-2 py-1 text-[11px] rounded border hover:bg-neutral-50" onClick={addNavigate}>
                                     + Navigate
                                 </button>
-                                <button className="ml-auto text-[11px] px-2 py-1 border rounded hover:bg-neutral-50" onClick={runNow} type="button">
+                                <button className="px-2 py-1 text-[11px] rounded border hover:bg-neutral-50" onClick={runNow} disabled={!nodeId || steps.length === 0}>
                                     Run Now
                                 </button>
                             </div>
