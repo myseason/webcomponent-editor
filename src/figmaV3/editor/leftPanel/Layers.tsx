@@ -1,6 +1,7 @@
 'use client';
+
 import React, { memo, useCallback, useMemo } from 'react';
-import { useEditor } from '../useEditor';
+import { useLayersController } from '../../controllers/layers/LayersController';
 import type {NodeId, Node, Fragment} from '../../core/types';
 import { getDefinition } from '../../core/registry';
 import { Lock, Unlock, Eye, EyeOff, Trash2, GripVertical } from 'lucide-react';
@@ -39,25 +40,29 @@ function getDisplayName(node: Node): string {
 }
 
 const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
-    const state = useEditor();
-    const node = state.project.nodes[id];
+    const layerCtl = useLayersController();
+    const rLayer = layerCtl.reader();
+    const wLayer = layerCtl.writer();
+    const node =  rLayer.getNode(id);
 
     const { attributes, listeners, setNodeRef: draggableRef, isDragging } = useDraggable({ id, data: { kind: 'layers-node', nodeId: id } });
     const { setNodeRef: droppableRef } = useDroppable({ id, data: { kind: 'layers-node', nodeId: id, position: 'inside' } });
 
     if (!node) return null;
 
-    const isRoot = id === state.project.rootId || id === state.project.fragments.find((f: Fragment) => f.id === state.ui.editingFragmentId)?.rootId;
-    const selected = state.ui.selectedId === id;
+    const isRoot = rLayer.isRoot(id);
+    const selected = rLayer.selectedId() === id;
     const name = getDisplayName(node);
 
-    const onSelect = useCallback(() => state.select(id), [state, id]);
-    const onToggleVisible = useCallback(() => state.toggleNodeVisibility(id), [state, id]);
-    const onToggleLock = useCallback(() => state.toggleNodeLock(id), [state, id]);
+    const onSelect = useCallback(() => wLayer.setSelected(id), [wLayer, id]);
+    const onToggleVisible = useCallback(() => wLayer.toggleVisible(id), [wLayer, id]);
+    const onToggleLock = useCallback(() => wLayer.toggleLock(id), [wLayer, id]);
     const onRemove = useCallback(() => {
-        if (isRoot) return;
-        state.removeNodeCascade(id);
-    }, [state, id, isRoot]);
+        if (isRoot)
+            return;
+        wLayer.removeCascade(id);
+        }, [wLayer, id, isRoot]
+    );
 
     return (
         <div
@@ -94,10 +99,14 @@ const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
 Row.displayName = 'Row';
 
 const Tree: React.FC<{ id: NodeId; depth: number }> = ({ id, depth }) => {
-    const state = useEditor();
-    const node = state.project.nodes[id];
-    if (!node) return null;
-    const children = useMemo(() => ((node.children ?? []) as NodeId[]).filter((cid) => !!state.project.nodes[cid]), [node.children, state.project.nodes]);
+    const layerCtl = useLayersController();
+    const rLayer = layerCtl.reader();
+
+    const node = rLayer.getNode(id);
+    if (!node)
+        return null;
+
+    const children = useMemo(() => rLayer.getChildren(id), [id, rLayer.token()]);
     return (
         <div>
             <Row id={id} depth={depth} />
@@ -107,14 +116,11 @@ const Tree: React.FC<{ id: NodeId; depth: number }> = ({ id, depth }) => {
 };
 
 export function Layers() {
-    const state = useEditor();
-    const { mode, editingFragmentId } = state.ui;
+    const layerCtl = useLayersController();
+    const rLayer = layerCtl.reader();
+    const rootId = rLayer.rootId();
 
-    const rootId = mode === 'Component' && editingFragmentId
-        ? state.project.fragments.find((f: Fragment) => f.id === editingFragmentId)?.rootId
-        : state.project.rootId;
-
-    if (!rootId || !state.project.nodes[rootId]) {
+    if (!rootId || !rLayer.getNode(rootId)) {
         return <div className="p-3 text-sm text-gray-500">루트 노드를 찾을 수 없습니다.</div>;
     }
 

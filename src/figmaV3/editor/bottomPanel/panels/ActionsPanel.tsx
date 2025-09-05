@@ -11,16 +11,9 @@
  */
 
 import * as React from 'react';
-import { useEditor } from '../../useEditor';
-import { editorStore } from '../../../store/editStore';
-import { runActions } from '../../../runtime/actions';
 import { getDefinition } from '../../../core/registry';
-import type {
-    SupportedEvent,
-    ActionStep,
-    NodeId,
-    EditorState,
-} from '../../../core/types';
+import type { SupportedEvent, ActionStep, NodeId } from '../../../core/types';
+import { useActionsFacadeController } from '../../../controllers/actions/ActionsFacadeController';
 
 const EVENTS: SupportedEvent[] = ['onLoad', 'onClick', 'onChange', 'onSubmit'];
 
@@ -34,30 +27,42 @@ function isSetProps(step: ActionStep): step is Extract<ActionStep, { kind: 'SetP
 
 /* ───────────── Component: Tag 전환(동적) ───────────── */
 function TagSwitchRow({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent }) {
-    const state = useEditor();
-    const node = state.project.nodes[nodeId];
-    const def = getDefinition(node.componentId);
+    const afCtl = useActionsFacadeController();
+    const aReader = afCtl.reader();
+    const aWriter = afCtl.writer();
+
+    const def = React.useMemo(() => {
+        try {
+            // R.getNode가 노출되지 않았다면 componentId는 steps/정의에서 추론해 사용
+            const anyR: any = aReader as any;
+            const node = typeof anyR.getNode === 'function' ? anyR.getNode(nodeId) : null;
+            const compId = node?.componentId;
+            return compId ? getDefinition(compId) : null;
+        } catch {
+            return null;
+        }
+    }, [aReader, nodeId]);
+
     const allowed = def?.capabilities?.allowedTags ?? [];
-    const currentTag = String((node.props as Record<string, unknown>).__tag ?? def?.capabilities?.defaultTag ?? '');
+    const currentTag = React.useMemo(() => {
+        try {
+            const anyR: any = aReader as any;
+            const node = typeof anyR.getNode === 'function' ? anyR.getNode(nodeId) : null;
+            const props = (node?.props ?? {}) as Record<string, unknown>;
+            const defTag = (def as any)?.capabilities?.defaultTag ?? '';
+            return String((props.__tag as string | undefined) ?? defTag ?? '');
+        } catch {
+            return '';
+        }
+    }, [aReader, nodeId, def]);
 
     const [sel, setSel] = React.useState<string>(currentTag);
-
     React.useEffect(() => {
         setSel(currentTag);
     }, [nodeId, currentTag]);
 
-    const readSteps = (): ActionStep[] => {
-        const bag = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
-        return bag?.[event]?.steps ?? [];
-    };
-    const writeSteps = (next: ActionStep[]) => {
-        state.update((s: EditorState) => {
-            const p = s.project.nodes[nodeId].props as Record<string, unknown>;
-            const bag = (p.__actions as ActionsBag | undefined) ?? {};
-            bag[event] = { steps: next };
-            p.__actions = bag;
-        });
-    };
+    const readSteps = (): ActionStep[] => (aReader.getActionSteps(nodeId, event) as ActionStep[]) ?? [];
+    const writeSteps = (next: ActionStep[]) => aWriter.setActionSteps(nodeId, event, next);
 
     const add = () => {
         if (!sel) return;
@@ -99,9 +104,16 @@ function TagSwitchRow({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent
 
 /* ───────────── Component: Attributes(동적) ───────────── */
 function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent }) {
-    const state = useEditor();
-    const node = state.project.nodes[nodeId];
-    const props = (node.props ?? {}) as Record<string, unknown>;
+    const afCtl = useActionsFacadeController();
+    const aReader = afCtl.reader();
+    const aWriter = afCtl.writer();
+
+    const props = React.useMemo(() => {
+        const anyR: any = aReader as any;
+        const node = typeof anyR.getNode === 'function' ? anyR.getNode(nodeId) : null;
+        return (node?.props ?? {}) as Record<string, any>;
+    }, [aReader, nodeId, aReader.facadeToken()]);
+
     const tagAttrs = (props.__tagAttrs as Record<string, string> | undefined) ?? {};
     const [exprMap, setExprMap] = React.useState<Record<string, string>>({});
 
@@ -118,14 +130,7 @@ function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: Sup
         const bag = (props.__actions as ActionsBag | undefined);
         return bag?.[event]?.steps ?? [];
     };
-    const writeSteps = (next: ActionStep[]) => {
-        state.update((s: EditorState) => {
-            const p = s.project.nodes[nodeId].props as Record<string, unknown>;
-            const bag = (p.__actions as ActionsBag | undefined) ?? {};
-            bag[event] = { steps: next };
-            p.__actions = bag;
-        });
-    };
+    const writeSteps = (next: ActionStep[]) => aWriter.setActionSteps(nodeId, event, next);
 
     const addSetAttr = (key: string, value: string) => {
         const steps = readSteps();
@@ -181,47 +186,41 @@ function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: Sup
 
 /* ───────────── 메인 패널 ───────────── */
 export function ActionsPanel() {
-    const state = useEditor();
+    const afCtl = useActionsFacadeController();
+    const aReader = afCtl.reader();
+    const aWriter = afCtl.writer();
+
     const [scope, setScope] = React.useState<Scope>('Component');
 
     // 선택 컨텍스트
-    const nodeId = state.ui.selectedId ?? null;
+    const nodeId = aReader.selectedNodeId() ?? null;
 
     // Component 스코프만 실동작
     const [evt, setEvt] = React.useState<SupportedEvent>('onClick');
     const steps: ActionStep[] = React.useMemo(() => {
-        if (!nodeId || scope !== 'Component') return [];
-        const node = state.project.nodes[nodeId];
-        const bag = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
-        return bag?.[evt]?.steps ?? [];
-    }, [nodeId, evt, scope, state.project.nodes]);
+        if (!nodeId || scope !== 'Component')
+            return [];
+        return (aReader.getActionSteps(nodeId, evt) as ActionStep[]) ?? [];
+    }, [nodeId, evt, scope, aReader, aReader.facadeToken()]);
 
+    // 전체 교체 (원본 setSteps와 동일 의미)
     const setSteps = (next: ActionStep[]) => {
-        if (!nodeId) return;
-        const node = state.project.nodes[nodeId];
-        const bag = (node.props as Record<string, unknown>).__actions as ActionsBag | undefined;
-        const nextBag: ActionsBag = { ...(bag ?? {}), [evt]: { steps: next } };
-        state.updateNodeProps(nodeId, { __actions: nextBag });
+        if (!nodeId)
+            return;
+        aWriter.setActionSteps(nodeId, evt, next);
     };
 
     const addAlert = () => setSteps([...(steps ?? []), { kind: 'Alert', message: 'Hello' }]);
     const addNavigate = () =>
-        setSteps([...(steps ?? []), { kind: 'Navigate', toPageId: state.project.pages[0]?.id ?? state.project.rootId }]);
+        setSteps([...(steps ?? []), {
+                kind: 'Navigate',
+                toPageId: (aReader.pages()?.[0]?.id as string | undefined) ?? aReader.defaultNavigateTargetId() ?? '',
+            } as any,
+        ]);
 
-    const runNow = async () => {
-        await runActions(steps ?? [], {
-            alert: (m) => alert(m),
-            setData: (p, v) => editorStore.getState().setData(p, v),
-            setProps: (nid, patch) => editorStore.getState().updateNodeProps(nid, patch),
-            navigate: (pid) => editorStore.getState().selectPage(pid),
-            openFragment: () => {},
-            closeFragment: () => {},
-            http: async (m, url, body, headers) => {
-                const res = await fetch(url, { method: m, headers, body: body ? JSON.stringify(body) : undefined });
-                try { return await res.json(); } catch { return await res.text(); }
-            },
-            emit: () => {},
-        });
+    const runNow = () => {
+        if (!nodeId) return;
+        aWriter.runActionSteps(nodeId, evt);
     };
 
     return (

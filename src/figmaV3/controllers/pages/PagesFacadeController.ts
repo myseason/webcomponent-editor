@@ -69,7 +69,7 @@ function buildReader(
 
     return {
         pages() {
-            return PR.list();
+            return PR.list() as ReadonlyArray<Page>;
         },
         selectedPageId() {
             return PR.currentPageId();
