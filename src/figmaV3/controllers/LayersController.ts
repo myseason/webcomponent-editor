@@ -1,59 +1,81 @@
 'use client';
+
 import * as React from 'react';
-import { useEditorLike as useEditor } from './adapters/useEditorLike';
+import { useEngine } from '../engine/Engine';
 import type { NodeId } from '../core/types';
 
+export interface LayersReader {
+    getNode(id: NodeId): any | null;
+    getChildren(id: NodeId): NodeId[];
+    getRootId(): NodeId | null;
+    isSelected(id: NodeId): boolean;
+}
+export interface LayersWriter {
+    select(id: NodeId): void;
+    toggleVisibility(id: NodeId): void;
+    toggleLock(id: NodeId): void;
+    removeCascade(id: NodeId): void;
+    setProps?(nodeId: NodeId, patch: Record<string, unknown>): void;
+}
 export interface LayersController {
-    select(nodeId: NodeId): void;
-    toggleVisibility(nodeId: NodeId): void;
-    toggleLock(nodeId: NodeId): void;
-    removeCascade(nodeId: NodeId): void;
+    reader(): LayersReader;
+    writer(): LayersWriter;
 }
 
 export function useLayersController(): LayersController {
-    const state = useEditor();
+    const eng = useEngine();
 
-    const select = React.useCallback((nodeId: NodeId) => {
-        state.update((s: any) => {
-            s.ui.selectedId = nodeId;
-        });
-    }, [state]);
+    const reader = React.useMemo<LayersReader>(() => ({
+        getNode(id) {
+            return (eng.project as any)?.nodes?.[id] ?? null;
+        },
+        getChildren(id) {
+            const n = (eng.project as any)?.nodes?.[id];
+            return ((n?.children ?? []) as NodeId[]) || [];
+        },
+        getRootId() {
+            return (eng.project as any)?.rootId ?? null;
+        },
+        isSelected(id) {
+            return (eng.ui as any)?.selectedId === id;
+        },
+    }), [eng.project, eng.ui]);
 
-    const toggleVisibility = React.useCallback((nodeId: NodeId) => {
-        state.update((s: any) => {
-            const n = s.project?.nodes?.[nodeId];
-            if (!n) return;
-            n.isVisible = !(n.isVisible !== false);
-        });
-    }, [state]);
+    const writer = React.useMemo<LayersWriter>(() => ({
+        select(id) {
+            if (typeof eng.selectNode === 'function') eng.selectNode(id);
+            else eng.update((s: any) => { (s.ui as any).selectedId = id; });
+        },
+        toggleVisibility(id) {
+            eng.update((s: any) => {
+                const n = s.project?.nodes?.[id]; if (!n) return;
+                n.isVisible = !(n.isVisible ?? true);
+            });
+        },
+        toggleLock(id) {
+            eng.update((s: any) => {
+                const n = s.project?.nodes?.[id]; if (!n) return;
+                n.locked = !n.locked;
+            });
+        },
+        removeCascade(id) {
+            eng.update((s: any) => {
+                const nodes = s.project?.nodes ?? {};
+                const removeRec = (nid: NodeId) => {
+                    const node = nodes[nid]; if (!node) return;
+                    (node.children ?? []).forEach((cid: NodeId) => removeRec(cid));
+                    delete nodes[nid];
+                };
+                removeRec(id);
+            });
+        },
+        setProps(nodeId, patch) {
+            eng.update((s: any) => {
+                const n = s.project?.nodes?.[nodeId]; if (!n) return;
+                n.props = { ...(n.props ?? {}), ...(patch as any) };
+            });
+        },
+    }), [eng]);
 
-    const toggleLock = React.useCallback((nodeId: NodeId) => {
-        state.update((s: any) => {
-            const n = s.project?.nodes?.[nodeId];
-            if (!n) return;
-            n.locked = !n.locked;
-        });
-    }, [state]);
-
-    const removeCascade = React.useCallback((nodeId: NodeId) => {
-        state.update((s: any) => {
-            const { nodes } = s.project ?? { nodes: {} };
-            const visit = (id: string) => {
-                const node = nodes?.[id];
-                if (!node) return;
-                const cs = (node.children ?? []) as string[];
-                cs.forEach(visit);
-                delete nodes[id];
-            };
-            visit(nodeId);
-
-            // 선택 보정
-            if (s.ui.selectedId === nodeId) {
-                s.ui.selectedId = null;
-            }
-        });
-        state.setNotification?.('Node removed.');
-    }, [state]);
-
-    return { select, toggleVisibility, toggleLock, removeCascade };
+    return React.useMemo(() => ({ reader: () => reader, writer: () => writer }), [reader, writer]);
 }
