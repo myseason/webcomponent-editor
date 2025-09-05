@@ -1,0 +1,84 @@
+컨트롤러 설계 기준 (핵심 요약)
+	1.	도메인 경계 = 사용자 행동 + 저장 단위 + 정책 일관성이 동시에 만나는 곳
+	•	동일한 사용자 태스크(읽기/쓰기 흐름)끼리 묶고, 저장 위치/정책(검증·권한·정합성)도 함께 움직여야 한다면 같은 컨트롤러.
+	•	저장소가 다르고 정책/사이드이펙트가 다르면 다른 컨트롤러.
+	2.	1 컴포넌트 = 1~2 컨트롤러(원칙)
+	•	패널/뷰는 최대 2개의 컨트롤러만 의존하도록 설계합니다.
+	•	여러 도메인 기능이 필요하면 “패널 파사드(Panel Facade Controller)”를 만들어 하위 도메인 컨트롤러를 합성해 노출합니다. (아래 예시)
+	3.	Reader/Writer 분리 + Token 의존(불변 규칙)
+	•	View는 오직 reader()와 writer() 제공 인터페이스만 사용.
+	•	반응성 useEffect/useMemo 의존성에는 내부 구조 대신 *Token()만 사용.
+	4.	컨트롤러 크기 가이드(S/M/L)
+	•	S (<= 6 메서드): 한 패널의 단일 태스크(예: 바인딩, 액션).
+	•	M (7~15 메서드): 패널 핵심 흐름 + 보조(예: Pages + 선택 연동).
+	•	L (>15 메서드): 반드시 분리하거나 파사드를 도입.
+	5.	경계 이동 기준(리팩토링 트리거)
+	•	UI에서 같은 도메인의 상태를 3곳 이상 참조 → 컨트롤러로 흡수.
+	•	검증/권한/정합성 로직이 2곳 이상 중복 → 상위 도메인 컨트롤러로 승격.
+	•	컨트롤러 내부에서 다른 컨트롤러 Writer를 3회 이상 호출 → 경계 재검토(응집도 부족 신호).
+
+⸻
+
+권장 도메인 컨트롤러 세트 (안정판)
+
+아래는 “기본 세트 + 패널 파사드” 조합입니다. 이대로 가면 각 View가 1~2개 컨트롤러만 바라보게 됩니다.
+
+A. 코어(세션 공통)
+	•	SelectionController (S)
+	•	읽기: getSelectedId(), selectionToken()
+	•	쓰기: setSelected(id), notify(msg), navigate(to)
+	•	목적: 엔진/스토어 은닉, 모든 패널의 공통 선택·알림·네비 초점 제공.
+	•	HistoryController (S) (이미 존재 UndoService로 매핑 가능)
+	•	읽기: canUndo(), canRedo(), historyToken()
+	•	쓰기: undo(), redo()
+
+B. 좌 패널 영역 (Left Sidebar)
+	•	PagesFacadeController (M)
+	•	Reader: list(), getCurrentPageId(), getById(), pagesToken()
+	•	Writer: setCurrentPage(id), addPage(title), renamePage(id,title), removePage(id), duplicatePage(id), updatePageMeta(id,patch)
+	•	정책: 페이지 전환시 선택 노드/루트 선택 보정은 여기서 책임.
+	•	LayersController (M)
+	•	Reader: getNode(id), getChildren(id), getAncestors(id), treeToken()
+	•	Writer: setSelected(id), reorder(id, toIndex), wrap/unwrap, deleteNode(id)
+	•	정책: 트리 정합성(부모/자식 타입 제약)과 권한(가드) 내장.
+	•	Assets/Components/FragmentsController (S)
+	•	Reader: 목록/검색/토큰
+	•	Writer: 삽입/치환/등록
+	•	LeftPanelFacadeController (S) 파사드
+	•	Pages + Layers + (선택) 조합 후, 좌패널이 이 파사드 하나만 쓰도록 제공.
+
+C. 우 패널 영역 (Inspector)
+	•	InspectorController (M)
+	•	Reader: targetNodeId(), nodeToken(), schemaOf(node), styleOf(node), visibility()
+	•	Writer: patchProps(nodeId, kv), patchStyles(nodeId, kv), saveAsComponent(...)
+	•	정책: 정책/가시성/유효성(Binding/Validation) 조율자 역할(조합하지 구현은 각 컨트롤러에 위임).
+	•	BindingController (S)
+	•	Reader: preview(nodeId, propKey, expr), bindingToken()
+	•	Writer: apply(nodeId,propKey,expr), clear(nodeId,propKey)
+	•	ProjectPolicyController (S)
+	•	Reader: get(), policyToken()
+	•	Writer: override(patch), replace(all)
+	•	정책: Provider가 있으면 Provider 우선 적용.
+	•	ActionsController (S)
+	•	Reader: getSteps(nodeId,event), actionsToken()
+	•	Writer: setSteps(nodeId,event,steps), run(nodeId,event)
+	•	InspectorFacadeController (M) 파사드
+	•	Inspector + Binding + Actions + Policy 합성 → Inspector/Styles/Props 패널은 이 파사드 하나만 의존.
+
+D. 하단 패널 (Bottom Dock)
+	•	DataPanelController / FlowsPanelController / FragmentsPanelController (S)
+	•	각 패널 목적에 맞는 Reader/Writer + Token.
+	•	필요시 BottomDockFacadeController로 합성.
+
+E. 공통 서비스 (도메인 서비스)
+	•	ValidationController (S): binding/props/styles에 대한 검사.
+	•	CommandController (S): 도메인 명령 버스 추상화(히스토리/가드/저널과 연계).
+
+요점: View가 한 번에 붙을 컨트롤러는 파사드 1개(좌/우/하 패널별) + SelectionController 정도로 끝
+
+적용 방침 (재확인)
+	•	View ↔ Controller ↔ EditorEngine(파사드) ↔ Store(zustand)
+	•	View는 컨트롤러만 의존(Reader/Writer + Token).
+	•	컨트롤러는 오직 EditorEngine만 의존(store를 절대 직접 보지 않음).
+	•	UI/UX/레이아웃/마크업은 불변이고, import/호출부만 교체.
+
