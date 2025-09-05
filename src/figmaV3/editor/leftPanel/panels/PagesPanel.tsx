@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { useEditor } from '../../useEditor';
+import { usePagesFacadeController } from '../../../controllers/pages/PagesFacadeController';
 import type { Page } from '../../../core/types';
 import { MoreHorizontal, Copy, Trash2 } from 'lucide-react';
 
@@ -52,30 +52,32 @@ const PageActions = ({ page, onDuplicate, onDelete }: { page: Page; onDuplicate:
 };
 
 export function PagesPanel() {
-    const state = useEditor();
-    const { project, ui, addPage, removePage, selectPage, update, duplicatePage } = state;
 
-    const [selectedPageIdForDetails, setSelectedPageIdForDetails] = useState<string | null>(
-        project.pages.find((p: Page) => p.rootId === project.rootId)?.id ?? project.pages[0]?.id ?? null
-    );
+    const pCtl = usePagesFacadeController();
+    const pReader = pCtl.reader();
+    const pWriter = pCtl.writer();
+
+    const pages = pReader.pages();
+    const currentPageId = pReader.selectedPageId()!;
+    const [selectedPageIdForDetails, setSelectedPageIdForDetails] = useState<string | null>(currentPageId ?? (pages[0]?.id ?? null));
 
     useEffect(() => {
-        const currentPage = project.pages.find((p: Page) => p.rootId === project.rootId);
-        if (currentPage) {
-            setSelectedPageIdForDetails(currentPage.id);
-        }
-    }, [project.rootId, project.pages]);
+       const id = pReader.selectedPageId();
+       if (id)
+           setSelectedPageIdForDetails(id);
+    }, [pReader.facadeToken()]);
 
 
-    if (ui.mode !== 'Page') {
+    if (pReader.editorMode() !== 'Page') {
         return <div className="p-4 text-sm text-gray-500">Page management is available in Page Build Mode.</div>
     }
 
-    const selectedPage = project.pages.find((p: Page) => p.id === selectedPageIdForDetails);
+    const selectedPage = pReader.pages().find((p: Page) => p.id === selectedPageIdForDetails);
 
     const createPage = () => {
-        const newPageId = addPage('Untitled Page');
-        selectPage(newPageId);
+        const newPageId = pWriter.addPage('Untitled Page');
+        if (newPageId)
+            pWriter.setSelectedPageId(newPageId);
     };
 
     return (
@@ -84,21 +86,21 @@ export function PagesPanel() {
             <div className="flex-1 overflow-auto p-2">
                 <div className="text-xs font-semibold text-gray-700 px-2 py-1">Pages</div>
                 <ul className="space-y-1 mt-2">
-                    {project.pages.map((p: Page) => (
+                    {pages.map((p: Page) => (
                         <li key={p.id}>
                             <div
-                                onClick={() => { selectPage(p.id); setSelectedPageIdForDetails(p.id); }}
+                                onClick={() => { pWriter.setSelectedPageId(p.id); setSelectedPageIdForDetails(p.id); }}
                                 className={`w-full flex items-center justify-between px-2 py-1.5 rounded border text-sm cursor-pointer ${selectedPageIdForDetails === p.id ? 'bg-blue-50 border-blue-400' : 'hover:bg-gray-50'}`}
                             >
                                 <span className="truncate">{p.name}</span>
                                 <div className="flex items-center gap-2">
-                                    {p.rootId === project.rootId && (
+                                    {p.rootId === pReader.selectedPageId() && (
                                         <span className="text-xs text-blue-600 font-semibold bg-blue-100 px-2 py-0.5 rounded-full">OPEN</span>
                                     )}
                                     <PageActions
                                         page={p}
-                                        onDuplicate={() => duplicatePage(p.id)}
-                                        onDelete={() => project.pages.length > 1 && removePage(p.id)}
+                                        onDuplicate={() => pWriter.duplicatePage(p.id)}
+                                        onDelete={() => (pages.length > 1) && pWriter.removePage(p.id)}
                                     />
                                 </div>
                             </div>
@@ -129,7 +131,7 @@ export function PagesPanel() {
                                 <input
                                     className="w-full border rounded px-2 py-1 text-sm"
                                     value={selectedPage.name}
-                                    onChange={e => update(s => { s.project.pages.find((p: Page)=>p.id===selectedPageIdForDetails)!.name = e.target.value })}
+                                    onChange={(e) => pWriter.renamePage(currentPageId, e.target.value)}
                                 />
                             </div>
                             <div>
@@ -137,7 +139,7 @@ export function PagesPanel() {
                                 <textarea
                                     className="w-full border rounded px-2 py-1 text-sm h-16 resize-none"
                                     value={selectedPage.description ?? ''}
-                                    onChange={e => update(s => { s.project.pages.find((p: Page) =>p.id===selectedPageIdForDetails)!.description = e.target.value })}
+                                    onChange={(e) => pWriter.updatePageMeta(currentPageId, { description: e.target.value })}
                                 />
                             </div>
                             <div>
@@ -145,7 +147,7 @@ export function PagesPanel() {
                                 <input
                                     className="w-full border rounded px-2 py-1 font-mono text-xs"
                                     value={selectedPage.slug ?? ''}
-                                    onChange={e => update(s => { s.project.pages.find((p: Page)=>p.id===selectedPageIdForDetails)!.slug = slugify(e.target.value) })}
+                                    onChange={(e) => pWriter.updatePageMeta(currentPageId, { slug: slugify(e.target.value) })}
                                 />
                             </div>
                         </div>
