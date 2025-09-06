@@ -14,6 +14,7 @@ import * as React from 'react';
 import { getDefinition } from '../../../core/registry';
 import type { SupportedEvent, ActionStep, NodeId } from '../../../core/types';
 import { useActionsFacadeController } from '../../../controllers/actions/ActionsFacadeController';
+import {useControllerTick} from "../../../controllers/adapters/useControllerTick";
 
 const EVENTS: SupportedEvent[] = ['onLoad', 'onClick', 'onChange', 'onSubmit'];
 
@@ -191,6 +192,8 @@ export function ActionsPanel() {
     const aWriter = afCtl.writer();
 
     const [scope, setScope] = React.useState<Scope>('Component');
+
+    useControllerTick(() => aReader.facadeToken());
 
     // 선택 컨텍스트
     const nodeId = aReader.selectedNodeId() ?? null;

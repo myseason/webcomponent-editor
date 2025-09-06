@@ -6,26 +6,25 @@
  * - View는 이 컨트롤러 하나만 사용하여 Page/UI 관련 읽기·쓰기를 수행합니다.
  *
  * Reader API
- *  - pages(): ReadonlyArray<Page>
- *  - selectedPageId(): string | null
- *  - editingFragmentId(): string | null
- *  - editorMode(): string | undefined
- *  - uiHubTab(): string | undefined
- *  - facadeToken(): string   // page/ui 변경을 모두 추적할 합성 토큰
+ * - pages(): ReadonlyArray<Page>
+ * - selectedPageId(): string | null
+ * - editingFragmentId(): string | null
+ * - editorMode(): string | undefined
+ * - hubTab(): string | undefined   // (uiHubTab -> hubTab 이름 고정)
+ * - facadeToken(): string          // page/ui 변경을 모두 추적할 합성 토큰
  *
  * Writer API
- *  - setSelectedPageId(id: string): void
- *  - setSelectedNodeId(id: string | null): void
- *  - addPage(title?: string): string
- *  - removePage(id: string): void
- *  - duplicatePage(id: string): string | null
- *  - renamePage(id: string, title: string): void
- *  - updatePageMeta(id: string, patch: Partial<Page>): void
- *  - setEditorMode(mode: string): void
- *  - setNotification(msg: string): void
- *  - setUiHubTab(tab: string): void
+ * - setSelectedPageId(id: string): void
+ * - setSelectedNodeId(id: string | null): void
+ * - addPage(title?: string): string
+ * - removePage(id: string): void
+ * - duplicatePage(id: string): string | null
+ * - renamePage(id: string, title: string): void
+ * - updatePageMeta(id: string, patch: Partial<Page>): void
+ * - setEditorMode(mode: string): void
+ * - setNotification(msg: string): void
+ * - setHubTab(tab: string): void
  */
-
 import { useMemo } from 'react';
 import type { Page } from '../../core/types';
 import { usePagesController } from './PagesController';
@@ -43,13 +42,11 @@ export interface PagesFacadeReader {
 export interface PagesFacadeWriter {
     setSelectedPageId(id: string): void;
     setSelectedNodeId(id: string | null): void;
-
     addPage(title?: string): string;
     removePage(id: string): void;
     duplicatePage(id: string): string | null;
     renamePage(id: string, title: string): void;
     updatePageMeta(id: string, patch: Partial<Page>): void;
-
     setEditorMode(mode: string): void;
     setNotification(msg: string): void;
     setHubTab(tab: string): void;
@@ -66,10 +63,9 @@ function buildReader(
 ): PagesFacadeReader {
     const PR = pageReaderFn();
     const UR = uiReaderFn();
-
     return {
         pages() {
-            return PR.list() as ReadonlyArray<Page>;
+            return PR.list();
         },
         selectedPageId() {
             return PR.currentPageId();
@@ -96,7 +92,6 @@ function buildWriter(
 ): PagesFacadeWriter {
     const PW = pageWriterFn();
     const UW = uiWriterFn();
-
     return {
         setSelectedPageId(id: string) {
             PW.setSelected(id);
@@ -104,7 +99,6 @@ function buildWriter(
         setSelectedNodeId(id: string | null) {
             UW.setSelected(id);
         },
-
         addPage(title?: string) {
             return PW.add(title);
         },
@@ -120,7 +114,6 @@ function buildWriter(
         updatePageMeta(id: string, patch: Partial<Page>) {
             PW.updateMeta(id, patch);
         },
-
         setEditorMode(mode: string) {
             UW.setMode(mode);
         },
@@ -143,10 +136,7 @@ export function usePagesFacadeController(): PagesFacadeController {
 
     // 일관된 인터페이스 보장
     return useMemo(
-        () => ({
-            reader: () => reader,
-            writer: () => writer,
-        }),
-        [reader, writer]
+        () => ({ reader: () => reader, writer: () => writer }),
+        [reader, writer],
     );
 }

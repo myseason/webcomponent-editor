@@ -1,8 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useEngine } from '../adapters/useEngine';
-import type { EditorEngine } from '../../engine/EditorEngine';
+import { EditorEngine } from '../../engine/EditorEngine';
 
 export interface UiReader {
     /** 'Page' | 'Component' | ... */
@@ -29,68 +28,53 @@ export interface UiController {
     writer(): UiWriter;
 }
 
-function buildReader(engine: EditorEngine): UiReader {
+function buildReader(): UiReader {
     return {
         mode() {
-            return engine.getUI()?.mode;
+            return EditorEngine.ui.getEditorMode() as any;
         },
         selectedId() {
-            return engine.getUI()?.selectedId ?? null;
+            return EditorEngine.nodes.getSelectedNodeId();
         },
         editingFragmentId() {
-            return engine.getUI()?.editingFragmentId ?? null;
+            // v1.3.1: 편집 중 fragment id는 파사드에 직접 노출되어 있지 않으므로 state에서 안전 조회
+            return (EditorEngine.getState().ui as any)?.editingFragmentId ?? null;
         },
         hubTab() {
-            // 프로젝트별로 명칭이 다를 수 있으므로 안전 접근
-            return engine.getUI()?.hubTab;
+            return EditorEngine.ui.getActiveHubTab() as any;
         },
         token() {
-            const ui = engine.getUI() ?? {};
-            // 의존 필드들을 문자열로 묶어서 View의 deps로 사용
+            const ui: any = EditorEngine.getState().ui ?? {};
             return [
                 String(ui.mode ?? ''),
                 String(ui.selectedId ?? ''),
                 String(ui.editingFragmentId ?? ''),
-                String(ui.hubTab ?? ''),
+                // 좌패널 hubTab 경로는 파사드의 getActiveHubTab()으로 대응
+                String(EditorEngine.ui.getActiveHubTab() ?? ''),
             ].join('::');
         },
     };
 }
 
-function buildWriter(engine: EditorEngine): UiWriter {
+function buildWriter(): UiWriter {
     return {
         setSelected(id) {
-            engine.select(id as any);
+            EditorEngine.nodes.setSelectedNodeId(id as any);
         },
         setMode(mode) {
-            // v1.3.1 uiSlice에 setMode가 없다면, update 캡슐화로 반영
-            const ui = engine.getUI();
-            if (typeof (engine as any).setMode === 'function') {
-                (engine as any).setMode(mode);
-            } else if (typeof (engine as any)['state']?.update === 'function') {
-                // EditorEngine에 노출된 update를 통해 안전하게 반영
-                (engine as any)['state'].update((draft: any) => {
-                    if (draft?.ui) draft.ui.mode = mode;
-                });
-            }
+            EditorEngine.ui.setEditorMode(mode as any);
         },
         setNotification(message) {
-            engine.setNotification(message);
+            EditorEngine.ui.setNotification(message);
         },
         setHubTab(tab) {
-            // v1.3.1에 전용 API 없을 가능성 → update 캡슐화
-            if (typeof (engine as any)['state']?.update === 'function') {
-                (engine as any)['state'].update((draft: any) => {
-                    if (draft?.ui) draft.ui.hubTab = tab;
-                });
-            }
+            EditorEngine.ui.setActiveHubTab(tab as any);
         },
     };
 }
 
 export function useUiController(): UiController {
-    const engine = useEngine();
-    const reader = useMemo(() => buildReader(engine), [engine]);
-    const writer = useMemo(() => buildWriter(engine), [engine]);
+    const reader = useMemo(() => buildReader(), []);
+    const writer = useMemo(() => buildWriter(), []);
     return useMemo(() => ({ reader: () => reader, writer: () => writer }), [reader, writer]);
 }

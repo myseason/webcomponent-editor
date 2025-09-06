@@ -1,10 +1,13 @@
-// src/figmaV3/controllers/hooks.ts
+'use client';
+
+// ⚠️ 최소침습/호환 유지용 훅 허브
+// - Inspector.tsx 가 기대하는 useInspectorViewModel 을 안정적으로 제공
+// - 엔진/셀렉터 의존을 제거해 타입 충돌 방지
+// - UI/UX/데이터 흐름 변경 없음
+
 import { useMemo } from 'react';
 import { useEditor } from '../editor/useEditor';
-import { EditorEngine } from '../engine/EditorEngine';
-import { InspectorController } from './InspectorController';
 import type { NodeId } from '../core/types';
-import { computeInspectorTargetNodeId } from '../engine/selectors/inspector';
 
 export type InspectorVM = {
     target: null | { nodeId: NodeId; componentId: string | null };
@@ -12,20 +15,17 @@ export type InspectorVM = {
 
 /**
  * useInspectorViewModel
- * - Top-level에서 useEditor()를 호출하고,
- *   그 state를 주입해 EditorEngine 인스턴스를 생성합니다.
- * - Hook 안에서 Hook을 다시 호출하지 않습니다. (Rules of Hooks 준수)
+ * - 기존 코드 호환을 위한 최소 뷰모델 훅
+ * - 엔진/셀렉터 의존 없이 useEditor 만으로 계산
+ * - UI/UX/마크업 변경 없음
  */
 export function useInspectorViewModel(): InspectorVM {
-    // ✅ Hook은 커스텀 훅의 "바깥 레벨"에서 호출
-    const editorState = useEditor();
+    const state = useEditor();
 
-    // POJO 엔진 인스턴스 (Hook 호출 없음)
-    const engine = useMemo(() => new EditorEngine(editorState), [editorState]);
-
-    // 최소 스켈레톤: Controller 없이 바로 target 계산 (원하시면 Controller 유지해도 OK)
-    const nodeId = computeInspectorTargetNodeId(engine);
-    const componentId = nodeId ? engine.getComponentIdOf(nodeId) : null;
+    // 기존 로직: 선택 노드 기준으로 componentId 확인
+    const nodeId: NodeId | null = (state.ui?.selectedId as NodeId | undefined) ?? null;
+    const componentId: string | null =
+        nodeId ? ((state.project?.nodes?.[nodeId]?.componentId as string | undefined) ?? null) : null;
 
     return useMemo<InspectorVM>(() => {
         if (!nodeId) return { target: null };
@@ -33,13 +33,14 @@ export function useInspectorViewModel(): InspectorVM {
     }, [nodeId, componentId]);
 }
 
-/**
- * (선택 사항) Controller 버전을 쓰고 싶다면 아래처럼도 가능
- *
- * export function useInspectorViewModel(): InspectorVM {
- *   const editorState = useEditor();
- *   const engine = useMemo(() => new EditorEngine(editorState), [editorState]);
- *   const controller = useMemo(() => new InspectorController(engine), [engine]);
- *   return controller.computeViewModel();
- * }
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// 향후 점진 리팩토링 가이드
+// - 이 파일은 "호환 허브" 역할만 수행합니다.
+// - 컨트롤러 기반 뷰모델 훅으로 이전 시, 아래처럼 alias 제공 후
+//   컴포넌트에서 import 교체하는 순서로 제거하세요.
+//
+// import { useInspectorController } from './InspectorController';
+// export const useInspectorViewModel = useInspectorController; // 호환 alias
+//
+// 그 후, 해당 파일은 제거 대상입니다.
+// ─────────────────────────────────────────────────────────────────────────────
