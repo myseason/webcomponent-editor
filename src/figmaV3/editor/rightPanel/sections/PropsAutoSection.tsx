@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useEditor } from '../../useEditor';
 import { getDefinition } from '../../../core/registry';
 import type { NodeId } from '../../../core/types';
 import { Database } from 'lucide-react';
@@ -17,6 +16,7 @@ import {
     MiniSelectV1,
     IconBtnV1,
 } from './styles/layoutV1';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 const RESERVED_PROP_KEYS = new Set([
     'as',
@@ -41,7 +41,21 @@ function filterByTagAndDef(defTitle: string, selTag: string, entries: any[]) {
 }
 
 export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
-    const state = useEditor();
+    const { reader, writer } = useInspectorController();
+    const R = reader(); const W = writer();
+
+    const state = {
+  ui: R.ui(),
+  project: R.project(),
+  data: R.data(),
+  getEffectiveDecl: R.getEffectiveDecl.bind(R),
+  updateNodeStyles: W.updateNodeStyles.bind(W),
+  updateNodeProps: W.updateNodeProps.bind(W),
+  setNotification: W.setNotification.bind(W),
+  saveNodeAsComponent: W.saveNodeAsComponent.bind(W),
+  updateComponentPolicy: W.updateComponentPolicy.bind(W),
+  update: W.update.bind(W),
+};
     const { project, ui, updateNodeProps } = state;
 
     const node = project.nodes[nodeId];

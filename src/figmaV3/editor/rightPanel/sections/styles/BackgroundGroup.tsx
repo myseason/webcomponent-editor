@@ -18,8 +18,6 @@ import {
     ColorField,
 } from './common';
 
-import { useEditor } from '../../../useEditor';
-
 // 인스펙터 공통 레이아웃 프리미티브 (라벨 80px + 우측 6그리드)
 import {
     SectionShellV1,
@@ -29,6 +27,7 @@ import {
     MiniInputV1,
     MiniSelectV1,
 } from './layoutV1';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 // 안전 문자열 헬퍼
 function s(v: unknown): string {
@@ -56,8 +55,13 @@ export function BackgroundGroup(props: {
     nodeId: NodeId;
     componentId: string;
 }) {
+
+    const { reader, writer } = useInspectorController();
+    const R = reader(); const W = writer();
+
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui, project } = useEditor();
+    const ui = R.ui();
+    const project = R.project();
     const allow = useAllowed(nodeId);
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 

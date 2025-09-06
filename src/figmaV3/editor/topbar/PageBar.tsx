@@ -1,8 +1,8 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
-import { useEditor } from '../useEditor';
 import type { Viewport, Page, ViewportMode } from '../../core/types';
 import { Monitor, Tablet, Smartphone, RotateCw, Plus, Minus, Undo, Redo, Info } from 'lucide-react';
+import {useTopbarController} from "@/figmaV3/controllers/topbar/TopbarController";
 
 const VIEWPORT_SIZES: Record<Viewport, { w: number; h: number }> = {
     base:   { w: 1280, h: 800 },
@@ -20,7 +20,48 @@ const VP_LIST: Viewport[] = ['base', 'tablet', 'mobile'];
 const ZOOM_MIN = 0.25, ZOOM_MAX = 4.0, ZOOM_STEP = 0.25;
 
 export default function PageBar() {
-    const state = useEditor();
+    const { reader, writer } = useTopbarController();
+    const R = reader(); const W = writer();
+    const state = {
+        // --- 읽기 ---
+        ui: R.ui(),
+        project: R.project(),
+        data: R.data(),
+        history: R.history(),
+        pages: R.pages(),
+        currentPageId: R.currentPageId(),
+        activeViewport: R.activeViewport(),
+        viewportMode: R.viewportMode.bind(R),
+        zoom: R.zoom(),
+
+        // --- 쓰기 ---
+        update: W.update.bind(W),
+        setNotification: W.setNotification.bind(W),
+
+        setCurrentPage: W.setCurrentPage.bind(W),
+        addPage: W.addPage.bind(W),
+        removePage: W.removePage.bind(W),
+        duplicatePage: W.duplicatePage.bind(W),
+        renamePage: W.renamePage.bind(W),
+
+        setActiveViewport: W.setActiveViewport.bind(W),
+        toggleViewportMode: W.toggleViewportMode.bind(W),
+        zoomIn: W.zoomIn.bind(W),
+        zoomOut: W.zoomOut.bind(W),
+        resetZoom: W.resetZoom.bind(W),
+        togglePreview: W.togglePreview.bind(W),
+        undo: W.undo.bind(W),
+        redo: W.redo.bind(W),
+
+        // --- ★ 추가된 레거시/확장 메서드 바인딩 (PageBar가 기대) ---
+        setCanvasSize: W.setCanvasSize.bind(W),
+        setCanvasZoom: W.setCanvasZoom.bind(W),
+        toggleCanvasOrientation: W.toggleCanvasOrientation.bind(W),
+        selectPage: W.selectPage.bind(W),          // (setCurrentPage alias)
+        setBaseViewport: W.setBaseViewport.bind(W),
+        setViewportMode: W.setViewportMode.bind(W),
+    };
+
     const {
         project, ui, history,
         setActiveViewport, setCanvasSize, setCanvasZoom,

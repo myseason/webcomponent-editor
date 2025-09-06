@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { useEditor } from '../../useEditor';
 import { getDefinition } from '../../../core/registry';
 import type { NodeId, ComponentDefinition } from '../../../core/types';
 import { PermissionLock } from './styles/common';
@@ -13,10 +12,26 @@ import {
     MiniInputV1,
 } from './styles/layoutV1';
 
+import { useInspectorController } from "@/figmaV3/controllers/inspector/InspectorFacadeController";
+
 type AttrMap = Record<string, string>;
 
 export function CommonSection({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
-    const state = useEditor();
+    const { reader, writer } = useInspectorController();
+    const R = reader(); const W = writer();
+
+    const state = {
+  ui: R.ui(),
+  project: R.project(),
+  data: R.data(),
+  getEffectiveDecl: R.getEffectiveDecl.bind(R),
+  updateNodeStyles: W.updateNodeStyles.bind(W),
+  updateNodeProps: W.updateNodeProps.bind(W),
+  setNotification: W.setNotification.bind(W),
+  saveNodeAsComponent: W.saveNodeAsComponent.bind(W),
+  updateComponentPolicy: W.updateComponentPolicy.bind(W),
+  update: W.update.bind(W),
+};
     const { ui, project, updateNodeProps } = state;
 
     const node = project.nodes[nodeId];

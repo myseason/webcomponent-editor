@@ -5,11 +5,29 @@
  * - 바인딩 예: Text.content = "Hello {{data.user}}"
  */
 import React, { useState } from 'react';
-import { useEditor } from '../../useEditor';
 import {EditorState} from "@/figmaV3/core/types";
+import {useBottomPanelController} from "@/figmaV3/controllers/bottom/BottomPanelController";
 
 export function DataPanel() {
-    const state = useEditor(); // 상태+액션
+    const { reader, writer } = useBottomPanelController();
+const R = reader(); const W = writer();
+const state = {
+  ui: R.ui(),
+  project: R.project(),
+  data: R.data(),
+  history: R.history(),
+  getEffectiveDecl: R.getEffectiveDecl.bind(R),
+  updateNodeStyles: W.updateNodeStyles.bind(W),
+  updateNodeProps: W.updateNodeProps.bind(W),
+  setNotification: W.setNotification.bind(W),
+  update: W.update.bind(W),
+
+  // 선택적 도메인(있는 경우만 사용)
+  actions: (W.actions || {}),
+  flows: (W.flows || {}),
+  fragments: (W.fragments || {}),
+  dataOps: (W.dataOps || {}),
+}; // 상태+액션
     const [text, setText] = useState<string>(JSON.stringify(state.data, null, 2));
 
     const onApply = () => {

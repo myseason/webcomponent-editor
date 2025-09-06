@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useEditor } from '../useEditor';
 import { getDefinition } from '../../core/registry';
 import type { NodeId, Fragment, EditorState } from '../../core/types';
 
@@ -12,6 +11,7 @@ import { SchemaEditor } from './sections/SchemaEditor';
 import { SaveAsComponentDialog } from './sections/SaveAsComponentDialog';
 
 import { useInspectorViewModel } from '../../controllers/hooks';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     // def는 필요 시 참조만, propsSchema 유무와 무관하게 PropsAutoSection을 항상 렌더
@@ -60,7 +60,23 @@ function ComponentInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }
 }
 
 export function Inspector() {
-    const state = useEditor();
+
+    const { reader, writer } = useInspectorController();
+    const R = reader();
+    const W = writer();
+
+    const state = {
+  ui: R.ui(),
+  project: R.project(),
+  data: R.data(),
+  getEffectiveDecl: R.getEffectiveDecl.bind(R),
+  updateNodeStyles: W.updateNodeStyles.bind(W),
+  updateNodeProps: W.updateNodeProps.bind(W),
+  setNotification: W.setNotification.bind(W),
+  saveNodeAsComponent: W.saveNodeAsComponent.bind(W),
+  updateComponentPolicy: W.updateComponentPolicy.bind(W),
+  update: W.update.bind(W),
+};
     const { ui, project, update, setNotification } = state;
     const { mode, selectedId, editingFragmentId, expertMode } = ui;
     const { rootId, fragments, nodes } = project;

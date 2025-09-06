@@ -1,10 +1,10 @@
 'use client';
 
 import { useMemo, useCallback } from 'react';
-import { useEditor } from '../../useEditor';
 import { getDefinition } from '../../../core/registry';
 import type { NodeId } from '../../../core/types';
 import type { ComponentInspectorPolicyV2, InspectorModePolicy } from '../../../policy/types.local';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 type AllowSpec = {
     allowAllProps: boolean;
@@ -83,7 +83,12 @@ export function useTagBasedPropFilter(defTitle: string | undefined, selTag: stri
 
 /** Prop 표시 여부 훅 */
 export function usePropVisibility(nodeId: NodeId, defId: string) {
-    const { project, ui } = useEditor();
+
+    const { reader, writer } = useInspectorController();
+    const R = reader(); const W = writer();
+
+    const project = R.project();
+    const ui = R.ui();
     const def = getDefinition(defId);
     const node = project.nodes[nodeId];
 
@@ -129,7 +134,12 @@ export function usePropVisibility(nodeId: NodeId, defId: string) {
 
 /** Style 표시 여부 훅 */
 export function useStyleVisibility(nodeId: NodeId, defId: string) {
-    const { project, ui } = useEditor();
+
+    const { reader, writer } = useInspectorController();
+    const R = reader(); const W = writer();
+
+    const project = R.project();
+    const ui = R.ui();
     const def = getDefinition(defId);
 
     const compPol = getComponentPolicyV2(project, def?.title);

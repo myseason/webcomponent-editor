@@ -17,8 +17,6 @@ import {
     reasonForKey,
 } from './common';
 
-import { useEditor } from '../../../useEditor';
-
 import {
     SectionShellV1,
     RowV1,
@@ -26,6 +24,7 @@ import {
     RowRightGridV1,
     MiniInputV1,
 } from './layoutV1';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 /* ───────── utils ───────── */
 function s(v: unknown): string {
@@ -80,8 +79,13 @@ export function CustomGroup(props: {
     nodeId: NodeId;
     componentId: string;
 }) {
+
+    const { reader, writer } = useInspectorController();
+    const R = reader(); const W = writer();
+
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui, project } = useEditor();
+    const ui = R.ui();
+    const project = R.project();
     const allow = useAllowed(nodeId);
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 

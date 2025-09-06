@@ -30,8 +30,6 @@ import {
 } from 'lucide-react';
 
 import { coerceLen } from '../../../../runtime/styleUtils';
-import { useEditor } from '../../../useEditor';
-
 // 레이아웃 프리미티브
 import {
     SectionShellV1,
@@ -43,6 +41,7 @@ import {
     ChipBtnV1,
     IconBtnV1,
 } from './layoutV1';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 type IconCmp = React.ComponentType<{ size?: number; className?: string }>;
 
@@ -63,8 +62,13 @@ export function LayoutGroup(props: {
     nodeId: NodeId;
     componentId: string;
 }) {
+
+    const { reader, writer } = useInspectorController();
+    const R = reader(); const W = writer();
+
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui, project } = useEditor();
+    const ui = R.ui();
+    const project = R.project();
     const def = getDefinition(componentId);
     const allow = useAllowed(nodeId);
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);

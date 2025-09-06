@@ -7,7 +7,6 @@
  */
 
 import React from 'react';
-import { useEditor } from '../useEditor';
 import { ActionsPanel } from './panels/ActionsPanel';
 import { DataPanel } from './panels/DataPanel';
 import { FlowsPanel } from './panels/FlowsPanel';
@@ -15,6 +14,7 @@ import { FragmentsPanel } from './panels/FragmentsPanel';
 import { SchemaEditor } from '../rightPanel/sections/SchemaEditor';
 import type { BottomRightPanelKind, EditorState } from '../../core/types';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import {useBottomPanelController} from "@/figmaV3/controllers/bottom/BottomPanelController";
 
 type Tab = 'actions' | 'data' | 'flows' | 'fragments';
 
@@ -24,7 +24,50 @@ const COLLAPSED_HEIGHT_PX = 40; // 리사이저(8px) + 탭바(32px)
 const TAB_BAR_HEIGHT_REM = '2rem'; // 32px
 
 export function BottomDock() {
-    const state = useEditor();
+    const { reader, writer } = useBottomPanelController();
+    const R = reader(); const W = writer();
+    const state = {
+        // ---- 읽기 호환 ----
+        ui: R.ui(),
+        project: R.project(),
+        data: R.data(),
+        history: R.history(),
+        getEffectiveDecl: R.getEffectiveDecl.bind(R),
+
+        // ---- 쓰기 호환 ----
+        updateNodeStyles: W.updateNodeStyles.bind(W),
+        updateNodeProps: W.updateNodeProps.bind(W),
+        setNotification: W.setNotification.bind(W),
+        update: W.update.bind(W),
+
+        // ====== 레거시 표면(파일들이 그대로 기대하는 이름 유지) ======
+        /*
+        toggleBottomDock: () =>
+            W.update((s: any) => {
+                const cur = s.ui?.panels?.bottom ?? (s.ui.panels.bottom = {});
+                cur.isCollapsed = !Boolean(cur.isCollapsed);
+            }),
+        */
+        toggleBottomDock: W.toggleBottomDock.bind(W),
+
+        // Flows(Edges)
+        flowEdges: R.flowEdges(),
+        addFlowEdge: W.addFlowEdge.bind(W),
+        removeFlowEdge: W.removeFlowEdge.bind(W),
+        updateFlowEdge: W.updateFlowEdge.bind(W),
+
+        // Fragments
+        addFragment: W.addFragment.bind(W),
+        openFragment: W.openFragment.bind(W),
+        closeFragment: W.closeFragment.bind(W),
+        removeFragment: W.removeFragment.bind(W),
+
+        // 선택 도메인 직접 접근(있을 때만 사용)
+        actions: (W.actions || {}),
+        flows: (W.flows || {}),
+        fragments: (W.fragments || {}),
+        dataOps: (W.dataOps || {}),
+    };
 
     // ✅ [수정] 새로운 UI 상태 경로 참조
     const { heightPx, isCollapsed, advanced: advancedPanel } = state.ui.panels.bottom;

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useEditor } from '../../useEditor';
 import type { NodeId } from '../../../core/types';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 interface SaveAsComponentDialogProps {
     nodeId: NodeId;
@@ -10,7 +10,12 @@ interface SaveAsComponentDialogProps {
 }
 
 export function SaveAsComponentDialog({ nodeId, onClose }: SaveAsComponentDialogProps) {
-    const { saveNodeAsComponent, setNotification } = useEditor();
+    const { reader, writer } = useInspectorController();
+    const R = reader();
+    const W = writer();
+
+    const saveNodeAsComponent = W.saveNodeAsComponent;
+const setNotification = W.setNotification;
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [isPublic, setIsPublic] = useState(true);

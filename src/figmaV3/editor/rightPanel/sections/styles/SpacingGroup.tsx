@@ -17,7 +17,6 @@ import {
     reasonForKey,
 } from './common';
 
-import { useEditor } from '../../../useEditor';
 import { coerceLen } from '../../../../runtime/styleUtils';
 
 // 인스펙터 공통 레이아웃 프리미티브 (라벨 80px + 우측 6그리드)
@@ -29,6 +28,7 @@ import {
     MiniInputV1,
     ChipBtnV1,
 } from './layoutV1';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 export function SpacingGroup(props: {
     el: Record<string, any>;
@@ -43,8 +43,13 @@ export function SpacingGroup(props: {
     nodeId: NodeId;
     componentId: string;
 }) {
+
+    const { reader, writer } = useInspectorController();
+    const R = reader(); const W = writer();
+
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const { ui, project } = useEditor();
+    const ui = R.ui();
+    const project = R.project();
     const allow = useAllowed(nodeId);
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 

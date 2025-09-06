@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { useEditor } from '../../useEditor';
 import type { NodeId } from '../../../core/types';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 interface DataBindingPopoverProps {
     nodeId: NodeId;
@@ -12,7 +12,23 @@ interface DataBindingPopoverProps {
 }
 
 export function DataBindingPopover({ nodeId, propKey, anchorEl, onClose }: DataBindingPopoverProps) {
-    const state = useEditor();
+
+    const { reader, writer } = useInspectorController();
+    const R = reader();
+    const W = writer();
+
+    const state = {
+  ui: R.ui(),
+  project: R.project(),
+  data: R.data(),
+  getEffectiveDecl: R.getEffectiveDecl.bind(R),
+  updateNodeStyles: W.updateNodeStyles.bind(W),
+  updateNodeProps: W.updateNodeProps.bind(W),
+  setNotification: W.setNotification.bind(W),
+  saveNodeAsComponent: W.saveNodeAsComponent.bind(W),
+  updateComponentPolicy: W.updateComponentPolicy.bind(W),
+  update: W.update.bind(W),
+};
     const ref = useRef<HTMLDivElement>(null);
 
     const setBinding = (path: string) => {

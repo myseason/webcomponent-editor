@@ -14,18 +14,55 @@
 
 import React from 'react';
 import type { SupportedEvent, FlowEdge, NodeId, EditorState } from '../../../core/types';
-import { useEditor } from '../../useEditor';
 import { SelectPage } from '../../common/SelectPage';
 import { SelectFragment } from '../../common/SelectFragment';
 import { WhenBuilder } from '../../common/WhenBuilder';
+import {useBottomPanelController} from "@/figmaV3/controllers/bottom/BottomPanelController";
 
 const SUPPORTED_EVENTS: SupportedEvent[] = ['onClick', 'onChange', 'onSubmit', 'onLoad'];
 type ToKind = 'Navigate' | 'OpenFragment' | 'CloseFragment';
 
 export function FlowsPanel() {
     // 1) 훅은 최상위에서만 호출
-    const state = useEditor();
+    const { reader, writer } = useBottomPanelController();
+    const R = reader(); const W = writer();
+    const state = {
+        // ---- 읽기 호환 ----
+        ui: R.ui(),
+        project: R.project(),
+        data: R.data(),
+        history: R.history(),
+        getEffectiveDecl: R.getEffectiveDecl.bind(R),
 
+        // ---- 쓰기 호환 ----
+        updateNodeStyles: W.updateNodeStyles.bind(W),
+        updateNodeProps: W.updateNodeProps.bind(W),
+        setNotification: W.setNotification.bind(W),
+        update: W.update.bind(W),
+
+        // ====== 레거시 표면(파일들이 그대로 기대하는 이름 유지) ======
+
+        // Dock
+        toggleBottomDock: W.toggleBottomDock.bind(W),
+
+        // Flows(Edges)
+        flowEdges: R.flowEdges(),
+        addFlowEdge: W.addFlowEdge.bind(W),
+        removeFlowEdge: W.removeFlowEdge.bind(W),
+        updateFlowEdge: W.updateFlowEdge.bind(W),
+
+        // Fragments
+        addFragment: W.addFragment.bind(W),
+        openFragment: W.openFragment.bind(W),
+        closeFragment: W.closeFragment.bind(W),
+        removeFragment: W.removeFragment.bind(W),
+
+        // 선택 도메인 직접 접근(있을 때만 사용)
+        actions: (W.actions || {}),
+        flows: (W.flows || {}),
+        fragments: (W.fragments || {}),
+        dataOps: (W.dataOps || {}),
+    };
     // 2) 입력 폼 상태 (from/event/toKind/target)
     const defaultFrom = state.ui.selectedId ?? state.project.rootId;
     const [fromNode, setFromNode] = React.useState<NodeId>(defaultFrom);

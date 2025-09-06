@@ -1,7 +1,6 @@
 'use client';
 
 import React, {JSX, useMemo, useState} from 'react';
-import { useEditor } from '../../useEditor';
 import type { CSSDict, Viewport } from '../../../core/types';
 import { getEffectivePoliciesForNode } from '../../../runtime/capabilities';
 
@@ -14,6 +13,7 @@ import { BorderGroup } from './styles/BorderGroup';
 import { BackgroundGroup } from './styles/BackgroundGroup';
 import { EffectsGroup } from './styles/EffectsGroup';
 import { CustomGroup } from './styles/CustomGroup';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 type OpenState = {
     layout: boolean;
@@ -27,7 +27,23 @@ type OpenState = {
 };
 
 export function StylesSection(): JSX.Element {
-    const state = useEditor();
+
+    const { reader, writer } = useInspectorController();
+    const R = reader();
+    const W = writer();
+
+    const state = {
+  ui: R.ui(),
+  project: R.project(),
+  data: R.data(),
+  getEffectiveDecl: R.getEffectiveDecl.bind(R),
+  updateNodeStyles: W.updateNodeStyles.bind(W),
+  updateNodeProps: W.updateNodeProps.bind(W),
+  setNotification: W.setNotification.bind(W),
+  saveNodeAsComponent: W.saveNodeAsComponent.bind(W),
+  updateComponentPolicy: W.updateComponentPolicy.bind(W),
+  update: W.update.bind(W),
+};
     const expert = state.ui.expertMode;
 
     // 현재 선택 노드 (없으면 루트)

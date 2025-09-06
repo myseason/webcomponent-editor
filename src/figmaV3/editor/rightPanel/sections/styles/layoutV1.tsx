@@ -3,8 +3,8 @@
 import React from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
-import { useEditor } from '../../../useEditor';
 import { modeBorderClass } from './common';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 // 나머지 MiniInputV1, MiniSelectV1 등 기존 export 들은 그대로 두세요.
 // 아래는 SectionShellV1만 교체/갱신한 것입니다.
@@ -30,7 +30,12 @@ type SectionShellV1Props = {
  */
 
 export function SectionShellV1({ title, open, onToggle, children, className }: SectionShellV1Props) {
-    const { ui } = useEditor();
+
+    const { reader, writer } = useInspectorController();
+    const R = reader();
+    const W = writer();
+
+    const ui = R.ui();
     const borderColor = modeBorderClass(ui?.mode); // 🔹 모드별 상단 보더 색상 결정
 
     return (

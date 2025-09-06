@@ -12,9 +12,9 @@
  */
 
 import React from 'react';
-import { useEditor } from '../../useEditor';
 import { getDefinition } from '../../../core/registry';
 import type {EditorState, NodeId, PropSchemaEntry} from '../../../core/types';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 type Row = PropSchemaEntry<Record<string, unknown>>;
 type RowText = Extract<Row, { type: 'text' }>;
@@ -110,8 +110,24 @@ function parseOptionsJson(src: string): RowSelect['options'] | null {
 }
 
 export function SchemaEditor({ nodeId }: { nodeId: NodeId }) {
+
+    const { reader, writer } = useInspectorController();
+    const R = reader();
+    const W = writer();
+
     // 상태 구독(최상위 훅)
-    const state = useEditor();
+    const state = {
+  ui: R.ui(),
+  project: R.project(),
+  data: R.data(),
+  getEffectiveDecl: R.getEffectiveDecl.bind(R),
+  updateNodeStyles: W.updateNodeStyles.bind(W),
+  updateNodeProps: W.updateNodeProps.bind(W),
+  setNotification: W.setNotification.bind(W),
+  saveNodeAsComponent: W.saveNodeAsComponent.bind(W),
+  updateComponentPolicy: W.updateComponentPolicy.bind(W),
+  update: W.update.bind(W),
+};
     const node = state.project.nodes[nodeId];
     const defId = node.componentId;
 

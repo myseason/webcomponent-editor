@@ -10,8 +10,8 @@ import type {
 } from '../../../../core/types';
 import { getAllowedStyleKeysForNode, getEffectivePoliciesForNode } from '../../../../runtime/capabilities';
 import { Lock, Unlock } from 'lucide-react';
-import { useEditor } from '../../../useEditor';
 import styles from '../../../ui/theme.module.css';
+import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
 
 /* ────────────────────────────────────────────────────
  * 공통 레이아웃 컴포넌트
@@ -55,7 +55,12 @@ export const PermissionLock: React.FC<{
     componentId: string;
     controlKey: string;
 }> = ({ componentId, controlKey }) => {
-    const { project, updateComponentPolicy } = useEditor();
+
+    const { reader, writer } = useInspectorController();
+    const R = reader(); const W = writer();
+
+    const project = R.project();
+    const updateComponentPolicy = W.updateComponentPolicy;
     const isVisible = project.policies?.components?.[componentId]?.inspector?.controls?.[controlKey]?.visible !== false;
     const toggleVisibility = () => {
         const patch: Partial<ComponentPolicy> = {
@@ -222,7 +227,12 @@ export const ColorField: React.FC<{
 export type DisallowReason = 'template' | 'tag' | 'component' | null;
 // ... (useAllowed, reasonForKey 함수는 변경 없음)
 export function useAllowed(nodeId: NodeId): Set<string> {
-    const { project, ui } = useEditor();
+
+    const { reader, writer } = useInspectorController();
+    const R = reader(); const W = writer();
+
+    const project = R.project();
+    const ui = R.ui();
     const { mode, expertMode } = ui;
 
     return React.useMemo(() => {
