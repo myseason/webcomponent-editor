@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import type { ProjectHubTab, EditorMode } from '../../core/types';
-import { useLeftSidebarFacade } from '@/figmaV3/controllers/ui/LeftSidebarFacadeController';
 
 // 패널들
 import { PagesPanel } from './panels/PagesPanel';
@@ -11,6 +10,8 @@ import { ComponentsPanel } from './panels/ComponentsPanel';
 import { Layers as LayersPanel } from './Layers';
 
 import { modeBorderClass } from '../rightPanel/sections/styles/common';
+
+import { useLeftPanelFacadeController } from '../../controllers/left/LeftPanelFacadeController';
 
 // 아이콘 (lucide-react)
 import {
@@ -147,31 +148,23 @@ function SinglePanel({ tab }: { tab: HubTab }) {
 }
 
 export function LeftSidebar() {
-    const state = useLeftSidebarFacade();
-    const {
-        ui,
-        // 기존 액션/상태
-        setEditorMode,
-        setActiveHubTab,
-        setNotification,
-        // Split 관련
-        toggleLeftPanelSplit,
-        setLeftPanelSplitPercentage,
-    } = state;
+    const { reader, writer } = useLeftPanelFacadeController();
 
     // ── 모드 UI(기존 유지) ────────────────────────────────────────────────
+    const ui = reader.ui();
     const mode = (ui?.mode ?? 'Page') as EditorMode;
 
     const handleModeChange = React.useCallback((newMode: EditorMode) => {
-        if (ui.mode === newMode) return;
-        setEditorMode?.(newMode);
+        if (ui.mode === newMode)
+            return;
+        writer.setEditorMode?.(newMode);
         // 기존 알림 사용
         const message =
             newMode === 'Page'
                 ? '🚀 페이지 빌드 모드로 전환되었습니다.'
                 : '🛠️ 컴포넌트 개발 모드로 전환되었습니다.';
-        setNotification?.(message);
-    }, [ui.mode, setEditorMode, setNotification]);
+        writer.setNotification?.(message);
+    }, [ui.mode, writer.setEditorMode, writer.setNotification]);
 
     // 모드별 상단 테두리 색상 (기존 유지)
     const modeBorderStyle = modeBorderClass(ui?.mode);
@@ -197,15 +190,15 @@ export function LeftSidebar() {
     // 컴포넌트 모드 전환 시, 허용되지 않는 탭이 active면 Components로 보정 (기존 유지)
     React.useEffect(() => {
         if (mode === 'Component' && !COMPONENT_MODE_TABS.has(activeHubTab)) {
-            setActiveHubTab('Components');
+            writer.setActiveHubTab('Components');
         }
-    }, [mode, activeHubTab, setActiveHubTab]);
+    }, [mode, activeHubTab, writer.setActiveHubTab]);
 
     // Split 리사이저 변경 핸들러
     const handleResizePct = React.useCallback((pct: number) => {
         const clamped = Math.max(20, Math.min(80, pct));
-        setLeftPanelSplitPercentage?.(clamped);
-    }, [setLeftPanelSplitPercentage]);
+        writer.setLeftPanelSplitPercentage?.(clamped);
+    }, [writer.setLeftPanelSplitPercentage]);
 
     // 분할 모드에서 상단 패널이 Layers와 중복되면 상단은 Components로
     const primaryTab: HubTab = React.useMemo(() => {
@@ -225,7 +218,7 @@ export function LeftSidebar() {
                         icon={icon}
                         label={id}
                         active={activeHubTab === id}
-                        onClick={() => setActiveHubTab(id)}
+                        onClick={() => writer.setActiveHubTab(id)}
                         title={id}
                     />
                 ))}
@@ -237,7 +230,7 @@ export function LeftSidebar() {
                         isSplit ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-200',
                     ].join(' ')}
                     title={isSplit ? 'Split View: ON (Click to turn OFF)' : 'Split View: OFF (Click to turn ON)'}
-                    onClick={toggleLeftPanelSplit}
+                    onClick={writer.toggleLeftPanelSplit}
                     aria-pressed={isSplit}
                     aria-label="Toggle Split View"
                 >
