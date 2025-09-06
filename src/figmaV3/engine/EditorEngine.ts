@@ -1,3 +1,4 @@
+// src/figmaV3/engine/EditorEngine.ts
 /**
  * EditorEngine (Facade over editStore)
  * - feature/v1.3.1 기준 editStore API를 깔끔하게 감쌉니다.
@@ -7,8 +8,8 @@
  * - getXxx* : 읽기(조회)
  * - setXxx* : 단일 값/선택 변경
  * - updateXxx* : 부분 수정/패치
- * - add / remove /duplicate : 컬렉션 조작
-*/
+ * - add / remove / duplicate : 컬렉션 조작
+ */
 
 import { editorStore } from '../store/editStore';
 import type { EditorStoreState } from '../store/types';
@@ -59,11 +60,10 @@ export interface EditorEngineFacade {
         appendChildNode(parentId: NodeId, childId: NodeId, index?: number): void;
         moveNode(nodeId: NodeId, newParentId: NodeId, index?: number): void;
         removeNodeCascade(nodeId: NodeId): void;
-        updateNodeProps(id: NodeId, props: Record<string, unknown>): void;
+        updateNodeProps(id: NodeId, props: Record<string, any>): void;
         updateNodeStyles(id: NodeId, styles: CSSDict, viewport?: Viewport): void;
         toggleNodeVisibility(id: NodeId): void;
         toggleNodeLock(id: NodeId): void;
-
         getParentId(id: NodeId): NodeId | null;
     };
 
@@ -85,6 +85,11 @@ export interface EditorEngineFacade {
         setCanvasZoom(zoom: number): void;
         setActiveViewport(viewport: Viewport): void;
         setBaseViewport(viewport: Viewport): void;
+
+        /** 🔹 좌패널 분할 관련 (추가) */
+        toggleLeftPanelSplit(): void;
+        setLeftPanelSplit(value: boolean): void;
+        setLeftPanelSplitPercentage(pct: number): void;
     };
 }
 
@@ -118,18 +123,15 @@ export const EditorEngine: EditorEngineFacade = {
         getPages() {
             return (editorStore.getState() as EditorStoreState).project.pages;
         },
-
         getPageById(id) {
             const s = editorStore.getState() as EditorStoreState;
             return s.project.pages.find((p) => p.id === id);
         },
-
         getSelectedPageId() {
             const s = editorStore.getState() as EditorStoreState;
             const current = s.project.pages.find((p) => p.rootId === s.project.rootId);
             return current?.id ?? null;
         },
-
         getCurrentPage() {
             const s = editorStore.getState() as EditorStoreState;
             const current = s.project.pages.find((p) => p.rootId === s.project.rootId);
@@ -138,35 +140,41 @@ export const EditorEngine: EditorEngineFacade = {
 
         // 쓰기
         setSelectedPageId(id) {
-            const S = editorStore.getState() as EditorStoreState & { selectPage?: (pid: string) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                selectPage?: (pid: string) => void;
+            };
             S.selectPage?.(id);
         },
-
         addPage(name) {
-            const S = editorStore.getState() as EditorStoreState & { addPage?: (title?: string) => string };
+            const S = editorStore.getState() as EditorStoreState & {
+                addPage?: (title?: string) => string;
+            };
             return S.addPage?.(name) ?? '';
         },
-
         removePage(id) {
-            const S = editorStore.getState() as EditorStoreState & { removePage?: (pid: string) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                removePage?: (pid: string) => void;
+            };
             S.removePage?.(id);
         },
-
         duplicatePage(id) {
-            const S = editorStore.getState() as EditorStoreState & { duplicatePage?: (pid: string) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                duplicatePage?: (pid: string) => void;
+            };
             S.duplicatePage?.(id);
         },
-
         renamePage(id, name) {
             EditorEngine.pages.updatePageMeta(id, { name });
         },
-
         updatePageMeta(id, meta) {
-            EditorEngine.update((draft) => {
-                const page = draft.project.pages.find((p) => p.id === id);
-                if (!page) return;
-                Object.assign(page, meta);
-            }, true);
+            EditorEngine.update(
+                (draft) => {
+                    const page = draft.project.pages.find((p) => p.id === id);
+                    if (!page) return;
+                    Object.assign(page, meta);
+                },
+                true,
+            );
         },
     },
 
@@ -176,12 +184,10 @@ export const EditorEngine: EditorEngineFacade = {
         getNodeById(id) {
             return (editorStore.getState() as EditorStoreState).project.nodes[id];
         },
-
         getNodeChildrenIds(id) {
             const n = EditorEngine.nodes.getNodeById(id);
             return ((n?.children ?? []) as NodeId[]);
         },
-
         getSelectedNodeId() {
             const s = editorStore.getState() as EditorStoreState;
             return (s.ui.selectedId ?? null) as NodeId | null;
@@ -189,10 +195,11 @@ export const EditorEngine: EditorEngineFacade = {
 
         // 쓰기
         setSelectedNodeId(id) {
-            const S = editorStore.getState() as EditorStoreState & { select?: (nid: NodeId | null) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                select?: (nid: NodeId | null) => void;
+            };
             S.select?.(id ?? null);
         },
-
         appendChildNode(parentId, childId, index) {
             // feature/v1.3.1: moveNode(nodeId, newParentId, newIndex)
             const S = editorStore.getState() as EditorStoreState & {
@@ -204,7 +211,6 @@ export const EditorEngine: EditorEngineFacade = {
                     : EditorEngine.nodes.getNodeChildrenIds(parentId)?.length ?? 0;
             S.moveNode?.(childId, parentId, i);
         },
-
         moveNode(nodeId, newParentId, index) {
             const S = editorStore.getState() as EditorStoreState & {
                 moveNode?: (nid: NodeId, pid: NodeId, idx: number) => void;
@@ -215,33 +221,34 @@ export const EditorEngine: EditorEngineFacade = {
                     : EditorEngine.nodes.getNodeChildrenIds(newParentId)?.length ?? 0;
             S.moveNode?.(nodeId, newParentId, i);
         },
-
         removeNodeCascade(nodeId) {
-            const S = editorStore.getState() as EditorStoreState & { removeNodeCascade?: (nid: NodeId) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                removeNodeCascade?: (nid: NodeId) => void;
+            };
             S.removeNodeCascade?.(nodeId);
         },
-
         updateNodeProps(id, props) {
             const S = editorStore.getState() as EditorStoreState & {
-                updateNodeProps?: (id: NodeId, props: Record<string, unknown>) => void;
+                updateNodeProps?: (id: NodeId, props: Record<string, any>) => void;
             };
             S.updateNodeProps?.(id, props);
         },
-
         updateNodeStyles(id, styles, viewport) {
             const S = editorStore.getState() as EditorStoreState & {
                 updateNodeStyles?: (id: NodeId, styles: CSSDict, vp?: Viewport) => void;
             };
             S.updateNodeStyles?.(id, styles, viewport);
         },
-
         toggleNodeVisibility(id) {
-            const S = editorStore.getState() as EditorStoreState & { toggleNodeVisibility?: (id: NodeId) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                toggleNodeVisibility?: (id: NodeId) => void;
+            };
             S.toggleNodeVisibility?.(id);
         },
-
         toggleNodeLock(id) {
-            const S = editorStore.getState() as EditorStoreState & { toggleNodeLock?: (id: NodeId) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                toggleNodeLock?: (id: NodeId) => void;
+            };
             S.toggleNodeLock?.(id);
         },
         getParentId(id) {
@@ -257,69 +264,124 @@ export const EditorEngine: EditorEngineFacade = {
         getEditorMode() {
             return (editorStore.getState() as EditorStoreState).ui.mode;
         },
-
         getActiveHubTab() {
-            // ✅ v1.3.1: ui.panels.left.activeHubTab
+            // v1.3.1: ui.panels.left.activeHubTab
             return (editorStore.getState() as EditorStoreState).ui.panels.left.activeHubTab;
         },
-
         getCanvasSize() {
-            // ✅ v1.3.1: ui.canvas.width/height
+            // v1.3.1: ui.canvas.width/height
             const { width, height } = (editorStore.getState() as EditorStoreState).ui.canvas;
             return { width, height };
         },
-
         getCanvasZoom() {
-            // ✅ v1.3.1: ui.canvas.zoom
+            // v1.3.1: ui.canvas.zoom
             return (editorStore.getState() as EditorStoreState).ui.canvas.zoom;
         },
-
         getActiveViewport() {
-            // ✅ v1.3.1: ui.canvas.activeViewport
+            // v1.3.1: ui.canvas.activeViewport
             return (editorStore.getState() as EditorStoreState).ui.canvas.activeViewport;
         },
-
         getBaseViewport() {
-            // ✅ v1.3.1: ui.canvas.baseViewport
+            // v1.3.1: ui.canvas.baseViewport
             return (editorStore.getState() as EditorStoreState).ui.canvas.baseViewport;
         },
 
         // 쓰기
         setEditorMode(mode) {
-            const S = editorStore.getState() as EditorStoreState & { setEditorMode?: (m: EditorMode) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                setEditorMode?: (m: EditorMode) => void;
+            };
             S.setEditorMode?.(mode);
         },
-
         setActiveHubTab(tab) {
-            const S = editorStore.getState() as EditorStoreState & { setActiveHubTab?: (t: ProjectHubTab) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                setActiveHubTab?: (t: ProjectHubTab) => void;
+            };
             S.setActiveHubTab?.(tab);
         },
-
         setNotification(message) {
-            const S = editorStore.getState() as EditorStoreState & { setNotification?: (m: string) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                setNotification?: (m: string) => void;
+            };
             S.setNotification?.(message);
         },
-
         setCanvasSize(size) {
             const S = editorStore.getState() as EditorStoreState & {
                 setCanvasSize?: (s: { width: number; height: number }) => void;
             };
             S.setCanvasSize?.(size);
         },
-
         setCanvasZoom(zoom) {
-            const S = editorStore.getState() as EditorStoreState & { setCanvasZoom?: (z: number) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                setCanvasZoom?: (z: number) => void;
+            };
             S.setCanvasZoom?.(zoom);
         },
-
         setActiveViewport(viewport) {
-            const S = editorStore.getState() as EditorStoreState & { setActiveViewport?: (v: Viewport) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                setActiveViewport?: (v: Viewport) => void;
+            };
             S.setActiveViewport?.(viewport);
         },
-
         setBaseViewport(viewport) {
-            const S = editorStore.getState() as EditorStoreState & { setBaseViewport?: (v: Viewport) => void };
+            const S = editorStore.getState() as EditorStoreState & {
+                setBaseViewport?: (v: Viewport) => void;
+            };
             S.setBaseViewport?.(viewport);
+        },
+
+        // ---- 🔹 좌패널 분할 관련 (추가) ----
+        toggleLeftPanelSplit() {
+            // 우선 slice 액션이 있으면 사용
+            const S1 = editorStore.getState() as EditorStoreState & {
+                toggleLeftPanelSplit?: () => void;
+            };
+            if (S1.toggleLeftPanelSplit) {
+                S1.toggleLeftPanelSplit();
+                return;
+            }
+            // 폴백: 직접 토글 + Layers 탭 보정
+            const prev = !!(editorStore.getState() as any)?.ui?.panels?.left?.isSplit;
+            EditorEngine.update((draft) => {
+                draft.ui = draft.ui ?? ({} as any);
+                draft.ui.panels = draft.ui.panels ?? ({} as any);
+                draft.ui.panels.left = draft.ui.panels.left ?? ({} as any);
+                draft.ui.panels.left.isSplit = !prev;
+                if (draft.ui.panels.left.isSplit && draft.ui.panels.left.activeHubTab !== 'Layers') {
+                    draft.ui.panels.left.activeHubTab = 'Layers';
+                }
+            }, true);
+        },
+
+        setLeftPanelSplit(value: boolean) {
+            EditorEngine.update((draft) => {
+                draft.ui = draft.ui ?? ({} as any);
+                draft.ui.panels = draft.ui.panels ?? ({} as any);
+                draft.ui.panels.left = draft.ui.panels.left ?? ({} as any);
+                draft.ui.panels.left.isSplit = !!value;
+                if (draft.ui.panels.left.isSplit && draft.ui.panels.left.activeHubTab !== 'Layers') {
+                    draft.ui.panels.left.activeHubTab = 'Layers';
+                }
+            }, true);
+        },
+
+        setLeftPanelSplitPercentage(pct: number) {
+            const clamp = (n: number) => Math.max(20, Math.min(80, Math.floor(n)));
+            // slice 액션이 있으면 우선 사용
+            const S2 = editorStore.getState() as EditorStoreState & {
+                setLeftPanelSplitPercentage?: (n: number) => void;
+            };
+            if (S2.setLeftPanelSplitPercentage) {
+                S2.setLeftPanelSplitPercentage(clamp(pct));
+                return;
+            }
+            // 폴백
+            EditorEngine.update((draft) => {
+                draft.ui = draft.ui ?? ({} as any);
+                draft.ui.panels = draft.ui.panels ?? ({} as any);
+                draft.ui.panels.left = draft.ui.panels.left ?? ({} as any);
+                draft.ui.panels.left.splitPercentage = clamp(pct);
+            }, true);
         },
     },
 };
