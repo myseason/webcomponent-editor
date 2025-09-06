@@ -5,6 +5,7 @@
 ============================================================================= */
 
 export type NodeId = string;
+export type PageId = string;
 export type CSSDict = Record<string, unknown>;
 
 /** V3는 'base' | 'tablet' | 'mobile' 3-뷰포트로 운용합니다. */

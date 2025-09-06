@@ -46,7 +46,7 @@ function getDisplayName(node: Node): string {
 }
 
 /** ───────── Row: 한 줄 (메모 유지, selToken으로 리렌더 트리거) ───────── */
-const Row: React.FC<{ id: NodeId; depth: number; rootId: NodeId | null; selToken: string | null }> = memo(
+const Row: React.FC<{ id: NodeId; depth: number; rootId: NodeId | null; selToken: string | null; verToken: string; }> = memo(
     ({ id, depth, rootId, selToken }) => {
         const { reader: _r, writer: _w } = useLayersController();
         const R = _r();
@@ -166,15 +166,16 @@ const Tree: React.FC<{ id: NodeId; depth: number; rootId: NodeId | null }> = ({ 
     if (!node) return null;
 
     const selToken = R.selectedNodeId() ?? null;
+    const ver = R.useNodesToken();
 
     const children = useMemo(
         () => (R.getChildren(id) as NodeId[]).filter((cid) => !!R.getNode(cid)),
-        [id, (node as any)?.children, R.nodesToken()],
+        [id, (node as any)?.children, ver],
     );
 
     return (
         <>
-            <Row id={id} depth={depth} rootId={rootId} selToken={selToken} />
+            <Row id={id} depth={depth} rootId={rootId} selToken={selToken} verToken={ver}/>
             {children.map((cid) => (
                 <Tree key={cid} id={cid} depth={depth + 1} rootId={rootId} />
             ))}

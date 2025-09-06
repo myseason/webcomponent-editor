@@ -57,6 +57,13 @@ const initialState: EditorState = {
     history: { past: [], future: [] },
 };
 
+
+/**
+ * @deprecated
+ * editStore 직접 접근은 Engine 파사드 은닉 원칙에 어긋납니다.
+ * 외부 코드는 반드시 ../engine/EditorEngine 파사드를 사용해 주세요.
+ * (getState / update / subscribe + 도메인 오퍼레이션)
+ */
 export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreState>((set, get, api) => {
     const update = (fn: (draft: EditorState) => void, recordHistory = false) => {
         const current = get();

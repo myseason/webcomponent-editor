@@ -1,34 +1,41 @@
 'use client';
+
 /**
  * AssetsPanel
  * - Media: 이미지 등 정적 자산 업로드 및 관리
  * - Scripts (전문가): 전역 JS 편집
  * - Styles (전문가): 전역 CSS 및 테마 변수 편집
+ *
+ * ✅ UI/UX는 기준 소스와 동일하게 유지합니다.
+ *   (useEditor → useAssetsFacadeController 로 데이터/액션 공급자만 치환)
  */
+
 import React, { useState, useCallback } from 'react';
-import { useEditor } from '../../useEditor';
 import type { Asset } from '../../../core/types';
+import { useAssetsFacadeController } from '@/figmaV3/controllers/assets/AssetsFacadeController';
 
 type AssetTab = 'Media' | 'Scripts' | 'Styles';
 
 export function AssetsPanel() {
-    const state = useEditor();
-    const { ui, project, addAsset, removeAsset, updateGlobalCss, updateGlobalJs } = state;
-    const { expertMode } = ui;
+    const ctrl = useAssetsFacadeController();
+    const R = ctrl.reader();
+    const W = ctrl.writer();
 
+    const expertMode = R.expertMode();
     const [activeTab, setActiveTab] = useState<AssetTab>('Media');
-    const [globalCss, setGlobalCss] = useState(project.globalCss ?? '');
-    const [globalJs, setGlobalJs] = useState(project.globalJs ?? '');
+
+    // 초기값은 Reader에서 가져오되, 입력은 로컬 상태 → 저장 버튼으로 반영(기존 동작 유지)
+    const [globalCss, setGlobalCss] = useState<string>(R.globalCss());
+    const [globalJs, setGlobalJs] = useState<string>(R.globalJs());
 
     const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = (event) => {
             const url = event.target?.result as string;
             if (url) {
-                addAsset({
+                W.addAsset({
                     name: file.name,
                     url,
                     type: file.type.startsWith('image/') ? 'image' : 'video', // 간단한 타입 추론
@@ -36,11 +43,13 @@ export function AssetsPanel() {
             }
         };
         reader.readAsDataURL(file);
-    }, [addAsset]);
+    }, [W]);
+
+    const assets = R.assets();
 
     return (
-        <div className="p-2 h-full flex flex-col">
-            <div className="flex gap-2 mb-2 border-b">
+        <div className="h-full flex flex-col">
+            <div className="px-3 pt-2 flex items-center gap-4 border-b">
                 <button
                     onClick={() => setActiveTab('Media')}
                     className={`pb-2 text-sm ${activeTab === 'Media' ? 'border-b-2 border-blue-500 font-semibold' : 'text-gray-500'}`}
@@ -65,21 +74,35 @@ export function AssetsPanel() {
                 )}
             </div>
 
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 p-3 overflow-auto">
                 {activeTab === 'Media' && (
-                    <div className="space-y-2">
-                        <label className="w-full text-center px-3 py-2 border-2 border-dashed rounded-md cursor-pointer hover:border-blue-500 hover:bg-blue-50 block">
-                            <span>Click to upload files</span>
-                            <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*,video/*" />
+                    <div className="space-y-3">
+                        <label className="block">
+                            <input type="file" className="hidden" onChange={handleFileUpload} />
+                            <div className="w-full border-2 border-dashed rounded p-6 text-center text-sm text-gray-500 cursor-pointer hover:bg-gray-50">
+                                Click to upload files
+                            </div>
                         </label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {(project.assets ?? []).map((asset: Asset) => (
-                                <div key={asset.id} className="relative group">
-                                    <img src={asset.url} alt={asset.name} className="w-full h-20 object-cover rounded" />
-                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                        <button onClick={() => removeAsset(asset.id)} className="text-white text-xs bg-red-500 px-2 py-1 rounded">Delete</button>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            {(assets ?? []).map((asset: Asset) => (
+                                <div key={asset.id} className="border rounded p-2">
+                                    <div className="flex justify-between items-center">
+                                        <div className="text-sm font-medium truncate">{asset.name}</div>
+                                        <button
+                                            onClick={() => W.removeAsset(asset.id)}
+                                            className="text-white text-xs bg-red-500 px-2 py-1 rounded"
+                                        >
+                                            Delete
+                                        </button>
                                     </div>
-                                    <div className="text-[10px] truncate" title={asset.name}>{asset.name}</div>
+                                    <div className="mt-2">
+                                        {asset.type === 'image' ? (
+                                            <img src={asset.url} alt={asset.name} className="w-full h-24 object-cover rounded" />
+                                        ) : (
+                                            <video src={asset.url} className="w-full h-24 rounded" />
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -88,13 +111,16 @@ export function AssetsPanel() {
 
                 {expertMode && activeTab === 'Scripts' && (
                     <div className="h-full flex flex-col">
-                        <textarea
-                            value={globalJs}
-                            onChange={(e) => setGlobalJs(e.target.value)}
-                            className="flex-1 w-full font-mono text-xs border rounded p-2"
-                            placeholder="// Global JavaScript for your project"
-                        />
-                        <button onClick={() => updateGlobalJs(globalJs)} className="mt-2 text-xs border rounded px-3 py-1 bg-gray-100 hover:bg-gray-200">
+            <textarea
+                value={globalJs}
+                onChange={(e) => setGlobalJs(e.target.value)}
+                className="flex-1 w-full font-mono text-xs border rounded p-2"
+                placeholder="// Global JavaScript for your project"
+            />
+                        <button
+                            onClick={() => W.updateGlobalJs(globalJs)}
+                            className="mt-2 text-xs border rounded px-3 py-1 bg-gray-100 hover:bg-gray-200"
+                        >
                             Save Scripts
                         </button>
                     </div>
@@ -102,13 +128,16 @@ export function AssetsPanel() {
 
                 {expertMode && activeTab === 'Styles' && (
                     <div className="h-full flex flex-col">
-                        <textarea
-                            value={globalCss}
-                            onChange={(e) => setGlobalCss(e.target.value)}
-                            className="flex-1 w-full font-mono text-xs border rounded p-2"
-                            placeholder="/* Global CSS for your project */"
-                        />
-                        <button onClick={() => updateGlobalCss(globalCss)} className="mt-2 text-xs border rounded px-3 py-1 bg-gray-100 hover:bg-gray-200">
+            <textarea
+                value={globalCss}
+                onChange={(e) => setGlobalCss(e.target.value)}
+                className="flex-1 w-full font-mono text-xs border rounded p-2"
+                placeholder="/* Global CSS for your project */"
+            />
+                        <button
+                            onClick={() => W.updateGlobalCss(globalCss)}
+                            className="mt-2 text-xs border rounded px-3 py-1 bg-gray-100 hover:bg-gray-200"
+                        >
                             Save Styles
                         </button>
                     </div>

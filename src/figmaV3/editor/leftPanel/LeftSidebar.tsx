@@ -1,8 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useEditor } from '../useEditor';
 import type { ProjectHubTab, EditorMode } from '../../core/types';
+import { useLeftSidebarFacade } from '@/figmaV3/controllers/ui/LeftSidebarFacadeController';
 
 // 패널들
 import { PagesPanel } from './panels/PagesPanel';
@@ -147,7 +147,7 @@ function SinglePanel({ tab }: { tab: HubTab }) {
 }
 
 export function LeftSidebar() {
-    const state = useEditor();
+    const state = useLeftSidebarFacade();
     const {
         ui,
         // 기존 액션/상태
