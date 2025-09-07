@@ -30,7 +30,9 @@ import {
     MiniSelectV1,
     ChipBtnV1,
 } from './layoutV1';
-import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
+
+// ✅ 컨트롤러 교체
+import { useRightPanelController } from '@/figmaV3/controllers/right/RightPanelController';
 
 // 안전 문자열 헬퍼
 function s(v: unknown): string {
@@ -56,13 +58,13 @@ export function BorderGroup(props: {
     nodeId: NodeId;
     componentId: string;
 }) {
-
-    const { reader, writer } = useInspectorController();
-    const R = reader(); const W = writer();
+    // ✅ RightPanelController 사용
+    const { reader } = useRightPanelController();
+    const R = reader;
 
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const ui = R.ui();
-    const project = R.project();
+    const ui = R.getUI();
+    const project = R.getProject();
     const allow = useAllowed(nodeId);
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
@@ -369,7 +371,7 @@ export function BorderGroup(props: {
                 <RowV1>
                     <RowLeftV1 title="" />
                     <RowRightGridV1>
-                        <div className="col-span-1 flex items-center text-[11px] text-gray-600 pl-[2px]">B</div>
+                        <div className="col-span-1 flex items中心 text-[11px] text-gray-600 pl-[2px]">B</div>
                         <div className="col-span-2 min-w-0">
                             {renderLock('borderBottomWidth')}
                             {!allow.has('borderBottomWidth') && <DisabledHint reason={dis('borderBottomWidth') ?? 'template'} />}

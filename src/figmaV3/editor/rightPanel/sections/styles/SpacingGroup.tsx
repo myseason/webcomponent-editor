@@ -28,7 +28,9 @@ import {
     MiniInputV1,
     ChipBtnV1,
 } from './layoutV1';
-import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
+
+// ✅ 컨트롤러 교체: RightPanelController 사용
+import { useRightPanelController } from '../../../../controllers/right/RightPanelController';
 
 export function SpacingGroup(props: {
     el: Record<string, any>;
@@ -43,13 +45,12 @@ export function SpacingGroup(props: {
     nodeId: NodeId;
     componentId: string;
 }) {
-
-    const { reader, writer } = useInspectorController();
-    const R = reader(); const W = writer();
+    const { reader } = useRightPanelController();
+    const R = reader;
 
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const ui = R.ui();
-    const project = R.project();
+    const ui = R.getUI();
+    const project = R.getProject();
     const allow = useAllowed(nodeId);
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 

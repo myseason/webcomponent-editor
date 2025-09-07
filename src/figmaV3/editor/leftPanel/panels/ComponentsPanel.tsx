@@ -1,15 +1,15 @@
 'use client';
 
-import React, {useEffect, useState} from 'react';
-import {TemplatesPanel} from '../TemplatesPanel';
-import {Palette} from '../Palette';
-import type {Fragment} from '../../../core/types';
-import {Trash2, UploadCloud} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { TemplatesPanel } from '../TemplatesPanel';
+import { Palette } from '../Palette';
+import type { Fragment } from '../../../core/types';
+import { Trash2, UploadCloud } from 'lucide-react';
 
-import {LeftDomain, useLeftPanelController} from '../../../controllers/left/LeftPanelController';
+import { useLeftPanelController } from '../../../controllers/left/LeftPanelController';
 
 function ComponentEditorCard({ frag }: { frag: Fragment }) {
-    const { reader, writer } = useLeftPanelController([LeftDomain.Components]);
+    const { reader, writer } = useLeftPanelController();
 
     const ui = reader.getUi();
     const [name, setName] = useState(frag.name);
@@ -24,7 +24,7 @@ function ComponentEditorCard({ frag }: { frag: Fragment }) {
     const handleSave = () => {
         if (frag.name !== name || frag.description !== description) {
             writer.updateFragment(frag.id, { name, description });
-            writer.setNotification("Component details auto-saved.");
+            writer.setNotification('Component details auto-saved.');
         }
     };
 
@@ -32,22 +32,32 @@ function ComponentEditorCard({ frag }: { frag: Fragment }) {
         if (!isEditing) {
             writer.openComponentEditor(frag.id);
         }
-        if (window.confirm(`Are you sure you want to publish "${frag.name}" to the shared library? This action cannot be undone.`)) {
+        if (
+            window.confirm(
+                `Are you sure you want to publish "${frag.name}" to the shared library? This action cannot be undone.`
+            )
+        ) {
             writer.publishComponent();
             writer.setNotification(`Component "${frag.name}" published to library.`);
         }
     };
 
     const handleDelete = () => {
-        if (window.confirm(`Are you sure you want to delete the component "${frag.name}"? This action cannot be undone.`)) {
+        if (
+            window.confirm(
+                `Are you sure you want to delete the component "${frag.name}"? This action cannot be undone.`
+            )
+        ) {
             writer.removeFragment(frag.id);
         }
     };
 
     return (
-        // ✨ [수정] 카드 내부 상하 간격을 space-y-3에서 space-y-2로 줄였습니다.
+        // 카드 내부 상하 간격: 기존 의도 유지 (space-y-2)
         <li
-            className={`border rounded-lg p-3 space-y-2 cursor-pointer ${isEditing ? 'border-blue-500 bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
+            className={`border rounded-lg p-3 space-y-2 cursor-pointer ${
+                isEditing ? 'border-blue-500 bg-blue-50' : 'bg-white hover:bg-gray-50'
+            }`}
             onClick={() => !isEditing && writer.openComponentEditor(frag.id)}
         >
             <div className="flex items-start justify-between">
@@ -95,7 +105,7 @@ function ComponentEditorCard({ frag }: { frag: Fragment }) {
 }
 
 function ComponentDevelopmentPanel() {
-    const { reader, writer } = useLeftPanelController([LeftDomain.Components]);
+    const { reader, writer } = useLeftPanelController();
     const project = reader.getProject();
     const { fragments } = project;
 
@@ -104,7 +114,12 @@ function ComponentDevelopmentPanel() {
             <div className="p-2 space-y-3 border-b">
                 <div className="flex justify-between items-center px-1">
                     <div className="text-xs font-semibold text-gray-700">Project Components</div>
-                    <button onClick={() => writer.addFragment('New Component')} className="text-xs px-2 py-1 border rounded bg-white hover:bg-gray-50">+ New</button>
+                    <button
+                        onClick={() => writer.addFragment('New Component')}
+                        className="text-xs px-2 py-1 border rounded bg-white hover:bg-gray-50"
+                    >
+                        + New
+                    </button>
                 </div>
                 {fragments.length === 0 ? (
                     <div className="text-xs text-gray-400 py-4 text-center">No components created yet.</div>
@@ -139,6 +154,6 @@ function PageBuildPanel() {
 }
 
 export function ComponentsPanel() {
-    const { reader } = useLeftPanelController([LeftDomain.Components]);
+    const { reader } = useLeftPanelController();
     return reader.getUi().mode === 'Component' ? <ComponentDevelopmentPanel /> : <PageBuildPanel />;
 }

@@ -1,10 +1,10 @@
 'use client';
 
-import React, {useEffect, useRef, useState} from 'react';
-import type {EditorState, Page} from '../../../core/types';
-import {Copy, MoreHorizontal, Trash2} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import type { EditorState, Page } from '../../../core/types';
+import { Copy, MoreHorizontal, Trash2 } from 'lucide-react';
 
-import {LeftDomain, useLeftPanelController} from '../../../controllers/left/LeftPanelController';
+import { useLeftPanelController } from '../../../controllers/left/LeftPanelController';
 
 function slugify(s: string): string {
     return s.trim().toLowerCase().replace(/[\s_]+/g, '-').slice(0, 64);
@@ -13,7 +13,15 @@ function slugify(s: string): string {
 /**
  * ✨ [신규] 페이지 액션 메뉴 컴포넌트
  */
-const PageActions = ({ page, onDuplicate, onDelete }: { page: Page; onDuplicate: () => void; onDelete: () => void; }) => {
+const PageActions = ({
+                         page,
+                         onDuplicate,
+                         onDelete,
+                     }: {
+    page: Page;
+    onDuplicate: () => void;
+    onDelete: () => void;
+}) => {
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -36,12 +44,24 @@ const PageActions = ({ page, onDuplicate, onDelete }: { page: Page; onDuplicate:
                 <div className="absolute right-0 mt-1 w-40 bg-white border rounded-md shadow-lg z-10">
                     <ul className="text-xs">
                         <li>
-                            <button onClick={() => { onDuplicate(); setIsOpen(false); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    onDuplicate();
+                                    setIsOpen(false);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-gray-100 flex items-center gap-2"
+                            >
                                 <Copy size={14} /> Duplicate
                             </button>
                         </li>
                         <li>
-                            <button onClick={() => { onDelete(); setIsOpen(false); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-600 flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    onDelete();
+                                    setIsOpen(false);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-600 flex items-center gap-2"
+                            >
                                 <Trash2 size={14} /> Delete
                             </button>
                         </li>
@@ -54,7 +74,7 @@ const PageActions = ({ page, onDuplicate, onDelete }: { page: Page; onDuplicate:
 };
 
 export function PagesPanel() {
-    const { reader, writer } = useLeftPanelController([LeftDomain.Pages]);
+    const { reader, writer } = useLeftPanelController();
 
     const project = reader.getProject();
     const [selectedPageIdForDetails, setSelectedPageIdForDetails] = useState<string | null>(
@@ -68,10 +88,9 @@ export function PagesPanel() {
         }
     }, [project.rootId, project.pages]);
 
-
     const ui = reader.getUi();
     if (ui.mode !== 'Page') {
-        return <div className="p-4 text-sm text-gray-500">Page management is available in Page Build Mode.</div>
+        return <div className="p-4 text-sm text-gray-500">Page management is available in Page Build Mode.</div>;
     }
 
     const selectedPage = project.pages.find((p: Page) => p.id === selectedPageIdForDetails);
@@ -90,13 +109,20 @@ export function PagesPanel() {
                     {project.pages.map((p: Page) => (
                         <li key={p.id}>
                             <div
-                                onClick={() => { writer.selectPage(p.id); setSelectedPageIdForDetails(p.id); }}
-                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded border text-sm cursor-pointer ${selectedPageIdForDetails === p.id ? 'bg-blue-50 border-blue-400' : 'hover:bg-gray-50'}`}
+                                onClick={() => {
+                                    writer.selectPage(p.id);
+                                    setSelectedPageIdForDetails(p.id);
+                                }}
+                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded border text-sm cursor-pointer ${
+                                    selectedPageIdForDetails === p.id ? 'bg-blue-50 border-blue-400' : 'hover:bg-gray-50'
+                                }`}
                             >
                                 <span className="truncate">{p.name}</span>
                                 <div className="flex items-center gap-2">
                                     {p.rootId === project.rootId && (
-                                        <span className="text-xs text-blue-600 font-semibold bg-blue-100 px-2 py-0.5 rounded-full">OPEN</span>
+                                        <span className="text-xs text-blue-600 font-semibold bg-blue-100 px-2 py-0.5 rounded-full">
+                                            OPEN
+                                        </span>
                                     )}
                                     <PageActions
                                         page={p}
@@ -119,7 +145,12 @@ export function PagesPanel() {
                         <select className="flex-1 border rounded px-2 py-1 text-sm bg-white">
                             <option value="blank">Blank Page</option>
                         </select>
-                        <button className="text-xs px-3 py-1 border rounded bg-blue-600 text-white hover:bg-blue-700" onClick={createPage}>+ Create</button>
+                        <button
+                            className="text-xs px-3 py-1 border rounded bg-blue-600 text-white hover:bg-blue-700"
+                            onClick={createPage}
+                        >
+                            + Create
+                        </button>
                     </div>
                 </div>
 
@@ -132,7 +163,12 @@ export function PagesPanel() {
                                 <input
                                     className="w-full border rounded px-2 py-1 text-sm"
                                     value={selectedPage.name}
-                                    onChange={e => writer.update((s: EditorState) => { s.project.pages.find((p: Page)=>p.id===selectedPageIdForDetails)!.name = e.target.value })}
+                                    onChange={(e) =>
+                                        writer.update((s: EditorState) => {
+                                            s.project.pages.find((p: Page) => p.id === selectedPageIdForDetails)!.name =
+                                                e.target.value;
+                                        })
+                                    }
                                 />
                             </div>
                             <div>
@@ -140,7 +176,12 @@ export function PagesPanel() {
                                 <textarea
                                     className="w-full border rounded px-2 py-1 text-sm h-16 resize-none"
                                     value={selectedPage.description ?? ''}
-                                    onChange={e => writer.update((s: EditorState) => { s.project.pages.find((p: Page) =>p.id===selectedPageIdForDetails)!.description = e.target.value })}
+                                    onChange={(e) =>
+                                        writer.update((s: EditorState) => {
+                                            s.project.pages.find((p: Page) => p.id === selectedPageIdForDetails)!.description =
+                                                e.target.value;
+                                        })
+                                    }
                                 />
                             </div>
                             <div>
@@ -148,7 +189,12 @@ export function PagesPanel() {
                                 <input
                                     className="w-full border rounded px-2 py-1 font-mono text-xs"
                                     value={selectedPage.slug ?? ''}
-                                    onChange={e => writer.update((s: EditorState) => { s.project.pages.find((p: Page)=>p.id===selectedPageIdForDetails)!.slug = slugify(e.target.value) })}
+                                    onChange={(e) =>
+                                        writer.update((s: EditorState) => {
+                                            s.project.pages.find((p: Page) => p.id === selectedPageIdForDetails)!.slug =
+                                                slugify(e.target.value);
+                                        })
+                                    }
                                 />
                             </div>
                         </div>

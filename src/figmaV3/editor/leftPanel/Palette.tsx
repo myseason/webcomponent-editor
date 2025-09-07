@@ -1,11 +1,12 @@
 'use client';
 
 import React from 'react';
-import {listDefinitions} from '../../core/registry';
-import type {Fragment} from '../../core/types';
-import {Trash2} from 'lucide-react';
+import { listDefinitions } from '../../core/registry';
+import type { Fragment } from '../../core/types';
+import { Trash2 } from 'lucide-react';
 
-import {LeftDomain, useLeftPanelController} from '../../controllers/left/LeftPanelController';
+// ✅ 도메인 인자 제거
+import { useLeftPanelController } from '../../controllers/left/LeftPanelController';
 
 function itemMatch(title: string, id: string, q: string): boolean {
     const qq = q.trim().toLowerCase();
@@ -14,15 +15,20 @@ function itemMatch(title: string, id: string, q: string): boolean {
 }
 
 export function Palette({ query = '' }: { query?: string }) {
-    const { reader, writer } = useLeftPanelController([LeftDomain.Palette]);
+    // ✅ 인자 없이 컨트롤러 사용
+    const { reader, writer } = useLeftPanelController();
+
     const project = reader.getProject();
     const coreDefs = listDefinitions().filter((d) => itemMatch(d.title, d.id, query));
-    // ✨ [수정] isPublic이 true인 컴포넌트(Fragment)만 필터링합니다.
-    const sharedComponents = React.useMemo<Fragment[]>(() => {
-        return project.fragments.filter((f: Fragment) => f.isPublic);
-    }, [project.fragments]);
 
-    const filteredSharedComponents = sharedComponents.filter(c => itemMatch(c.name, c.id, query));
+    // isPublic === true 인 Fragment만
+    const sharedComponents = React.useMemo<Fragment[]>(
+        () => project.fragments.filter((f: Fragment) => f.isPublic),
+        [project.fragments]
+    );
+    const filteredSharedComponents = sharedComponents.filter((c) =>
+        itemMatch(c.name, c.id, query)
+    );
 
     const onInsertCore = (defId: string) => {
         const parent = reader.getUi().selectedId ?? project.rootId;
@@ -69,7 +75,6 @@ export function Palette({ query = '' }: { query?: string }) {
                                 <button
                                     type="button"
                                     className="w-full text-left px-2 py-2 border rounded hover:border-gray-300"
-                                    // ✨ [수정] insertComponent 액션 호출
                                     onClick={() => writer.insertComponent(c.id)}
                                     title={`${c.name}\nComponent: ${c.id}`}
                                 >

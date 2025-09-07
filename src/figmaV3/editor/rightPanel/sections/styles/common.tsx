@@ -11,7 +11,7 @@ import type {
 import { getAllowedStyleKeysForNode, getEffectivePoliciesForNode } from '../../../../runtime/capabilities';
 import { Lock, Unlock } from 'lucide-react';
 import styles from '../../../ui/theme.module.css';
-import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
+import { useRightPanelController } from '@/figmaV3/controllers/right/RightPanelController';
 
 /* ────────────────────────────────────────────────────
  * 공통 레이아웃 컴포넌트
@@ -47,7 +47,7 @@ export const DisabledHint: React.FC<{ reason: 'template' | 'tag' | 'component' }
                     'Template 필터에 의해 제한됨'
         }
     >
-        { reason === 'tag' ? 'TAG' : reason === 'component' ? 'COMP' : 'TPL' }
+        {reason === 'tag' ? 'TAG' : reason === 'component' ? 'COMP' : 'TPL'}
     </span>
 );
 
@@ -55,26 +55,28 @@ export const PermissionLock: React.FC<{
     componentId: string;
     controlKey: string;
 }> = ({ componentId, controlKey }) => {
+    const { reader, writer } = useRightPanelController();
+    const R = reader; const W = writer;
 
-    const { reader, writer } = useInspectorController();
-    const R = reader(); const W = writer();
-
-    const project = R.project();
+    const project = R.getProject();
     const updateComponentPolicy = W.updateComponentPolicy;
-    const isVisible = project.policies?.components?.[componentId]?.inspector?.controls?.[controlKey]?.visible !== false;
+    const isVisible =
+        project.policies?.components?.[componentId]?.inspector?.controls?.[controlKey]?.visible !== false;
+
     const toggleVisibility = () => {
         const patch: Partial<ComponentPolicy> = {
             inspector: {
-                controls: { [controlKey]: { visible: !isVisible } }
-            }
+                controls: { [controlKey]: { visible: !isVisible } },
+            },
         };
         updateComponentPolicy(componentId, patch);
     };
+
     return (
         <button
             onClick={toggleVisibility}
             className="p-1 rounded text-[var(--mdt-color-text-secondary)] hover:bg-[var(--mdt-color-panel-secondary)] hover:text-[var(--mdt-color-text-primary)]"
-            title={isVisible ? `페이지 빌더에게 이 컨트롤 숨기기` : `페이지 빌더에게 이 컨트롤 보이기`}
+            title={isVisible ? '페이지 빌더에게 이 컨트롤 숨기기' : '페이지 빌더에게 이 컨트롤 보이기'}
         >
             {isVisible ? <Unlock size={12} /> : <Lock size={12} />}
         </button>
@@ -225,14 +227,13 @@ export const ColorField: React.FC<{
  * 허용/제한 판단 유틸 (변경 없음)
  * ──────────────────────────────────────────────────── */
 export type DisallowReason = 'template' | 'tag' | 'component' | null;
-// ... (useAllowed, reasonForKey 함수는 변경 없음)
+
 export function useAllowed(nodeId: NodeId): Set<string> {
+    const { reader } = useRightPanelController();
+    const R = reader;
 
-    const { reader, writer } = useInspectorController();
-    const R = reader(); const W = writer();
-
-    const project = R.project();
-    const ui = R.ui();
+    const project = R.getProject();
+    const ui = R.getUI();
     const { mode, expertMode } = ui;
 
     return React.useMemo(() => {
@@ -280,8 +281,6 @@ export function reasonForKey(
 }
 
 // 🔹 개발 모드에 따른 상단 보더 색상 클래스 (공통 유틸)
-// Page Build Mode  -> 'border-t-blue-500'
-// Component Dev Mode -> 'border-t-purple-500'
 export function modeBorderClass(mode?: string) {
     return mode === 'Page' ? 'border-t-blue-500' : 'border-t-purple-500';
 }

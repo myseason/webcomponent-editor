@@ -28,7 +28,9 @@ import {
     MiniInputV1,
     MiniSelectV1,
 } from './layoutV1';
-import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
+
+// ✅ 변경: RightPanelController 사용
+import { useRightPanelController } from '@/figmaV3/controllers/right/RightPanelController';
 
 export function PositionGroup(props: {
     el: Record<string, any>;
@@ -43,13 +45,16 @@ export function PositionGroup(props: {
     nodeId: NodeId;
     componentId: string;
 }) {
-
-    const { reader, writer } = useInspectorController();
-    const R = reader(); const W = writer();
+    // ✅ 변경: 컨트롤러 교체
+    const { reader } = useRightPanelController();
+    const R = reader;
 
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const ui = R.ui();
-    const project = R.project();
+
+    // 기존 로직 유지: 프로젝트/UI 조회
+    const ui = R.getUI();
+    const project = R.getProject();
+
     const allow = useAllowed(nodeId);
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
@@ -208,7 +213,7 @@ export function PositionGroup(props: {
                             {allow.has('zIndex') ? (
                                 <MiniSelectV1
                                     value={zIndex}
-                                    options={zIndexOptions}
+                                    options={['', 'auto', '0', '10', '100', '1000']}
                                     onChange={(v) => patch({ zIndex: v || undefined })}
                                     title="z-index"
                                 />

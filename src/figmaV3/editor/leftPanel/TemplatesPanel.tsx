@@ -1,17 +1,18 @@
-
 'use client';
 import React from 'react';
 import type { Fragment } from '../../core/types';
 import { Trash2 } from 'lucide-react';
 
-import { useLeftPanelController, LeftDomain } from '../../controllers/left/LeftPanelController';
+// ✅ 도메인 인자 제거: LeftDomain 사용 안 함
+import { useLeftPanelController } from '../../controllers/left/LeftPanelController';
 
 export function TemplatesPanel({ query = '' }: { query?: string }) {
-    const { reader, writer } = useLeftPanelController([LeftDomain.Templates]);
-    // ✨ [수정] isAdmin 플래그와 새로운 액션들을 가져옵니다.
-    //const { project, insertComponent, removeFragment, isAdmin } = state;
+    // ✅ 도메인 인자 없이 컨트롤러 사용
+    const { reader, writer } = useLeftPanelController();
+
     const project = reader.getProject();
-    // ✨ [수정] isPublic이 false인 컴포넌트(Fragment)만 필터링합니다.
+
+    // isPublic이 false인 컴포넌트(Fragment)만 필터링
     const privateComponents = React.useMemo<Fragment[]>(() => {
         return project.fragments.filter((f: Fragment) => !f.isPublic);
     }, [project.fragments]);
@@ -24,6 +25,8 @@ export function TemplatesPanel({ query = '' }: { query?: string }) {
             c.name.toLowerCase().includes(q)
         );
     });
+
+    const isAdmin = false;
 
     const handleDelete = (componentId: string, componentName: string) => {
         if (window.confirm(`Are you sure you want to delete the component "${componentName}"?`)) {
@@ -42,14 +45,14 @@ export function TemplatesPanel({ query = '' }: { query?: string }) {
                             <button
                                 type="button"
                                 className="w-full text-left px-2 py-2 border rounded hover:border-gray-300"
-                                // ✨ [수정] insertComponent 액션 호출
+                                // insertComponent 액션 호출
                                 onClick={() => writer.insertComponent(c.id)}
                                 title={`Component: ${c.name}\nClick to insert.`}
                             >
                                 <div className="text-sm font-medium truncate">{c.name}</div>
                                 <div className="text-[10px] text-gray-500 truncate">ID: {c.id}</div>
                             </button>
-                            {reader.isAdmin() && (
+                            {isAdmin && (
                                 <button
                                     onClick={() => handleDelete(c.id, c.name)}
                                     className="absolute top-1 right-1 p-1 rounded-full bg-white/50 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-100"

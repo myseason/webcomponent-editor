@@ -1,5 +1,4 @@
 'use client';
-
 /**
  * ActionsPanel (Scope 구조 반영)
  * - 상단 스코프 탭: Page / Fragment / Component
@@ -9,68 +8,52 @@
  *   · Tag 전환(동적) + Tag Attributes(동적) → SetProps 스텝으로 추가
  * - Page/Fragment 스코프는 골격만(향후 Flows·FragmentsPanel 연계)
  */
-
 import * as React from 'react';
 import { getDefinition } from '../../../core/registry';
-import type { SupportedEvent, ActionStep, NodeId } from '../../../core/types';
-import { useActionsFacadeController } from '../../../controllers/actions/ActionsFacadeController';
-import {useControllerTick} from "../../../controllers/adapters/useControllerTick";
+import type {SupportedEvent, ActionStep, NodeId, EditorState, Node, Page} from '../../../core/types';
+import { useBottomPanelController } from '@/figmaV3/controllers/bottom/BottomPanelController';
 
 const EVENTS: SupportedEvent[] = ['onLoad', 'onClick', 'onChange', 'onSubmit'];
-
 type ActionsBag = Partial<Record<SupportedEvent, { steps: ActionStep[] }>>;
 type Scope = 'Page' | 'Fragment' | 'Component';
 
-/* ───────────── 공통 유틸 ───────────── */
+/* 공통 유틸 */
 function isSetProps(step: ActionStep): step is Extract<ActionStep, { kind: 'SetProps' }> {
     return step.kind === 'SetProps';
 }
 
 /* ───────────── Component: Tag 전환(동적) ───────────── */
-function TagSwitchRow({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent }) {
-    const afCtl = useActionsFacadeController();
-    const aReader = afCtl.reader();
-    const aWriter = afCtl.writer();
-
-    const def = React.useMemo(() => {
-        try {
-            // R.getNode가 노출되지 않았다면 componentId는 steps/정의에서 추론해 사용
-            const anyR: any = aReader as any;
-            const node = typeof anyR.getNode === 'function' ? anyR.getNode(nodeId) : null;
-            const compId = node?.componentId;
-            return compId ? getDefinition(compId) : null;
-        } catch {
-            return null;
-        }
-    }, [aReader, nodeId]);
-
+function TagSwitchRow({
+                          node,
+                          event,
+                          readSteps,
+                          writeSteps,
+                      }: {
+    node: Node;
+    event: SupportedEvent;
+    readSteps: () => ActionStep[];
+    writeSteps: (next: ActionStep[]) => void;
+}) {
+    const def = React.useMemo(() => getDefinition(node.componentId), [node.componentId]);
     const allowed = def?.capabilities?.allowedTags ?? [];
+
     const currentTag = React.useMemo(() => {
-        try {
-            const anyR: any = aReader as any;
-            const node = typeof anyR.getNode === 'function' ? anyR.getNode(nodeId) : null;
-            const props = (node?.props ?? {}) as Record<string, unknown>;
-            const defTag = (def as any)?.capabilities?.defaultTag ?? '';
-            return String((props.__tag as string | undefined) ?? defTag ?? '');
-        } catch {
-            return '';
-        }
-    }, [aReader, nodeId, def]);
+        const props = (node?.props ?? {}) as Record<string, unknown>;
+        const defTag = (def as any)?.capabilities?.defaultTag ?? '';
+        return String((props.__tag as string | undefined) ?? defTag ?? '');
+    }, [node?.props, def]);
 
     const [sel, setSel] = React.useState<string>(currentTag);
-    React.useEffect(() => {
-        setSel(currentTag);
-    }, [nodeId, currentTag]);
-
-    const readSteps = (): ActionStep[] => (aReader.getActionSteps(nodeId, event) as ActionStep[]) ?? [];
-    const writeSteps = (next: ActionStep[]) => aWriter.setActionSteps(nodeId, event, next);
+    React.useEffect(() => setSel(currentTag), [currentTag]);
 
     const add = () => {
         if (!sel) return;
         const steps = readSteps();
         const patch = { __tag: sel };
-        const next: ActionStep = { kind: 'SetProps', nodeId, patch };
-        const dup = steps.some((s) => isSetProps(s) && s.nodeId === nodeId && JSON.stringify(s.patch) === JSON.stringify(patch));
+        const next: ActionStep = { kind: 'SetProps', nodeId: node.id, patch };
+        const dup = steps.some(
+            (s) => isSetProps(s) && s.nodeId === node.id && JSON.stringify(s.patch) === JSON.stringify(patch),
+        );
         if (dup) return;
         writeSteps([...steps, next]);
     };
@@ -104,17 +87,18 @@ function TagSwitchRow({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent
 }
 
 /* ───────────── Component: Attributes(동적) ───────────── */
-function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: SupportedEvent }) {
-    const afCtl = useActionsFacadeController();
-    const aReader = afCtl.reader();
-    const aWriter = afCtl.writer();
-
-    const props = React.useMemo(() => {
-        const anyR: any = aReader as any;
-        const node = typeof anyR.getNode === 'function' ? anyR.getNode(nodeId) : null;
-        return (node?.props ?? {}) as Record<string, any>;
-    }, [aReader, nodeId, aReader.facadeToken()]);
-
+function NodeAttrsDynamicSection({
+                                     node,
+                                     event,
+                                     readSteps,
+                                     writeSteps,
+                                 }: {
+    node: Node;
+    event: SupportedEvent;
+    readSteps: () => ActionStep[];
+    writeSteps: (next: ActionStep[]) => void;
+}) {
+    const props = (node?.props ?? {}) as Record<string, any>;
     const tagAttrs = (props.__tagAttrs as Record<string, string> | undefined) ?? {};
     const [exprMap, setExprMap] = React.useState<Record<string, string>>({});
 
@@ -123,21 +107,17 @@ function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: Sup
         Object.entries(tagAttrs).forEach(([k, v]) => (init[k] = typeof v === 'string' ? v : ''));
         setExprMap(init);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [nodeId]);
+    }, [node.id, JSON.stringify(tagAttrs)]);
 
     const setExpr = (k: string, v: string) => setExprMap((m) => (m[k] === v ? m : { ...m, [k]: v }));
-
-    const readSteps = (): ActionStep[] => {
-        const bag = (props.__actions as ActionsBag | undefined);
-        return bag?.[event]?.steps ?? [];
-    };
-    const writeSteps = (next: ActionStep[]) => aWriter.setActionSteps(nodeId, event, next);
 
     const addSetAttr = (key: string, value: string) => {
         const steps = readSteps();
         const patch = { __tagAttrs: { ...(props.__tagAttrs as Record<string, string> ?? {}), [key]: value } };
-        const next: ActionStep = { kind: 'SetProps', nodeId, patch };
-        const dup = steps.some((s) => isSetProps(s) && s.nodeId === nodeId && JSON.stringify(s.patch) === JSON.stringify(patch));
+        const next: ActionStep = { kind: 'SetProps', nodeId: node.id, patch };
+        const dup = steps.some(
+            (s) => isSetProps(s) && s.nodeId === node.id && JSON.stringify(s.patch) === JSON.stringify(patch),
+        );
         if (dup) return;
         writeSteps([...steps, next]);
     };
@@ -187,43 +167,70 @@ function NodeAttrsDynamicSection({ nodeId, event }: { nodeId: NodeId; event: Sup
 
 /* ───────────── 메인 패널 ───────────── */
 export function ActionsPanel() {
-    const afCtl = useActionsFacadeController();
-    const aReader = afCtl.reader();
-    const aWriter = afCtl.writer();
+    const { reader, writer } = useBottomPanelController();
+
+    // 스냅샷
+    const ui = reader.getUI();
+    const project = reader.getProject();
 
     const [scope, setScope] = React.useState<Scope>('Component');
 
-    useControllerTick(() => aReader.facadeToken());
-
     // 선택 컨텍스트
-    const nodeId = aReader.selectedNodeId() ?? null;
+    const selectedNodeId: NodeId | null = (ui.selectedId as NodeId) ?? null;
+    const node: Node | null = selectedNodeId ? (project.nodes[selectedNodeId] as Node) ?? null : null;
 
     // Component 스코프만 실동작
     const [evt, setEvt] = React.useState<SupportedEvent>('onClick');
-    const steps: ActionStep[] = React.useMemo(() => {
-        if (!nodeId || scope !== 'Component')
-            return [];
-        return (aReader.getActionSteps(nodeId, evt) as ActionStep[]) ?? [];
-    }, [nodeId, evt, scope, aReader, aReader.facadeToken()]);
 
-    // 전체 교체 (원본 setSteps와 동일 의미)
-    const setSteps = (next: ActionStep[]) => {
-        if (!nodeId)
-            return;
-        aWriter.setActionSteps(nodeId, evt, next);
-    };
+    // steps 읽기/쓰기 helper (node/evt에 의존)
+    const readSteps = React.useCallback((): ActionStep[] => {
+        if (!node) return [];
+        const bag = ((node.props as any)?.__actions as ActionsBag | undefined) ?? {};
+        return (bag[evt]?.steps as ActionStep[]) ?? [];
+    }, [node, evt]);
+
+    const writeSteps = React.useCallback(
+        (next: ActionStep[]) => {
+            if (!node) return;
+            writer.update((s: EditorState) => {
+                const n = s.project.nodes[node.id] as Node;
+                const props = (n.props ?? {}) as Record<string, unknown>;
+                const bag = (props.__actions as ActionsBag | undefined) ?? {};
+                const cur = bag[evt]?.steps ?? [];
+                if (JSON.stringify(cur) === JSON.stringify(next)) return; // 불필요 갱신 방지
+                const newBag: ActionsBag = { ...bag, [evt]: { steps: next } };
+                (n.props as any) = { ...props, __actions: newBag };
+            });
+        },
+        [node, evt, writer],
+    );
+
+    const steps: ActionStep[] = React.useMemo(() => (node && scope === 'Component' ? readSteps() : []), [
+        node,
+        scope,
+        readSteps,
+    ]);
+
+    const setSteps = (next: ActionStep[]) => writeSteps(next);
 
     const addAlert = () => setSteps([...(steps ?? []), { kind: 'Alert', message: 'Hello' }]);
-    const addNavigate = () =>
-        setSteps([...(steps ?? []), {
-                kind: 'Navigate',
-                toPageId: (aReader.pages()?.[0]?.id as string | undefined) ?? aReader.defaultNavigateTargetId() ?? '',
-            } as any,
-        ]);
+
+    const addNavigate = () => {
+        const firstPageId =
+            (project.pages?.[0]?.id as string | undefined) ??
+            project.pages.find((p: Page) => p.rootId === project.rootId)?.id ??
+            '';
+        setSteps([...(steps ?? []), { kind: 'Navigate', toPageId: firstPageId } as ActionStep]);
+    };
 
     const runNow = () => {
-        if (!nodeId) return;
-        aWriter.runActionSteps(nodeId, evt);
+        if (!node) return;
+        // 지원 시 런타임 실행, 아니면 알림
+        if ((writer as any).runActionSteps) {
+            (writer as any).runActionSteps(node.id, evt);
+        } else if ((writer as any).setNotification) {
+            (writer as any).setNotification('Run Now executed.');
+        }
     };
 
     return (
@@ -241,18 +248,16 @@ export function ActionsPanel() {
                 ))}
             </div>
 
-            {/* Page/Fragment: 이후 단계에서 연결 */}
             {scope !== 'Component' && (
                 <div className="text-[11px] text-neutral-500">
                     {scope} 액션은 향후 단계에서 Flows/Fragments와 통합됩니다.
                 </div>
             )}
 
-            {/* Component scope */}
             {scope === 'Component' && (
                 <>
-                    {!nodeId && <div className="text-[11px] text-neutral-400">노드를 선택하세요.</div>}
-                    {nodeId && (
+                    {!node && <div className="text-[11px] text-neutral-400">노드를 선택하세요.</div>}
+                    {node && (
                         <>
                             {/* 이벤트 선택 */}
                             <div className="flex items-center gap-2">
@@ -276,11 +281,14 @@ export function ActionsPanel() {
                             )}
                             <div className="space-y-1">
                                 {(steps ?? []).map((s, i) => (
-                                    <div key={i} className="flex items-center justify-between border rounded px-2 py-1 text-[11px]">
+                                    <div
+                                        key={i}
+                                        className="flex items-center justify-between border rounded px-2 py-1 text-[11px]"
+                                    >
                                         <div className="truncate">
                                             <span className="font-semibold">{s.kind}</span>{' '}
-                                            {s.kind === 'Alert' && `“${s.message}”`}
-                                            {s.kind === 'Navigate' && `→ ${s.toPageId}`}
+                                            {s.kind === 'Alert' && `“${(s as any).message}”`}
+                                            {s.kind === 'Navigate' && `→ ${(s as any).toPageId}`}
                                             {isSetProps(s) && ` (SetProps ${s.nodeId})`}
                                         </div>
                                         <button
@@ -296,21 +304,38 @@ export function ActionsPanel() {
 
                             {/* 기본 추가 & 실행 */}
                             <div className="flex items-center gap-2">
-                                <button className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50" onClick={addAlert} type="button">
+                                <button
+                                    className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50"
+                                    onClick={addAlert}
+                                    type="button"
+                                >
                                     + Alert
                                 </button>
-                                <button className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50" onClick={addNavigate} type="button">
+                                <button
+                                    className="text-[11px] px-2 py-1 border rounded hover:bg-neutral-50"
+                                    onClick={addNavigate}
+                                    type="button"
+                                >
                                     + Navigate
                                 </button>
-                                <button className="ml-auto text-[11px] px-2 py-1 border rounded hover:bg-neutral-50" onClick={runNow} type="button">
+                                <button
+                                    className="ml-auto text-[11px] px-2 py-1 border rounded hover:bg-neutral-50"
+                                    onClick={runNow}
+                                    type="button"
+                                >
                                     Run Now
                                 </button>
                             </div>
 
                             {/* 동적 Tag 전환 & 동적 Attributes */}
                             <div className="pt-2 border-t space-y-2">
-                                <TagSwitchRow nodeId={nodeId} event={evt} />
-                                <NodeAttrsDynamicSection nodeId={nodeId} event={evt} />
+                                <TagSwitchRow node={node} event={evt} readSteps={readSteps} writeSteps={writeSteps} />
+                                <NodeAttrsDynamicSection
+                                    node={node}
+                                    event={evt}
+                                    readSteps={readSteps}
+                                    writeSteps={writeSteps}
+                                />
                             </div>
                         </>
                     )}

@@ -10,8 +10,8 @@ import { StylesSection } from './sections/StylesSection';
 import { SchemaEditor } from './sections/SchemaEditor';
 import { SaveAsComponentDialog } from './sections/SaveAsComponentDialog';
 
-import { useInspectorViewModel } from '../../controllers/hooks';
-import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
+//import { useInspectorViewModel } from '../../controllers/hooks';
+import { useRightPanelController } from '../../controllers/right/RightPanelController';
 
 function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     // def는 필요 시 참조만, propsSchema 유무와 무관하게 PropsAutoSection을 항상 렌더
@@ -61,28 +61,11 @@ function ComponentInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }
 
 export function Inspector() {
 
-    const { reader, writer } = useInspectorController();
-    const R = reader();
-    const W = writer();
-
-    const state = {
-  ui: R.ui(),
-  project: R.project(),
-  data: R.data(),
-  getEffectiveDecl: R.getEffectiveDecl.bind(R),
-  updateNodeStyles: W.updateNodeStyles.bind(W),
-  updateNodeProps: W.updateNodeProps.bind(W),
-  setNotification: W.setNotification.bind(W),
-  saveNodeAsComponent: W.saveNodeAsComponent.bind(W),
-  updateComponentPolicy: W.updateComponentPolicy.bind(W),
-  update: W.update.bind(W),
-};
-    const { ui, project, update, setNotification } = state;
-    const { mode, selectedId, editingFragmentId, expertMode } = ui;
-    const { rootId, fragments, nodes } = project;
+    const { reader, writer } = useRightPanelController();
+    const { mode, selectedId, editingFragmentId, expertMode } = reader.getUi();
+    const { rootId, fragments, nodes } = reader.getProject();
 
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
-
 
     // 대상 노드 선택: Page 모드면 현재 선택(or 루트), Component 모드면 편집 중 프래그먼트 루트
     const targetNodeId: NodeId | null =
@@ -96,12 +79,12 @@ export function Inspector() {
 
     //------------------------------------------------------------------------------------------------------------------
     // 컨트롤러 기반 VM (타깃 노드 단일화)
-    const vm = useInspectorViewModel();
+    const vm = reader.getInspectorTarget();
 
     // 컨트롤러가 계산한 nodeId/defId가 있으면 우선 사용
-    const effectiveNodeId = (vm.target?.nodeId ?? targetNodeId) as NodeId | null;
+    const effectiveNodeId = (vm?.target?.nodeId ?? targetNodeId) as NodeId | null;
     const effectiveDefId =
-        vm.target?.componentId ??
+        vm?.target?.componentId ??
         (effectiveNodeId ? (nodes[effectiveNodeId]?.componentId as string | undefined) : undefined) ??
         null as unknown as string | null;
 
@@ -116,10 +99,8 @@ export function Inspector() {
 
     const handleToggleExpertMode = () => {
         const nextExpertMode = !expertMode;
-        update((s: EditorState) => {
-            s.ui.expertMode = nextExpertMode;
-        });
-        setNotification(`고급 모드: ${nextExpertMode ? 'ON' : 'OFF'}`);
+        writer.setExpertMode(nextExpertMode);
+        writer.setNotification(`고급 모드: ${nextExpertMode ? 'ON' : 'OFF'}`);
     };
 
     // SaveAsComponentDialog에 전달할 nodeId

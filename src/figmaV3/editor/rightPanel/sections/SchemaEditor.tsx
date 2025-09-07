@@ -1,20 +1,9 @@
 'use client';
-/**
- * SchemaEditor
- * - 선택 노드의 컴포넌트(defId)에 대한 propsSchema를 프로젝트 단위로 오버라이드합니다.
- * - 테이블 형태로 key/type/label/config(text:placeholder | select:options)/whenExpr를 편집
- * - 저장: state.update(s => s.project.schemaOverrides[defId] = rows)
- *
- * 규약:
- * - 훅 최상위 호출
- * - any 금지
- * - 얕은 복사 update
- */
 
 import React from 'react';
 import { getDefinition } from '../../../core/registry';
-import type {EditorState, NodeId, PropSchemaEntry} from '../../../core/types';
-import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
+import type { EditorUI, Project, NodeId, PropSchemaEntry } from '../../../core/types';
+import { useRightPanelController } from '../../../controllers/right/RightPanelController';
 
 type Row = PropSchemaEntry<Record<string, unknown>>;
 type RowText = Extract<Row, { type: 'text' }>;
@@ -56,7 +45,7 @@ function ensureSelectRow(r: Row): RowSelect {
 
 /** 유틸: 부분 패치를 안전하게 적용(식별자 변경 포함) */
 function patchRow(r: Row, patch: Partial<Row>): Row {
-    const nextType = (patch.type ?? r.type);
+    const nextType = patch.type ?? r.type;
     if (nextType === 'text') {
         const base = ensureTextRow(r);
         const p = patch as Partial<RowText>;
@@ -99,7 +88,6 @@ function parseOptionsJson(src: string): RowSelect['options'] | null {
                 'value' in (o as Record<string, unknown>)
         );
         if (!ok) return null;
-        // 타입 단언 없이 좁히기 어려워서 매핑으로 보강
         return (obj as Array<{ label: unknown; value: unknown }>).map((o) => ({
             label: String(o.label),
             value: o.value,
@@ -110,30 +98,17 @@ function parseOptionsJson(src: string): RowSelect['options'] | null {
 }
 
 export function SchemaEditor({ nodeId }: { nodeId: NodeId }) {
+    const { reader, writer } = useRightPanelController();
 
-    const { reader, writer } = useInspectorController();
-    const R = reader();
-    const W = writer();
+    // 프로젝트/노드/컴포넌트 정의
+    const project = reader.getProject();
+    const node = project.nodes[nodeId];
+    const defId = node?.componentId;
+    const defBase = defId ? getDefinition(defId) : null;
 
-    // 상태 구독(최상위 훅)
-    const state = {
-  ui: R.ui(),
-  project: R.project(),
-  data: R.data(),
-  getEffectiveDecl: R.getEffectiveDecl.bind(R),
-  updateNodeStyles: W.updateNodeStyles.bind(W),
-  updateNodeProps: W.updateNodeProps.bind(W),
-  setNotification: W.setNotification.bind(W),
-  saveNodeAsComponent: W.saveNodeAsComponent.bind(W),
-  updateComponentPolicy: W.updateComponentPolicy.bind(W),
-  update: W.update.bind(W),
-};
-    const node = state.project.nodes[nodeId];
-    const defId = node.componentId;
-
-    const defBase = getDefinition(defId);
-    const projectOverride = state.project.schemaOverrides?.[defId];
-    const initialRows = (projectOverride ?? defBase?.propsSchema ?? []) as Row[];
+    // 초기 행: 프로젝트 오버라이드 > 기본 스키마 > []
+    const projectOverride = defId ? project.schemaOverrides?.[defId] : undefined;
+    const initialRows = ((projectOverride ?? defBase?.propsSchema) ?? []) as Row[];
 
     // 로컬 편집 상태(깊은 복사)
     const [rows, setRows] = React.useState<Row[]>(
@@ -142,37 +117,31 @@ export function SchemaEditor({ nodeId }: { nodeId: NodeId }) {
 
     // defId나 프로젝트 오버라이드가 바뀌면 로컬 상태 갱신
     React.useEffect(() => {
-        const fresh = (state.project.schemaOverrides?.[defId] ?? defBase?.propsSchema ?? []) as Row[];
+        const fresh = defId ? ((reader.getProject().schemaOverrides?.[defId] ?? getDefinition(defId)?.propsSchema ?? []) as Row[]) : [];
         setRows(fresh.map((r) => ({ ...r })));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [defId, state.project.schemaOverrides]);
+    }, [defId, project.schemaOverrides]);
 
-    // 행 갱신(부분 패치) — 유니온 안전
+    // 행 갱신(부분 패치)
     const updateRow = (i: number, patch: Partial<Row>) => {
-        setRows((prev: Row[]) =>
-            prev.map((r, idx) => (idx === i ? patchRow(r, patch) : r))
-        );
+        setRows((prev) => prev.map((r, idx) => (idx === i ? patchRow(r, patch) : r)));
     };
 
     // type 변경은 전용 핸들러로 필수 필드 보장
     const changeType = (i: number, t: Row['type']) => {
-        setRows((prev: Row[]) =>
-            prev.map((r, idx) => {
-                if (idx !== i) return r;
-                // 임시 객체를 만들지 말고 r 자체를 전달해 안전 변환
-                return t === 'text' ? ensureTextRow(r) : ensureSelectRow(r);
-            }),
+        setRows((prev) =>
+            prev.map((r, idx) => (idx === i ? (t === 'text' ? ensureTextRow(r) : ensureSelectRow(r)) : r))
         );
     };
 
     const onAdd = (kind: 'text' | 'select') =>
-        setRows((prev: Row[]) => [...prev, kind === 'text' ? emptyTextRow(`prop${prev.length + 1}`) : emptySelectRow(`prop${prev.length + 1}`)]);
+        setRows((prev) => [...prev, kind === 'text' ? emptyTextRow(`prop${prev.length + 1}`) : emptySelectRow(`prop${prev.length + 1}`)]);
 
     const onRemove = (i: number) =>
-        setRows((prev: Row[]) => prev.filter((_, idx) => idx !== i));
+        setRows((prev) => prev.filter((_, idx) => idx !== i));
 
     const move = (i: number, dir: -1 | 1) =>
-        setRows((prev: Row[]) => {
+        setRows((prev) => {
             const next = [...prev];
             const j = i + dir;
             if (j < 0 || j >= next.length) return prev;
@@ -182,21 +151,21 @@ export function SchemaEditor({ nodeId }: { nodeId: NodeId }) {
             return next;
         });
 
+    // ✅ 저장/리셋은 컨트롤러 writer 경유
     const onSave = () => {
-        state.update((s: EditorState) => {
-            const map = { ...(s.project.schemaOverrides ?? {}) };
-            map[defId] = rows;
-            s.project.schemaOverrides = map;
-        });
+        if (!defId) return;
+        writer.setSchemaOverride(defId, rows);
     };
 
     const onReset = () => {
-        state.update((s: EditorState) => {
-            const map = { ...(s.project.schemaOverrides ?? {}) };
-            delete map[defId];
-            s.project.schemaOverrides = map;
-        });
+        if (!defId) return;
+        writer.removeSchemaOverride(defId);
+        setRows([]); // UI 버퍼도 초기화(필요 시 기본 스키마로 되돌리려면 defBase?.propsSchema 사용)
     };
+
+    if (!defId) {
+        return <div className="text-xs text-gray-500">No component selected.</div>;
+    }
 
     return (
         <div className="space-y-2">

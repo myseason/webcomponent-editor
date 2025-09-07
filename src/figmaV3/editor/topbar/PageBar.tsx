@@ -22,8 +22,8 @@ const ZOOM_MIN = 0.25, ZOOM_MAX = 4.0, ZOOM_STEP = 0.25;
 export default function PageBar() {
     const { reader, writer } = useTopbarController();
 
-    const project = reader.project();
-    const ui = reader.ui();
+    const project = reader.getProject();
+    const ui = reader.getUI();
 
     const currentPage = useMemo(
         () => project.pages.find((p: Page) => p.rootId === project.rootId),

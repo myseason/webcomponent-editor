@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import type { NodeId } from '../../../core/types';
-import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
+import { useRightPanelController } from '../../../controllers/right/RightPanelController';
 
 interface SaveAsComponentDialogProps {
     nodeId: NodeId;
@@ -10,12 +10,15 @@ interface SaveAsComponentDialogProps {
 }
 
 export function SaveAsComponentDialog({ nodeId, onClose }: SaveAsComponentDialogProps) {
-    const { reader, writer } = useInspectorController();
-    const R = reader();
-    const W = writer();
+    // ✅ Right 패널 컨트롤러 사용
+    const { reader, writer } = useRightPanelController();
 
-    const saveNodeAsComponent = W.saveNodeAsComponent;
-const setNotification = W.setNotification;
+    // writer에서 필요한 액션만 구조분해
+    const { saveNodeAsComponent, setNotification } = writer as {
+        saveNodeAsComponent: (nodeId: NodeId, name: string, description: string, isPublic: boolean) => void;
+        setNotification: (msg: string) => void;
+    };
+
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [isPublic, setIsPublic] = useState(true);
@@ -25,6 +28,7 @@ const setNotification = W.setNotification;
             alert('Component name is required.');
             return;
         }
+        // ✅ 컨트롤러 writer 경유
         saveNodeAsComponent(nodeId, name.trim(), description.trim(), isPublic);
         setNotification(`Component "${name.trim()}" has been saved.`);
         onClose();
@@ -40,6 +44,7 @@ const setNotification = W.setNotification;
                 onClick={(e) => e.stopPropagation()}
             >
                 <h3 className="text-lg font-semibold">Save as Component</h3>
+
                 <div>
                     <label className="text-xs font-medium text-gray-700 block mb-1">Component Name</label>
                     <input
@@ -50,6 +55,7 @@ const setNotification = W.setNotification;
                         placeholder="e.g., Primary Button"
                     />
                 </div>
+
                 <div>
                     <label className="text-xs font-medium text-gray-700 block mb-1">Description</label>
                     <textarea
@@ -59,6 +65,7 @@ const setNotification = W.setNotification;
                         placeholder="A brief description of the component"
                     />
                 </div>
+
                 <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Visibility</span>
                     <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg">
@@ -76,13 +83,14 @@ const setNotification = W.setNotification;
                         </button>
                     </div>
                 </div>
-                {/* ✨ [추가] 공개/비공개 선택에 따른 안내 메시지 */}
+
                 <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded-md">
                     {isPublic
-                        ? "This component will be saved to the shared Library and will be available in all your projects."
-                        : "This component will be saved to Project Components and will only be available in this project."
+                        ? 'This component will be saved to the shared Library and will be available in all your projects.'
+                        : 'This component will be saved to Project Components and will only be available in this project.'
                     }
                 </div>
+
                 <div className="flex justify-end gap-2 pt-4">
                     <button
                         onClick={onClose}

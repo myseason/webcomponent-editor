@@ -1,12 +1,12 @@
 'use client';
 import React, { memo, useCallback, useMemo } from 'react';
-import type {NodeId, Node, Fragment} from '../../core/types';
+import type { NodeId, Node, Fragment } from '../../core/types';
 import { getDefinition } from '../../core/registry';
 import { Lock, Unlock, Eye, EyeOff, Trash2, GripVertical } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import {PanelTitle} from "@/figmaV3/editor/common/PanelTitle";
+import { PanelTitle } from "@/figmaV3/editor/common/PanelTitle";
 
-import { useLeftPanelController, LeftDomain } from '../../controllers/left/LeftPanelController';
+import { useLeftPanelController } from '../../controllers/left/LeftPanelController';
 
 const LINE_COLOR = '#e5e7eb';
 
@@ -40,7 +40,7 @@ function getDisplayName(node: Node): string {
 }
 
 const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
-    const { reader, writer } = useLeftPanelController([LeftDomain.Layers]);
+    const { reader, writer } = useLeftPanelController();
     const project = reader.getProject();
     const ui = reader.getUi();
     const node = project.nodes[id];
@@ -50,7 +50,9 @@ const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
 
     if (!node) return null;
 
-    const isRoot = id === project.rootId || id === project.fragments.find((f: Fragment) => f.id === ui.editingFragmentId)?.rootId;
+    const isRoot =
+        id === project.rootId ||
+        id === project.fragments.find((f: Fragment) => f.id === ui.editingFragmentId)?.rootId;
     const selected = ui.selectedId === id;
     const name = getDisplayName(node);
 
@@ -94,12 +96,15 @@ const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
 Row.displayName = 'Row';
 
 const Tree: React.FC<{ id: NodeId; depth: number }> = ({ id, depth }) => {
-    const { reader, writer } = useLeftPanelController([LeftDomain.Layers]);
+    const { reader } = useLeftPanelController();
     const project = reader.getProject();
-    const node = reader.getNodeById(id);
+    const node = reader.getNode(id);
 
     if (!node) return null;
-    const children = useMemo(() => ((node.children ?? []) as NodeId[]).filter((cid) => !!project.nodes[cid]), [node.children, project.nodes]);
+    const children = useMemo(
+        () => ((node.children ?? []) as NodeId[]).filter((cid) => !!project.nodes[cid]),
+        [node.children, project.nodes]
+    );
     return (
         <div>
             <Row id={id} depth={depth} />
@@ -109,14 +114,15 @@ const Tree: React.FC<{ id: NodeId; depth: number }> = ({ id, depth }) => {
 };
 
 export function Layers() {
-    const { reader, writer } = useLeftPanelController([LeftDomain.Layers]);
+    const { reader } = useLeftPanelController();
     const project = reader.getProject();
     const mode = reader.getUi().mode;
     const editingFragmentId = reader.getUi().editingFragmentId;
 
-    const rootId = mode === 'Component' && editingFragmentId
-        ? project.fragments.find((f: Fragment) => f.id === editingFragmentId)?.rootId
-        : project.rootId;
+    const rootId =
+        mode === 'Component' && editingFragmentId
+            ? project.fragments.find((f: Fragment) => f.id === editingFragmentId)?.rootId
+            : project.rootId;
 
     if (!rootId || !project.nodes[rootId]) {
         return <div className="p-3 text-sm text-gray-500">루트 노드를 찾을 수 없습니다.</div>;

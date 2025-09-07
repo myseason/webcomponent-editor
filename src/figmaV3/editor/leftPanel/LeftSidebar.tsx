@@ -1,17 +1,18 @@
 'use client';
 
 import * as React from 'react';
-import type {EditorMode, ProjectHubTab} from '../../core/types';
+import type { EditorMode, ProjectHubTab } from '../../core/types';
 
 // 패널들
-import {PagesPanel} from './panels/PagesPanel';
-import {AssetsPanel} from './panels/AssetsPanel';
-import {ComponentsPanel} from './panels/ComponentsPanel';
-import {Layers as LayersPanel} from './Layers';
+import { PagesPanel } from './panels/PagesPanel';
+import { AssetsPanel } from './panels/AssetsPanel';
+import { ComponentsPanel } from './panels/ComponentsPanel';
+import { Layers as LayersPanel } from './Layers';
 
-import {modeBorderClass} from '../rightPanel/sections/styles/common';
+import { modeBorderClass } from '../rightPanel/sections/styles/common';
 
-import {LeftDomain, useLeftPanelController} from '../../controllers/left/LeftPanelController';
+// ✅ LeftDomain 제거
+import { useLeftPanelController } from '../../controllers/left/LeftPanelController';
 
 // 아이콘 (lucide-react)
 import {
@@ -22,7 +23,7 @@ import {
     Layers as LayersIcon,
     Settings as SettingsIcon,
 } from 'lucide-react';
-import {PanelTitle} from "@/figmaV3/editor/common/PanelTitle";
+import { PanelTitle } from "@/figmaV3/editor/common/PanelTitle";
 
 // 임시 Settings 패널(기존에 없다면 유지)
 const SettingsPanel = () => (
@@ -63,7 +64,6 @@ function TabButton({
     return (
         <button
             className={[
-                // 🔧 버튼은 컨테이너 폭 100% + box-border 로 ring/border 포함해도 넘치지 않게
                 'w-full h-10 box-border inline-flex items-center justify-center rounded-lg transition focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-0',
                 active ? 'bg-blue-500 text-white' : 'text-gray-500 hover:bg-gray-200',
             ].join(' ')}
@@ -94,7 +94,6 @@ function SplitResizer({
 
         const onMove = (ev: MouseEvent) => {
             const y = ev.clientY;
-            // 상/하단 최소 높이 60px 가드
             const clampedY = Math.max(rect.top + 60, Math.min(rect.bottom - 60, y));
             const pct = ((clampedY - rect.top) / rect.height) * 100;
             onChangePct(clamp(pct));
@@ -148,17 +147,16 @@ function SinglePanel({ tab }: { tab: HubTab }) {
 }
 
 export function LeftSidebar() {
-    const { reader, writer } = useLeftPanelController([LeftDomain.Sidebar]);
+    // ✅ 도메인 인자 삭제
+    const { reader, writer } = useLeftPanelController();
 
     // ── 모드 UI(기존 유지) ────────────────────────────────────────────────
     const ui = reader.getUi();
     const mode = (ui?.mode ?? 'Page') as EditorMode;
 
     const handleModeChange = React.useCallback((newMode: EditorMode) => {
-        if (ui.mode === newMode)
-            return;
+        if (ui.mode === newMode) return;
         writer.setEditorMode?.(newMode);
-        // 기존 알림 사용
         const message =
             newMode === 'Page'
                 ? '🚀 페이지 빌드 모드로 전환되었습니다.'
@@ -166,8 +164,8 @@ export function LeftSidebar() {
         writer.setNotification?.(message);
     }, [ui.mode, writer.setEditorMode, writer.setNotification]);
 
-    // 모드별 상단 테두리 색상 (기존 유지)
     const modeBorderStyle = modeBorderClass(ui?.mode);
+
     // ── 좌측 패널 상태(기존 + Split) ─────────────────────────────────────
     const leftUI = ui?.panels?.left ?? {
         activeHubTab: 'Pages' as HubTab,
@@ -179,7 +177,7 @@ export function LeftSidebar() {
     const splitPct =
         typeof leftUI.splitPercentage === 'number' ? leftUI.splitPercentage : 50;
 
-    // 모드에 따른 탭 필터: Component 모드 → Components/Layers만
+    // 모드에 따른 탭 필터
     const availableTabs = React.useMemo(() => {
         if (mode === 'Component') {
             return HUB_TABS.filter((t) => COMPONENT_MODE_TABS.has(t.id));
@@ -187,10 +185,10 @@ export function LeftSidebar() {
         return HUB_TABS;
     }, [mode]);
 
-    // 컴포넌트 모드 전환 시, 허용되지 않는 탭이 active면 Components로 보정 (기존 유지)
+    // 컴포넌트 모드에서 금지 탭이 활성화돼 있으면 Components로 보정
     React.useEffect(() => {
         if (mode === 'Component' && !COMPONENT_MODE_TABS.has(activeHubTab)) {
-            writer.setActiveHubTab('Components');
+            writer.setActiveHubTab?.('Components');
         }
     }, [mode, activeHubTab, writer.setActiveHubTab]);
 
@@ -204,13 +202,12 @@ export function LeftSidebar() {
     const primaryTab: HubTab = React.useMemo(() => {
         if (!isSplit) return activeHubTab;
         if (activeHubTab === 'Layers') return 'Components';
-        // Component 모드에서 Pages/Assets/Settings는 나타나지 않음 (availableTabs로 이미 필터됨)
         return activeHubTab;
     }, [isSplit, activeHubTab]);
 
     return (
         <div className="h-full flex bg-white">
-            {/* 1. 수직 아이콘 탭 바 (기존 유지 + 모드별 필터 적용) */}
+            {/* 1. 수직 아이콘 탭 바 */}
             <div className="w-12 px-1 py-1 box-border flex flex-col gap-2 border-r border-gray-200 shrink-0">
                 {availableTabs.map(({ id, icon }) => (
                     <TabButton
@@ -218,19 +215,19 @@ export function LeftSidebar() {
                         icon={icon}
                         label={id}
                         active={activeHubTab === id}
-                        onClick={() => writer.setActiveHubTab(id)}
+                        onClick={() => writer.setActiveHubTab?.(id)}
                         title={id}
                     />
                 ))}
 
-                {/* Split 토글 버튼 (Layers 아이콘 인접; 기존 레이아웃 최대한 유지) */}
+                {/* Split 토글 버튼 */}
                 <button
                     className={[
                         'w-10 h-10 mt-1 inline-flex items-center justify-center rounded-lg transition',
                         isSplit ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-200',
                     ].join(' ')}
                     title={isSplit ? 'Split View: ON (Click to turn OFF)' : 'Split View: OFF (Click to turn ON)'}
-                    onClick={writer.toggleLeftPanelSplit}
+                    onClick={() => writer.toggleLeftPanelSplit?.()}
                     aria-pressed={isSplit}
                     aria-label="Toggle Split View"
                 >
@@ -238,12 +235,12 @@ export function LeftSidebar() {
                 </button>
             </div>
 
-            {/* 2. 콘텐츠 영역 (기존 모드 UI + 단일/분할 패널) */}
+            {/* 2. 콘텐츠 영역 */}
             <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
-                {/* ✨ 모드 구분을 위한 색상 테두리 (기존 유지) */}
+                {/* 모드 구분 색상 테두리 */}
                 <div className={`w-full border-t-4 ${modeBorderStyle}`}></div>
 
-                {/* ✨ 패널 최상단에 모드 스위처 배치 (기존 유지) */}
+                {/* 모드 스위처 */}
                 <div className="p-2 border-b">
                     <select
                         value={mode}
@@ -258,12 +255,10 @@ export function LeftSidebar() {
                 {/* 본문: 단일 or 분할 */}
                 <div className="flex-1 min-h-0">
                     {!isSplit ? (
-                        // 단일 패널
                         <div className="h-full overflow-auto">
                             <SinglePanel tab={activeHubTab} />
                         </div>
                     ) : (
-                        // 분할 모드: 상단(선택 탭), 하단(Layers 고정) + 리사이저
                         <div className="h-full flex flex-col">
                             <div
                                 className="min-h-[120px] overflow-auto"

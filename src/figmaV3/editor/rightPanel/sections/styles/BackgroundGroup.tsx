@@ -27,7 +27,9 @@ import {
     MiniInputV1,
     MiniSelectV1,
 } from './layoutV1';
-import {useInspectorController} from "@/figmaV3/controllers/inspector/InspectorFacadeController";
+
+// ✅ 컨트롤러 교체
+import { useRightPanelController } from '@/figmaV3/controllers/right/RightPanelController';
 
 // 안전 문자열 헬퍼
 function s(v: unknown): string {
@@ -55,13 +57,13 @@ export function BackgroundGroup(props: {
     nodeId: NodeId;
     componentId: string;
 }) {
-
-    const { reader, writer } = useInspectorController();
-    const R = reader(); const W = writer();
+    // ✅ RightPanelController 사용
+    const { reader } = useRightPanelController();
+    const R = reader;
 
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const ui = R.ui();
-    const project = R.project();
+    const ui = R.getUI();
+    const project = R.getProject();
     const allow = useAllowed(nodeId);
     const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
@@ -99,7 +101,6 @@ export function BackgroundGroup(props: {
             });
         } else if (m === 'image') {
             // color는 그대로 두되 필요한 값만 채움
-            // (별도 초기화는 하지 않음: 사용자가 바로 URL을 입력)
         }
     };
 
@@ -121,12 +122,11 @@ export function BackgroundGroup(props: {
     return (
         <div className="mt-4">
             <SectionShellV1 title="Background" open={open} onToggle={onToggle}>
-                {/* ── Mode: select (3칸) ───────────────────────────────────── */}
+                {/* mode */}
                 <RowV1>
                     <RowLeftV1 title="mode" />
                     <RowRightGridV1>
                         <div className="col-span-3 min-w-0">
-                            {/* 모드 자체는 정책 키가 아니므로 DisabledHint 생략 */}
                             <MiniSelectV1
                                 value={mode}
                                 options={['color', 'image']}
@@ -134,17 +134,15 @@ export function BackgroundGroup(props: {
                                 title="background mode"
                             />
                         </div>
-                        {/* 나머지 3칸은 정렬 유지용 비움 */}
                         <div className="col-span-3" />
                     </RowRightGridV1>
                 </RowV1>
 
-                {/* ── COLOR MODE ───────────────────────────────────────────── */}
+                {/* COLOR MODE */}
                 {mode === 'color' && (
                     <RowV1>
                         <RowLeftV1 title="color" />
                         <RowRightGridV1>
-                            {/* color-picker (1칸) */}
                             <div className="col-span-6 min-w-0 flex items-center">
                                 {renderLock('backgroundColor')}
                                 {!allow.has('backgroundColor') && (
@@ -165,10 +163,10 @@ export function BackgroundGroup(props: {
                     </RowV1>
                 )}
 
-                {/* ── IMAGE MODE ───────────────────────────────────────────── */}
+                {/* IMAGE MODE */}
                 {mode === 'image' && (
                     <>
-                        {/* url: textfield (6칸) */}
+                        {/* url */}
                         <RowV1>
                             <RowLeftV1 title="url" />
                             <RowRightGridV1>
@@ -200,7 +198,7 @@ export function BackgroundGroup(props: {
                             </RowRightGridV1>
                         </RowV1>
 
-                        {/* opt: size(2칸, placeholder) | repeat(2칸, placeholder) | position(2칸, placeholder) */}
+                        {/* opt: size | repeat | position */}
                         <RowV1>
                             <RowLeftV1 title="opt" />
                             <RowRightGridV1>

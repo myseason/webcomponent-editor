@@ -5,57 +5,25 @@
  * - 훅 규칙: 최상위에서만 호출. map 내부에서는 훅 호출 금지 → FragmentRow로 분리
  */
 import React, { useMemo, useState } from 'react';
-import type {ActionStep, EditorState, FlowEdge, Fragment, Node} from '../../../core/types';
-import {useBottomPanelController} from "@/figmaV3/controllers/bottom/BottomPanelController";
+import type { ActionStep, EditorState, FlowEdge, Fragment, Node } from '../../../core/types';
+import { useBottomPanelController } from '@/figmaV3/controllers/bottom/BottomPanelController';
 
 export function FragmentsPanel() {
     // 최상위 훅들만 사용
     const { reader, writer } = useBottomPanelController();
-    const R = reader(); const W = writer();
-    const state = {
-        // ---- 읽기 호환 ----
-        ui: R.ui(),
-        project: R.project(),
-        data: R.data(),
-        history: R.history(),
-        getEffectiveDecl: R.getEffectiveDecl.bind(R),
 
-        // ---- 쓰기 호환 ----
-        updateNodeStyles: W.updateNodeStyles.bind(W),
-        updateNodeProps: W.updateNodeProps.bind(W),
-        setNotification: W.setNotification.bind(W),
-        update: W.update.bind(W),
-
-        // ====== 레거시 표면(파일들이 그대로 기대하는 이름 유지) ======
-
-        // Dock
-        toggleBottomDock: W.toggleBottomDock.bind(W),
-
-        // Flows(Edges)
-        flowEdges: R.flowEdges(),
-        addFlowEdge: W.addFlowEdge.bind(W),
-        removeFlowEdge: W.removeFlowEdge.bind(W),
-        updateFlowEdge: W.updateFlowEdge.bind(W),
-
-        // Fragments
-        addFragment: W.addFragment.bind(W),
-        openFragment: W.openFragment.bind(W),
-        closeFragment: W.closeFragment.bind(W),
-        removeFragment: W.removeFragment.bind(W),
-
-        // 선택 도메인 직접 접근(있을 때만 사용)
-        actions: (W.actions || {}),
-        flows: (W.flows || {}),
-        fragments: (W.fragments || {}),
-        dataOps: (W.dataOps || {}),
-    };
+    // 호환 접근(getUi/getProject 우선, 구형 시그니처 폴백)
+    const ui = (reader as any).getUi?.() ?? (reader as any).ui?.();
+    const project = (reader as any).getProject?.() ?? (reader as any).project?.();
+    const flowEdges: Record<string, FlowEdge> =
+        (reader as any).flowEdges?.() ?? {};
 
     // refs 카운트(Flows + Actions) — useMemo로 계산 비용 절감
     const refCountById = useMemo<Record<string, number>>(() => {
         const counts: Record<string, number> = Object.create(null);
 
         // (a) FlowEdges
-        const edges: FlowEdge[] = Object.values(state.flowEdges);
+        const edges: FlowEdge[] = Object.values(flowEdges);
         for (const e of edges) {
             if (e.to.kind === 'OpenFragment') {
                 counts[e.to.fragmentId] = (counts[e.to.fragmentId] ?? 0) + 1;
@@ -65,7 +33,7 @@ export function FragmentsPanel() {
         }
 
         // (b) Node actions(__actions)
-        const nodes = state.project.nodes ;
+        const nodes = project.nodes ?? {};
         for (const node of Object.values(nodes) as Node[]) {
             const bag = (node.props as Record<string, unknown>).__actions as
                 | Record<string, { steps: ActionStep[] }>
@@ -83,44 +51,55 @@ export function FragmentsPanel() {
         }
 
         return counts;
-    }, [state.flowEdges, state.project.nodes]);
+    }, [flowEdges, project.nodes]);
 
     // 열린 오버레이 집합
     const openSet = useMemo<Set<string>>(
-        () => new Set(state.ui.overlays),
-        [state.ui.overlays],
+        () => new Set(ui?.overlays ?? []),
+        [ui?.overlays]
     );
 
     // 생성 폼 상태
     const [newName, setNewName] = useState<string>('');
 
     const onCreate = () => {
-        const name = newName.trim() || `Fragment ${state.project.fragments.length + 1}`;
-        state.addFragment(name);
+        const name =
+            (newName || '').trim() || `Fragment ${project.fragments.length + 1}`;
+        (writer as any).addFragment?.(name);
         setNewName('');
     };
 
-    const onOpen = (fragmentId: string) => state.openFragment(fragmentId);
-    const onClose = (fragmentId: string) => state.closeFragment(fragmentId);
+    const onOpen = (fragmentId: string) =>
+        (writer as any).openFragment?.(fragmentId);
+
+    const onClose = (fragmentId: string) =>
+        (writer as any).closeFragment?.(fragmentId);
+
     const onDelete = (fragmentId: string) => {
         const used = refCountById[fragmentId] ?? 0;
-        if (used > 0 && !confirm(`이 프래그먼트를 참조하는 항목이 ${used}개 있습니다.\n그래도 삭제하시겠습니까?`)) {
+        if (
+            used > 0 &&
+            !confirm(
+                `이 프래그먼트를 참조하는 항목이 ${used}개 있습니다.\n그래도 삭제하시겠습니까?`
+            )
+        ) {
             return;
         }
-        state.closeFragment(fragmentId);
-        state.removeFragment(fragmentId);
+        (writer as any).closeFragment?.(fragmentId);
+        (writer as any).removeFragment?.(fragmentId);
     };
+
     const onRename = (fragmentId: string, name: string) => {
         const next = name.trim();
         if (!next) return;
-        state.update((s: EditorState) => {
+        (writer as any).update?.((s: EditorState) => {
             s.project.fragments = s.project.fragments.map((f) =>
-                f.id === fragmentId ? { ...f, name: next } : f,
+                f.id === fragmentId ? { ...f, name: next } : f
             );
         });
     };
 
-    const frags: Fragment[] = state.project.fragments;
+    const frags: Fragment[] = project.fragments ?? [];
 
     return (
         <div className="p-3 space-y-3">
@@ -142,11 +121,13 @@ export function FragmentsPanel() {
             {/* 리스트 */}
             <div className="space-y-2">
                 {frags.length === 0 && (
-                    <div className="text-xs text-gray-400">프래그먼트가 없습니다. 위에서 생성하세요.</div>
+                    <div className="text-xs text-gray-400">
+                        프래그먼트가 없습니다. 위에서 생성하세요.
+                    </div>
                 )}
                 {frags.map((f) => (
                     <FragmentRow
-                        key={f.id}                 // ← key로 인스턴스/훅 상태 안정화
+                        key={f.id} // ← key로 인스턴스/훅 상태 안정화
                         frag={f}
                         opened={openSet.has(f.id)}
                         refsCount={refCountById[f.id] ?? 0}
@@ -197,26 +178,42 @@ function FragmentRow({
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="Name"
             />
-            <button className="border rounded px-2 py-1" onClick={() => onRename(frag.id, draft)}>
+            <button
+                className="border rounded px-2 py-1"
+                onClick={() => onRename(frag.id, draft)}
+            >
                 Apply
             </button>
 
             {!opened ? (
-                <button className="border rounded px-2 py-1" onClick={() => onOpen(frag.id)}>
+                <button
+                    className="border rounded px-2 py-1"
+                    onClick={() => onOpen(frag.id)}
+                >
                     Open
                 </button>
             ) : (
-                <button className="border rounded px-2 py-1" onClick={() => onClose(frag.id)}>
+                <button
+                    className="border rounded px-2 py-1"
+                    onClick={() => onClose(frag.id)}
+                >
                     Close
                 </button>
             )}
 
-            <button className="border rounded px-2 py-1 text-red-600" onClick={() => onDelete(frag.id)}>
+            <button
+                className="border rounded px-2 py-1 text-red-600"
+                onClick={() => onDelete(frag.id)}
+            >
                 Delete
             </button>
 
             <span className="ml-2 text-[10px] text-gray-500">{refsCount} refs</span>
-            {opened && <span className="text-[10px] ml-1 px-1 rounded bg-emerald-50 text-emerald-700">open</span>}
+            {opened && (
+                <span className="text-[10px] ml-1 px-1 rounded bg-emerald-50 text-emerald-700">
+          open
+        </span>
+            )}
         </div>
     );
 }

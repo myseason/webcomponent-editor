@@ -16,6 +16,13 @@ export function nodesDomain() {
             const id = EditorEngineCore.getState().ui?.selectedId ?? null;
             return R.getNode(id);
         },
+        getRootNodeId: (): NodeId | null => {
+            return EditorEngineCore.getState().project?.rootId ?? null;
+        },
+        getRootNode: (): Node | null => {
+            const rootId = R.getRootNodeId();
+            return rootId ? R.getNode(rootId) : null;
+        },
     };
 
     const W = {

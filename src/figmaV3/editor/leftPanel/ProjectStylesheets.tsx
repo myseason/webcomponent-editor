@@ -1,10 +1,11 @@
 'use client';
 
 import React from 'react';
-import type {EditorState, Stylesheet} from '../../core/types';
+import type { EditorState, Stylesheet } from '../../core/types';
 import styles from '../ui/theme.module.css';
 
-import {LeftDomain, useLeftPanelController} from '../../controllers/left/LeftPanelController';
+// ✅ 도메인 인자 제거
+import { useLeftPanelController } from '../../controllers/left/LeftPanelController';
 
 /**
  * ProjectStylesheets
@@ -12,8 +13,10 @@ import {LeftDomain, useLeftPanelController} from '../../controllers/left/LeftPan
  * - 저장은 editorStore.subscribe → persistence 로 디바운스 저장됨
  */
 export function ProjectStylesheets() {
-    const { reader, writer } = useLeftPanelController([LeftDomain.Stylesheets]);
+    // ✅ 인자 없이 컨트롤러 사용
+    const { reader, writer } = useLeftPanelController();
     const project = reader.getProject();
+
     const sheets: Stylesheet[] = React.useMemo(
         () => project.stylesheets ?? [],
         [project.stylesheets],

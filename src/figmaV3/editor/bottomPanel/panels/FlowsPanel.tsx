@@ -13,11 +13,11 @@
  */
 
 import React from 'react';
-import type { SupportedEvent, FlowEdge, NodeId, EditorState } from '../../../core/types';
+import type { SupportedEvent, FlowEdge, NodeId } from '../../../core/types';
 import { SelectPage } from '../../common/SelectPage';
 import { SelectFragment } from '../../common/SelectFragment';
 import { WhenBuilder } from '../../common/WhenBuilder';
-import {useBottomPanelController} from "@/figmaV3/controllers/bottom/BottomPanelController";
+import { useBottomPanelController } from '@/figmaV3/controllers/bottom/BottomPanelController';
 
 const SUPPORTED_EVENTS: SupportedEvent[] = ['onClick', 'onChange', 'onSubmit', 'onLoad'];
 type ToKind = 'Navigate' | 'OpenFragment' | 'CloseFragment';
@@ -25,87 +25,68 @@ type ToKind = 'Navigate' | 'OpenFragment' | 'CloseFragment';
 export function FlowsPanel() {
     // 1) 훅은 최상위에서만 호출
     const { reader, writer } = useBottomPanelController();
-    const R = reader(); const W = writer();
-    const state = {
-        // ---- 읽기 호환 ----
-        ui: R.ui(),
-        project: R.project(),
-        data: R.data(),
-        history: R.history(),
-        getEffectiveDecl: R.getEffectiveDecl.bind(R),
 
-        // ---- 쓰기 호환 ----
-        updateNodeStyles: W.updateNodeStyles.bind(W),
-        updateNodeProps: W.updateNodeProps.bind(W),
-        setNotification: W.setNotification.bind(W),
-        update: W.update.bind(W),
+    // 호환 접근(getUi/getProject 우선, 구형 시그니처 폴백)
+    const ui = (reader as any).getUi?.() ?? (reader as any).ui?.();
+    const project = (reader as any).getProject?.() ?? (reader as any).project?.();
+    const flowEdgesMap: Record<string, FlowEdge> = (reader as any).flowEdges?.() ?? {};
 
-        // ====== 레거시 표면(파일들이 그대로 기대하는 이름 유지) ======
-
-        // Dock
-        toggleBottomDock: W.toggleBottomDock.bind(W),
-
-        // Flows(Edges)
-        flowEdges: R.flowEdges(),
-        addFlowEdge: W.addFlowEdge.bind(W),
-        removeFlowEdge: W.removeFlowEdge.bind(W),
-        updateFlowEdge: W.updateFlowEdge.bind(W),
-
-        // Fragments
-        addFragment: W.addFragment.bind(W),
-        openFragment: W.openFragment.bind(W),
-        closeFragment: W.closeFragment.bind(W),
-        removeFragment: W.removeFragment.bind(W),
-
-        // 선택 도메인 직접 접근(있을 때만 사용)
-        actions: (W.actions || {}),
-        flows: (W.flows || {}),
-        fragments: (W.fragments || {}),
-        dataOps: (W.dataOps || {}),
-    };
     // 2) 입력 폼 상태 (from/event/toKind/target)
-    const defaultFrom = state.ui.selectedId ?? state.project.rootId;
+    const defaultFrom = (ui?.selectedId as NodeId) ?? (project?.rootId as NodeId);
     const [fromNode, setFromNode] = React.useState<NodeId>(defaultFrom);
 
     // 정책 계산을 위해 fromNode가 바뀔 때마다 대상 노드/정책을 구합니다
-    const fromNodeObj = state.project.nodes[fromNode];
-    const expert = Boolean(state.ui.expertMode);
-    const filter = fromNodeObj ? state.project.inspectorFilters?.[fromNodeObj.componentId] : undefined;
+    const fromNodeObj = project?.nodes?.[fromNode];
+    const expert = Boolean(ui?.expertMode);
+    const filter = fromNodeObj ? project?.inspectorFilters?.[fromNodeObj.componentId] : undefined;
 
     // 이벤트 정책
-    const allowedEvents = (!expert && filter?.actions?.allowEvents) ? new Set(filter.actions.allowEvents) : null;
+    const allowedEvents =
+        !expert && filter?.actions?.allowEvents ? new Set(filter.actions.allowEvents) : null;
+
     const firstAllowedEvent: SupportedEvent = React.useMemo(() => {
-        if (allowedEvents && allowedEvents.size > 0) return Array.from(allowedEvents)[0] as SupportedEvent;
+        if (allowedEvents && allowedEvents.size > 0)
+            return Array.from(allowedEvents)[0] as SupportedEvent;
         return 'onClick';
     }, [allowedEvents]);
+
     const [evt, setEvt] = React.useState<SupportedEvent>(firstAllowedEvent);
     React.useEffect(() => {
         if (allowedEvents && !allowedEvents.has(evt)) setEvt(firstAllowedEvent);
     }, [allowedEvents, evt, firstAllowedEvent]);
 
     // toKind 정책
-    const allowedKinds = (!expert && filter?.flows?.allowKinds) ? new Set(filter.flows.allowKinds) : null;
+    const allowedKinds =
+        !expert && filter?.flows?.allowKinds ? new Set(filter.flows.allowKinds) : null;
+
     const firstAllowedKind: ToKind = React.useMemo(() => {
-        if (allowedKinds && allowedKinds.size > 0) return Array.from(allowedKinds)[0] as ToKind;
+        if (allowedKinds && allowedKinds.size > 0)
+            return Array.from(allowedKinds)[0] as ToKind;
         return 'Navigate';
     }, [allowedKinds]);
+
     const [toKind, setToKind] = React.useState<ToKind>(firstAllowedKind);
     React.useEffect(() => {
         if (allowedKinds && !allowedKinds.has(toKind)) setToKind(firstAllowedKind);
     }, [allowedKinds, toKind, firstAllowedKind]);
 
     // 대상(페이지/프래그먼트) 선택 상태 — 공용 셀렉트와 함께 사용
-    const [toPage, setToPage] = React.useState<string>(state.project.pages[0]?.id ?? 'page_home');
-    const [toFrag, setToFrag] = React.useState<string>(state.project.fragments[0]?.id ?? '');
+    const [toPage, setToPage] = React.useState<string>(project?.pages?.[0]?.id ?? '');
+    const [toFrag, setToFrag] = React.useState<string>(project?.fragments?.[0]?.id ?? '');
 
     // 3) 행별 when 편집 토글 상태
     const [editingEdgeId, setEditingEdgeId] = React.useState<string | null>(null);
 
     // 4) 현재 플로우 목록
-    const edges: FlowEdge[] = React.useMemo(() => Object.values(state.flowEdges), [state.flowEdges]);
+    const edges: FlowEdge[] = React.useMemo(
+        () => Object.values(flowEdgesMap),
+        [flowEdgesMap]
+    );
 
     // 5) 액션
     const onAdd = () => {
+        if (!project) return;
+
         const edge: FlowEdge =
             toKind === 'Navigate'
                 ? { from: { nodeId: fromNode, event: evt }, to: { kind: 'Navigate', toPageId: toPage } }
@@ -113,12 +94,12 @@ export function FlowsPanel() {
                     ? { from: { nodeId: fromNode, event: evt }, to: { kind: 'OpenFragment', fragmentId: toFrag } }
                     : { from: { nodeId: fromNode, event: evt }, to: { kind: 'CloseFragment', fragmentId: toFrag || undefined } };
 
-        state.addFlowEdge(edge);
+        (writer as any).addFlowEdge?.(edge);
     };
 
     const onRemove = (id?: string) => {
         if (!id) return;
-        state.removeFlowEdge(id);
+        (writer as any).removeFlowEdge?.(id);
         if (editingEdgeId === id) setEditingEdgeId(null);
     };
 
@@ -241,9 +222,9 @@ export function FlowsPanel() {
                                     value={e.when?.expr ?? ''}
                                     onChange={(expr) => {
                                         const trimmed = expr.trim();
-                                        state.updateFlowEdge(
+                                        (writer as any).updateFlowEdge?.(
                                             e.id as string,
-                                            trimmed ? { when: { expr: trimmed } } : { when: undefined },
+                                            trimmed ? { when: { expr: trimmed } } : { when: undefined }
                                         );
                                     }}
                                     previewNodeId={e.from.nodeId}
@@ -254,7 +235,9 @@ export function FlowsPanel() {
                 ))}
 
                 {edges.length === 0 && (
-                    <div className="text-[12px] text-gray-500">등록된 플로우가 없습니다. 위에서 추가하세요.</div>
+                    <div className="text-[12px] text-gray-500">
+                        등록된 플로우가 없습니다. 위에서 추가하세요.
+                    </div>
                 )}
             </div>
         </div>
