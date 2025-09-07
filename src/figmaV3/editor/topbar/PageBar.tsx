@@ -21,54 +21,9 @@ const ZOOM_MIN = 0.25, ZOOM_MAX = 4.0, ZOOM_STEP = 0.25;
 
 export default function PageBar() {
     const { reader, writer } = useTopbarController();
-    const R = reader(); const W = writer();
-    const state = {
-        // --- 읽기 ---
-        ui: R.ui(),
-        project: R.project(),
-        data: R.data(),
-        history: R.history(),
-        pages: R.pages(),
-        currentPageId: R.currentPageId(),
-        activeViewport: R.activeViewport(),
-        viewportMode: R.viewportMode.bind(R),
-        zoom: R.zoom(),
 
-        // --- 쓰기 ---
-        update: W.update.bind(W),
-        setNotification: W.setNotification.bind(W),
-
-        setCurrentPage: W.setCurrentPage.bind(W),
-        addPage: W.addPage.bind(W),
-        removePage: W.removePage.bind(W),
-        duplicatePage: W.duplicatePage.bind(W),
-        renamePage: W.renamePage.bind(W),
-
-        setActiveViewport: W.setActiveViewport.bind(W),
-        toggleViewportMode: W.toggleViewportMode.bind(W),
-        zoomIn: W.zoomIn.bind(W),
-        zoomOut: W.zoomOut.bind(W),
-        resetZoom: W.resetZoom.bind(W),
-        togglePreview: W.togglePreview.bind(W),
-        undo: W.undo.bind(W),
-        redo: W.redo.bind(W),
-
-        // --- ★ 추가된 레거시/확장 메서드 바인딩 (PageBar가 기대) ---
-        setCanvasSize: W.setCanvasSize.bind(W),
-        setCanvasZoom: W.setCanvasZoom.bind(W),
-        toggleCanvasOrientation: W.toggleCanvasOrientation.bind(W),
-        selectPage: W.selectPage.bind(W),          // (setCurrentPage alias)
-        setBaseViewport: W.setBaseViewport.bind(W),
-        setViewportMode: W.setViewportMode.bind(W),
-    };
-
-    const {
-        project, ui, history,
-        setActiveViewport, setCanvasSize, setCanvasZoom,
-        toggleCanvasOrientation, selectPage,
-        setBaseViewport, setViewportMode,
-        undo, redo, setNotification,
-    } = state;
+    const project = reader.project();
+    const ui = reader.ui();
 
     const currentPage = useMemo(
         () => project.pages.find((p: Page) => p.rootId === project.rootId),
@@ -98,21 +53,21 @@ export default function PageBar() {
     }, [ui.notification]);
 
     const setViewport = (vp: Viewport) => {
-        setActiveViewport(vp);
+        writer.setActiveViewport(vp);
         const sz = VIEWPORT_SIZES[vp];
-        setCanvasSize({ width: sz.w, height: sz.h });
+        writer.setCanvasSize({ width: sz.w, height: sz.h });
     };
 
     const applySize = () => {
         const w = parseInt(wStr, 10), h = parseInt(hStr, 10);
-        if (!isNaN(w) && w > 0 && !isNaN(h) && h > 0) setCanvasSize({ width: w, height: h });
+        if (!isNaN(w) && w > 0 && !isNaN(h) && h > 0) writer.setCanvasSize({ width: w, height: h });
         else {
             setWStr(String(canvasWidth));
             setHStr(String(canvasHeight));
         }
     };
 
-    const handleZoom = (z: number) => setCanvasZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z)));
+    const handleZoom = (z: number) => writer.setCanvasZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z)));
     const applyZoom = () => {
         const v = parseInt(zoomStr, 10);
         if (!isNaN(v)) handleZoom(v / 100);
@@ -126,7 +81,7 @@ export default function PageBar() {
                     <select
                         className="px-2 py-1 rounded border border-gray-200 text-sm"
                         value={currentPage?.id ?? ''}
-                        onChange={(e) => selectPage(e.target.value)}
+                        onChange={(e) => writer.selectPage(e.target.value)}
                     >
                         {project.pages.map((p: Page) => (
                             <option key={p.id} value={p.id}>{p.name}</option>
@@ -143,16 +98,16 @@ export default function PageBar() {
                 <div className="flex items-center gap-1">
                     <button
                         className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-                        onClick={undo}
-                        disabled={history.past.length === 0}
+                        onClick={writer.undo}
+                        disabled={reader.getPast().length === 0}
                         title="Undo (Cmd+Z)"
                     >
                         <Undo size={16} />
                     </button>
                     <button
                         className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-                        onClick={redo}
-                        disabled={history.future.length === 0}
+                        onClick={writer.redo}
+                        disabled={reader.getFuture().length === 0}
                         title="Redo (Cmd+Y)"
                     >
                         <Redo size={16} />
@@ -167,7 +122,7 @@ export default function PageBar() {
                             type="radio"
                             name="vp-mode"
                             checked={vpMode[activeViewport] === 'Unified'}
-                            onChange={() => { setViewportMode(activeViewport, 'Unified'); setNotification(`Mode: Unified (${activeViewport})`); }}
+                            onChange={() => { writer.setViewportMode(activeViewport, 'Unified'); writer.setNotification(`Mode: Unified (${activeViewport})`); }}
                         />
                         통합
                     </label>
@@ -176,7 +131,7 @@ export default function PageBar() {
                             type="radio"
                             name="vp-mode"
                             checked={vpMode[activeViewport] === 'Independent'}
-                            onChange={() => { setViewportMode(activeViewport, 'Independent'); setNotification(`Mode: Independent (${activeViewport})`); }}
+                            onChange={() => { writer.setViewportMode(activeViewport, 'Independent'); writer.setNotification(`Mode: Independent (${activeViewport})`); }}
                         />
                         개별
                     </label>
@@ -199,7 +154,7 @@ export default function PageBar() {
                                 name="vp-base"
                                 className="accent-blue-600"
                                 checked={baseViewport === vp}
-                                onChange={() => { setBaseViewport(vp); setNotification(`Base viewport: ${vp}`); }}
+                                onChange={() => { writer.setBaseViewport(vp); writer.setNotification(`Base viewport: ${vp}`); }}
                                 title="Set as Base"
                             />
                         </div>
@@ -230,7 +185,7 @@ export default function PageBar() {
                     </div>
                     <button
                         className="p-1.5 rounded border border-gray-200 hover:bg-gray-50"
-                        onClick={() => toggleCanvasOrientation()}
+                        onClick={() => writer.toggleCanvasOrientation()}
                         title="Swap width/height"
                     >
                         <RotateCw size={16} />

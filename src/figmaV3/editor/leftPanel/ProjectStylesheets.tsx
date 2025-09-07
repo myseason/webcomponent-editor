@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import type { EditorState, Stylesheet } from '../../core/types';
+import type {EditorState, Stylesheet} from '../../core/types';
 import styles from '../ui/theme.module.css';
 
-import { useLeftPanelFacadeController } from '../../controllers/left/LeftPanelFacadeController';
+import {LeftDomain, useLeftPanelController} from '../../controllers/left/LeftPanelController';
 
 /**
  * ProjectStylesheets
@@ -12,8 +12,8 @@ import { useLeftPanelFacadeController } from '../../controllers/left/LeftPanelFa
  * - 저장은 editorStore.subscribe → persistence 로 디바운스 저장됨
  */
 export function ProjectStylesheets() {
-    const { reader, writer } = useLeftPanelFacadeController();
-    const project = reader.project();
+    const { reader, writer } = useLeftPanelController([LeftDomain.Stylesheets]);
+    const project = reader.getProject();
     const sheets: Stylesheet[] = React.useMemo(
         () => project.stylesheets ?? [],
         [project.stylesheets],

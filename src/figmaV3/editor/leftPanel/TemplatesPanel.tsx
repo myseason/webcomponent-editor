@@ -1,16 +1,16 @@
 
 'use client';
 import React from 'react';
-import type { Fragment } from '../../core/types'; // ✨ [수정] TemplateDefinition 대신 Fragment 사용
+import type { Fragment } from '../../core/types';
 import { Trash2 } from 'lucide-react';
 
-import { useLeftPanelFacadeController } from '../../controllers/left/LeftPanelFacadeController';
+import { useLeftPanelController, LeftDomain } from '../../controllers/left/LeftPanelController';
 
 export function TemplatesPanel({ query = '' }: { query?: string }) {
-    const { reader, writer, templates } = useLeftPanelFacadeController();
+    const { reader, writer } = useLeftPanelController([LeftDomain.Templates]);
     // ✨ [수정] isAdmin 플래그와 새로운 액션들을 가져옵니다.
     //const { project, insertComponent, removeFragment, isAdmin } = state;
-    const project = reader.project();
+    const project = reader.getProject();
     // ✨ [수정] isPublic이 false인 컴포넌트(Fragment)만 필터링합니다.
     const privateComponents = React.useMemo<Fragment[]>(() => {
         return project.fragments.filter((f: Fragment) => !f.isPublic);

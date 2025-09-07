@@ -1,17 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { TemplatesPanel } from '../TemplatesPanel';
-import { Palette } from '../Palette';
-import type { Fragment } from '../../../core/types';
-import { Trash2, UploadCloud } from 'lucide-react';
+import React, {useEffect, useState} from 'react';
+import {TemplatesPanel} from '../TemplatesPanel';
+import {Palette} from '../Palette';
+import type {Fragment} from '../../../core/types';
+import {Trash2, UploadCloud} from 'lucide-react';
 
-import { useLeftPanelFacadeController } from '../../../controllers/left/LeftPanelFacadeController';
+import {LeftDomain, useLeftPanelController} from '../../../controllers/left/LeftPanelController';
 
 function ComponentEditorCard({ frag }: { frag: Fragment }) {
-    const { reader, writer } = useLeftPanelFacadeController();
+    const { reader, writer } = useLeftPanelController([LeftDomain.Components]);
 
-    const ui = reader.ui();
+    const ui = reader.getUi();
     const [name, setName] = useState(frag.name);
     const [description, setDescription] = useState(frag.description ?? '');
     const isEditing = ui.editingFragmentId === frag.id;
@@ -95,9 +95,8 @@ function ComponentEditorCard({ frag }: { frag: Fragment }) {
 }
 
 function ComponentDevelopmentPanel() {
-    const { reader, writer } = useLeftPanelFacadeController();
-    //const { project, addFragment } = state;
-    const project = reader.project();
+    const { reader, writer } = useLeftPanelController([LeftDomain.Components]);
+    const project = reader.getProject();
     const { fragments } = project;
 
     return (
@@ -140,6 +139,6 @@ function PageBuildPanel() {
 }
 
 export function ComponentsPanel() {
-    const { reader } = useLeftPanelFacadeController();
-    return reader.ui().mode === 'Component' ? <ComponentDevelopmentPanel /> : <PageBuildPanel />;
+    const { reader } = useLeftPanelController([LeftDomain.Components]);
+    return reader.getUi().mode === 'Component' ? <ComponentDevelopmentPanel /> : <PageBuildPanel />;
 }

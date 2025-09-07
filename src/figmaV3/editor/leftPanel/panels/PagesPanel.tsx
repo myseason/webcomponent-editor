@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import type { Page } from '../../../core/types';
-import { MoreHorizontal, Copy, Trash2 } from 'lucide-react';
+import React, {useEffect, useRef, useState} from 'react';
+import type {EditorState, Page} from '../../../core/types';
+import {Copy, MoreHorizontal, Trash2} from 'lucide-react';
 
-import { useLeftPanelFacadeController } from '../../../controllers/left/LeftPanelFacadeController';
+import {LeftDomain, useLeftPanelController} from '../../../controllers/left/LeftPanelController';
 
 function slugify(s: string): string {
     return s.trim().toLowerCase().replace(/[\s_]+/g, '-').slice(0, 64);
@@ -54,9 +54,9 @@ const PageActions = ({ page, onDuplicate, onDelete }: { page: Page; onDuplicate:
 };
 
 export function PagesPanel() {
-    const { reader, writer } = useLeftPanelFacadeController();
+    const { reader, writer } = useLeftPanelController([LeftDomain.Pages]);
 
-    const project = reader.project();
+    const project = reader.getProject();
     const [selectedPageIdForDetails, setSelectedPageIdForDetails] = useState<string | null>(
         project.pages.find((p: Page) => p.rootId === project.rootId)?.id ?? project.pages[0]?.id ?? null
     );
@@ -69,7 +69,7 @@ export function PagesPanel() {
     }, [project.rootId, project.pages]);
 
 
-    const ui = reader.ui();
+    const ui = reader.getUi();
     if (ui.mode !== 'Page') {
         return <div className="p-4 text-sm text-gray-500">Page management is available in Page Build Mode.</div>
     }
@@ -132,7 +132,7 @@ export function PagesPanel() {
                                 <input
                                     className="w-full border rounded px-2 py-1 text-sm"
                                     value={selectedPage.name}
-                                    onChange={e => writer.update(s => { s.project.pages.find((p: Page)=>p.id===selectedPageIdForDetails)!.name = e.target.value })}
+                                    onChange={e => writer.update((s: EditorState) => { s.project.pages.find((p: Page)=>p.id===selectedPageIdForDetails)!.name = e.target.value })}
                                 />
                             </div>
                             <div>
@@ -140,7 +140,7 @@ export function PagesPanel() {
                                 <textarea
                                     className="w-full border rounded px-2 py-1 text-sm h-16 resize-none"
                                     value={selectedPage.description ?? ''}
-                                    onChange={e => writer.update(s => { s.project.pages.find((p: Page) =>p.id===selectedPageIdForDetails)!.description = e.target.value })}
+                                    onChange={e => writer.update((s: EditorState) => { s.project.pages.find((p: Page) =>p.id===selectedPageIdForDetails)!.description = e.target.value })}
                                 />
                             </div>
                             <div>
@@ -148,7 +148,7 @@ export function PagesPanel() {
                                 <input
                                     className="w-full border rounded px-2 py-1 font-mono text-xs"
                                     value={selectedPage.slug ?? ''}
-                                    onChange={e => writer.update(s => { s.project.pages.find((p: Page)=>p.id===selectedPageIdForDetails)!.slug = slugify(e.target.value) })}
+                                    onChange={e => writer.update((s: EditorState) => { s.project.pages.find((p: Page)=>p.id===selectedPageIdForDetails)!.slug = slugify(e.target.value) })}
                                 />
                             </div>
                         </div>

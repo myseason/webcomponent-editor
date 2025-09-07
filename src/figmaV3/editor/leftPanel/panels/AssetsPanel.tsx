@@ -5,17 +5,17 @@
  * - Scripts (전문가): 전역 JS 편집
  * - Styles (전문가): 전역 CSS 및 테마 변수 편집
  */
-import React, { useState, useCallback } from 'react';
-import type { Asset } from '../../../core/types';
+import React, {useCallback, useState} from 'react';
+import type {Asset} from '../../../core/types';
 
-import { useLeftPanelFacadeController } from '../../../controllers/left/LeftPanelFacadeController';
+import {LeftDomain, useLeftPanelController} from '../../../controllers/left/LeftPanelController';
 
 type AssetTab = 'Media' | 'Scripts' | 'Styles';
 
 export function AssetsPanel() {
-    const { reader, writer } = useLeftPanelFacadeController();
-    const project = reader.project();
-    const ui   = reader.ui();
+    const { reader, writer } = useLeftPanelController([LeftDomain.Assets]);
+    const project = reader.getProject();
+    const ui   = reader.getUi();
 
     const expertMode = ui.expertMode;
 

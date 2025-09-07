@@ -4,11 +4,14 @@
    프로젝트의 핵심 데이터(노드, 페이지, 스타일)를 정의합니다.
 ============================================================================= */
 
+import {deprecate} from "node:util";
+
 export type NodeId = string;
 export type PageId = string;
 export type CSSDict = Record<string, unknown>;
 
 /** V3는 'base' | 'tablet' | 'mobile' 3-뷰포트로 운용합니다. */
+export const VIEWPORTS = ['base', 'tablet', 'mobile']; // base -> desktop
 export type Viewport = 'base' | 'tablet' | 'mobile';
 
 /** 스타일 컨테이너 (필요 시 확장) */
@@ -306,7 +309,9 @@ export interface EditorUI {
         orientation: 'portrait' | 'landscape';
         activeViewport: Viewport;
         baseViewport: Viewport;
+        // @deprecate()
         vpMode: Record<Viewport, ViewportMode>;
+        viewportMode: Record<Viewport, ViewportMode>;
     };
 
     // --- Side Panels ---

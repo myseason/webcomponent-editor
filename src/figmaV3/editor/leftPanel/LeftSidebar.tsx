@@ -1,26 +1,26 @@
 'use client';
 
 import * as React from 'react';
-import type { ProjectHubTab, EditorMode } from '../../core/types';
+import type {EditorMode, ProjectHubTab} from '../../core/types';
 
 // 패널들
-import { PagesPanel } from './panels/PagesPanel';
-import { AssetsPanel } from './panels/AssetsPanel';
-import { ComponentsPanel } from './panels/ComponentsPanel';
-import { Layers as LayersPanel } from './Layers';
+import {PagesPanel} from './panels/PagesPanel';
+import {AssetsPanel} from './panels/AssetsPanel';
+import {ComponentsPanel} from './panels/ComponentsPanel';
+import {Layers as LayersPanel} from './Layers';
 
-import { modeBorderClass } from '../rightPanel/sections/styles/common';
+import {modeBorderClass} from '../rightPanel/sections/styles/common';
 
-import { useLeftPanelFacadeController } from '../../controllers/left/LeftPanelFacadeController';
+import {LeftDomain, useLeftPanelController} from '../../controllers/left/LeftPanelController';
 
 // 아이콘 (lucide-react)
 import {
     Component as ComponentIcon,
-    Layers as LayersIcon,
     Folder as FolderIcon,
-    Image as ImageIcon,
-    Settings as SettingsIcon,
     GripHorizontal as GripIcon,
+    Image as ImageIcon,
+    Layers as LayersIcon,
+    Settings as SettingsIcon,
 } from 'lucide-react';
 import {PanelTitle} from "@/figmaV3/editor/common/PanelTitle";
 
@@ -148,10 +148,10 @@ function SinglePanel({ tab }: { tab: HubTab }) {
 }
 
 export function LeftSidebar() {
-    const { reader, writer } = useLeftPanelFacadeController();
+    const { reader, writer } = useLeftPanelController([LeftDomain.Sidebar]);
 
     // ── 모드 UI(기존 유지) ────────────────────────────────────────────────
-    const ui = reader.ui();
+    const ui = reader.getUi();
     const mode = (ui?.mode ?? 'Page') as EditorMode;
 
     const handleModeChange = React.useCallback((newMode: EditorMode) => {

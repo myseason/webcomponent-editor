@@ -41,6 +41,7 @@ const initialState: EditorState = {
             width: 1280, height: 800, zoom: 1, orientation: 'landscape',
             activeViewport: 'base', baseViewport: 'base',
             vpMode: { base: 'Unified', tablet: 'Unified', mobile: 'Unified' },
+            viewportMode: { base: 'Unified', tablet: 'Unified', mobile: 'Unified' },
         },
         panels: {
             left: {

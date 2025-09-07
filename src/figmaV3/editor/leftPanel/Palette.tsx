@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { listDefinitions } from '../../core/registry';
-import type { Fragment } from '../../core/types'; // ✨ [수정] TemplateDefinition 대신 Fragment 사용
-import { Trash2 } from 'lucide-react';
+import {listDefinitions} from '../../core/registry';
+import type {Fragment} from '../../core/types';
+import {Trash2} from 'lucide-react';
 
-import { useLeftPanelFacadeController } from '../../controllers/left/LeftPanelFacadeController';
+import {LeftDomain, useLeftPanelController} from '../../controllers/left/LeftPanelController';
 
 function itemMatch(title: string, id: string, q: string): boolean {
     const qq = q.trim().toLowerCase();
@@ -14,8 +14,8 @@ function itemMatch(title: string, id: string, q: string): boolean {
 }
 
 export function Palette({ query = '' }: { query?: string }) {
-    const { reader, writer } = useLeftPanelFacadeController();
-    const project = reader.project();
+    const { reader, writer } = useLeftPanelController([LeftDomain.Palette]);
+    const project = reader.getProject();
     const coreDefs = listDefinitions().filter((d) => itemMatch(d.title, d.id, query));
     // ✨ [수정] isPublic이 true인 컴포넌트(Fragment)만 필터링합니다.
     const sharedComponents = React.useMemo<Fragment[]>(() => {
@@ -25,7 +25,7 @@ export function Palette({ query = '' }: { query?: string }) {
     const filteredSharedComponents = sharedComponents.filter(c => itemMatch(c.name, c.id, query));
 
     const onInsertCore = (defId: string) => {
-        const parent = reader.ui().selectedId ?? project.rootId;
+        const parent = reader.getUi().selectedId ?? project.rootId;
         writer.addByDef(defId, parent);
     };
 

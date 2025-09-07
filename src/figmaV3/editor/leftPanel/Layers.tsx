@@ -6,7 +6,7 @@ import { Lock, Unlock, Eye, EyeOff, Trash2, GripVertical } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import {PanelTitle} from "@/figmaV3/editor/common/PanelTitle";
 
-import { useLeftPanelFacadeController } from '../../controllers/left/LeftPanelFacadeController';
+import { useLeftPanelController, LeftDomain } from '../../controllers/left/LeftPanelController';
 
 const LINE_COLOR = '#e5e7eb';
 
@@ -40,9 +40,9 @@ function getDisplayName(node: Node): string {
 }
 
 const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
-    const { reader, writer } = useLeftPanelFacadeController();
-    const project = reader.project();
-    const ui = reader.ui();
+    const { reader, writer } = useLeftPanelController([LeftDomain.Layers]);
+    const project = reader.getProject();
+    const ui = reader.getUi();
     const node = project.nodes[id];
 
     const { attributes, listeners, setNodeRef: draggableRef, isDragging } = useDraggable({ id, data: { kind: 'layers-node', nodeId: id } });
@@ -57,10 +57,7 @@ const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
     const onSelect = useCallback(() => writer.select(id), [writer, id]);
     const onToggleVisible = useCallback(() => writer.toggleNodeVisibility(id), [writer, id]);
     const onToggleLock = useCallback(() => writer.toggleNodeLock(id), [writer, id]);
-    const onRemove = useCallback(() => {
-        if (isRoot) return;
-        writer.removeNodeCascade(id);
-    }, [writer, id, isRoot]);
+    const onRemoveCascade = useCallback(() => writer.removeNodeCascade(id), [writer, id]);
 
     return (
         <div
@@ -86,7 +83,7 @@ const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
                     <button className="p-1 rounded border" onClick={onToggleVisible} title={node.isVisible === false ? 'Show' : 'Hide'}>
                         {node.isVisible === false ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
-                    <button className="p-1 rounded border text-red-600" onClick={onRemove} title="Delete">
+                    <button className="p-1 rounded border text-red-600" onClick={onRemoveCascade} title="Delete">
                         <Trash2 size={14} />
                     </button>
                 </div>
@@ -97,9 +94,10 @@ const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
 Row.displayName = 'Row';
 
 const Tree: React.FC<{ id: NodeId; depth: number }> = ({ id, depth }) => {
-    const state = useLeftPanelFacadeController();
-    const project = state.reader.project();
-    const node = project.nodes[id];
+    const { reader, writer } = useLeftPanelController([LeftDomain.Layers]);
+    const project = reader.getProject();
+    const node = reader.getNodeById(id);
+
     if (!node) return null;
     const children = useMemo(() => ((node.children ?? []) as NodeId[]).filter((cid) => !!project.nodes[cid]), [node.children, project.nodes]);
     return (
@@ -111,9 +109,10 @@ const Tree: React.FC<{ id: NodeId; depth: number }> = ({ id, depth }) => {
 };
 
 export function Layers() {
-    const state = useLeftPanelFacadeController();
-    const { mode, editingFragmentId } = state.reader.ui();
-    const project = state.reader.project();
+    const { reader, writer } = useLeftPanelController([LeftDomain.Layers]);
+    const project = reader.getProject();
+    const mode = reader.getUi().mode;
+    const editingFragmentId = reader.getUi().editingFragmentId;
 
     const rootId = mode === 'Component' && editingFragmentId
         ? project.fragments.find((f: Fragment) => f.id === editingFragmentId)?.rootId

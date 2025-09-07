@@ -1,325 +1,114 @@
 'use client';
 
-import { useRef, useSyncExternalStore } from 'react';
-import { EditorEngine } from '../../engine/EditorEngine';
+import { useStoreTick } from '../adapters/useStoreTick';
+import { useEngine, EngineDomain } from '../../engine/Engine';
+import type { EditorUI, Project, Page, Viewport, ViewportMode, EditorState } from '../../core/types';
+import { HistoryStack } from "../../engine/domains/history";
 
-// 레포 타입 의존 최소화(파사드 정리 후 점진적으로 좁힙니다)
-type Project = any;
-type EditorState = any;
-type PageId = string;
-type Viewport = string;
-type ViewportMode = string;
+/**
+ * TopbarController — Topbar 전용 단일 도메인 컨트롤러
+ * - View에서 필요한 것만 단일 묶음으로 제공
+ * - 내부적으로는 한 번의 useEngine 호출만 사용
+ * - 상태는 useStoreTick()으로만 리렌더 트리거, 실제 값은 엔진 reader에서 즉시 조회
+ */
+export function useTopbarController() {
+    // 1) 엔진 파사드(도메인 주입은 내부에서만)
+    const { reader: RE, writer: WE } = useEngine([ EngineDomain.UI, EngineDomain.History]);
 
-export interface TopbarReader {
-    project(): Project;
-    ui(): any;
-    data(): any;
-    history(): any;
+    // 2) 리렌더 트리거(스냅샷 보관 금지)
+    useStoreTick();
 
-    // Pages
-    pages(): { id: PageId; name: string }[];
-    currentPageId(): PageId | null;
+    // ──────────────────────────────────────────────────────────────
+    // Reader (Topbar가 화면에서 읽는 값들만)
+    // ──────────────────────────────────────────────────────────────
+    const reader = {
+        // 프로젝트
+        project: (): Project => (RE.getProject ? RE.getProject() : ({} as Project)),
 
-    // Viewport / Zoom
-    activeViewport(): Viewport;
-    viewportMode(vp: Viewport): ViewportMode;
-    zoom(): number;
+        // 페이지
+        pages: (): Page[] => (RE.getPages ? RE.getPages() : []),
+        currentPage: (): Page | null => (RE.getCurrentPage ? RE.getCurrentPage() : null),
+
+        // 프로젝트
+        ui: (): EditorUI => (RE.getUi ? RE.getUi() : ({} as EditorUI)),
+
+        // 캔버스/뷰포트
+        zoom: (): number =>
+            (RE.getCanvasZoom ? RE.getCanvasZoom() : (RE.getUI?.().canvas?.zoom ?? 1)),
+        activeViewport: (): Viewport =>
+            (RE.getActiveViewport
+                ? RE.getActiveViewport()
+                : (RE.getUI?.().canvas?.activeViewport ?? 'desktop')) as Viewport,
+        viewportMode: (vp: Viewport): ViewportMode =>
+            (RE.getViewportMode
+                ? RE.getViewportMode(vp)
+                : (RE.getUI?.().canvas?.vpMode?.[vp] ?? 'size')) as ViewportMode,
+        canvasSize: (): { width: number; height: number } => {
+            const c = RE.getUI?.().canvas ?? { width: 0, height: 0 };
+            return { width: c.width ?? 0, height: c.height ?? 0 };
+        },
+        orientation: (): 'portrait' | 'landscape' =>
+            (RE.getUI?.().canvas?.orientation ?? 'portrait') as 'portrait' | 'landscape',
+        baseViewport: (): Viewport =>
+            (RE.getBaseViewport
+                ? RE.getBaseViewport()
+                : (RE.getUI?.().canvas?.baseViewport ?? 'desktop')) as Viewport,
+
+        // 히스토리
+        canUndo: (): boolean => (RE.canUndo ? RE.canUndo() : true),
+        canRedo: (): boolean => (RE.canRedo ? RE.canRedo() : true),
+        getPast: (): HistoryStack =>  (RE.getPast() ? RE.getPast() : []),
+        getFuture: (): HistoryStack => (RE.getFuture() ? RE.getFuture() : []),
+
+        // 모드(에디터/스타일그래프)
+        editorMode: (): string => (RE.getUI?.().mode ?? 'edit'),
+        /** 스타일 그래프 모드: 'unified' | 'independent' */
+        styleGraphMode: (): 'unified' | 'independent' =>
+            ((RE.getUI?.() as any)?.styleGraphMode ?? 'unified') as 'unified' | 'independent',
+    } as const;
+
+    // ──────────────────────────────────────────────────────────────
+    // Writer (Topbar가 실행하는 액션들만)
+    // ──────────────────────────────────────────────────────────────
+    const writer = {
+        // 페이지
+        selectPage: (pageId: string) =>
+            WE.setCurrentPage ? WE.setCurrentPage(pageId) : (WE.selectPage ? WE.selectPage(pageId) : void 0),
+        addPage: (name?: string) => (WE.addPage ? WE.addPage(name) : void 0),
+        removePage: (id: string) => (WE.removePage ? WE.removePage(id) : void 0),
+        duplicatePage: (id: string) => (WE.duplicatePage ? WE.duplicatePage(id) : void 0),
+        updatePageMeta: (id: string, patch: Partial<Page>) =>
+            (WE.updatePageMeta ? WE.updatePageMeta(id, patch) : void 0),
+
+        // 캔버스/뷰포트
+        setCanvasZoom: (zoom: number) => (WE.setCanvasZoom ? WE.setCanvasZoom(zoom) : void 0),
+        setActiveViewport: (vp: Viewport) =>
+            (WE.setActiveViewport ? WE.setActiveViewport(vp) : void 0),
+        setViewportMode: (vp: Viewport, mode: ViewportMode) =>
+            (WE.setViewportMode ? WE.setViewportMode(vp, mode) : void 0),
+        setCanvasSize: (size: { width: number; height: number }) =>
+            (WE.setCanvasSize ? WE.setCanvasSize(size) : void 0),
+        toggleCanvasOrientation: () =>
+            (WE.toggleCanvasOrientation ? WE.toggleCanvasOrientation() : void 0),
+        setBaseViewport: (vp: Viewport) => (WE.setBaseViewport ? WE.setBaseViewport(vp) : void 0),
+
+        // 히스토리
+        undo: () => (WE.undo ? WE.undo() : void 0),
+        redo: () => (WE.redo ? WE.redo() : void 0),
+
+        // 모드
+        setEditorMode: (mode: string) =>
+            (WE.setEditorMode ? WE.setEditorMode(mode as any) : void 0),
+        setStyleGraphMode: (m: 'unified' | 'independent') => {
+            if ((WE as any).setStyleGraphMode) return (WE as any).setStyleGraphMode(m);
+            if ((WE as any).updateUI) return (WE as any).updateUI({ styleGraphMode: m });
+        },
+
+        // 알림
+        setNotification: (msg: string) => (WE.setNotification ? WE.setNotification(msg) : void 0),
+    } as const;
+
+    return { reader, writer } as const;
 }
 
-export interface TopbarWriter {
-    update(mutator: (draft: EditorState) => void): void;
-    setNotification(message: string): void;
-
-    // Pages
-    setCurrentPage(id: PageId): void;
-    addPage(name?: string): PageId;
-    removePage(id: PageId): void;
-    duplicatePage(id: PageId): PageId;
-    renamePage(id: PageId, name: string): void;
-
-    // Viewport / Canvas / Zoom / Preview
-    setActiveViewport(vp: Viewport): void;
-    setBaseViewport(vp: Viewport): void;               // ★ 추가
-    setViewportMode(vp: Viewport, mode: ViewportMode): void; // ★ 추가
-    toggleViewportMode(vp: Viewport): void;
-    setCanvasSize(size: { width: number; height: number } | number, heightMaybe?: number): void; // ★ 추가
-    setCanvasZoom(zoom: number): void;                  // ★ 추가
-    toggleCanvasOrientation(): void;                    // ★ 추가
-    zoomIn(): void;
-    zoomOut(): void;
-    resetZoom(): void;
-    togglePreview(): void;
-
-    // History
-    undo(): void;
-    redo(): void;
-
-    // 호환 alias
-    selectPage(id: PageId): void; // ★ 기존 코드 호환 (setCurrentPage와 동일)
-
-    // (선택) 파사드 전체 노출
-    pagesFacade?: any;
-    uiFacade?: any;
-}
-
-export function useTopbarController(): { reader: () => TopbarReader; writer: () => TopbarWriter } {
-    const cacheRef = useRef<{ state: any } | null>(null);
-
-    const subscribe = (cb: () => void) =>
-        EditorEngine.subscribe(() => {
-            cacheRef.current = { state: EditorEngine.getState() };
-            cb();
-        });
-
-    const getSnapshot = () => {
-        if (!cacheRef.current) cacheRef.current = { state: EditorEngine.getState() };
-        return cacheRef.current!;
-    };
-
-    const snap = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-
-    // ---------- Reader ----------
-    const R: TopbarReader = {
-        project() { return snap.state.project as Project; },
-        ui() { return snap.state.ui; },
-        data() { return snap.state.data ?? {}; },
-        history() { return snap.state.history ?? {}; },
-
-        pages() {
-            const list = (EditorEngine as any).pages?.list?.() as { id: PageId; name: string }[] | undefined;
-            if (Array.isArray(list)) return list;
-            const pages = (snap.state.project?.pages ?? []) as any[];
-            return pages.map(p => ({ id: p.id, name: p.name ?? p.title ?? p.id }));
-        },
-        currentPageId() {
-            const cur = (EditorEngine as any).pages?.currentId?.();
-            if (cur) return cur as PageId;
-            return snap.state.ui?.currentPageId ?? null;
-        },
-
-        activeViewport() { return snap.state.ui?.canvas?.activeViewport as Viewport; },
-        viewportMode(vp: Viewport) {
-            const m = snap.state.ui?.canvas?.vpMode ?? {};
-            return (m as Record<Viewport, ViewportMode>)[vp];
-        },
-        zoom() { return Number(snap.state.ui?.canvas?.zoom ?? 1); },
-    };
-
-    // ---------- Writer ----------
-    const W: TopbarWriter = {
-        update(mutator) { EditorEngine.update(mutator as any); },
-        setNotification(msg) {
-            (EditorEngine as any).ui?.setNotification?.(msg) ?? console.info('[notification]', msg);
-        },
-
-        // Pages
-        setCurrentPage(id) {
-            const f = (EditorEngine as any).pages?.setCurrent;
-            if (f) return f(id);
-            EditorEngine.update((draft: any) => {
-                draft.ui = draft.ui || {};
-                draft.ui.currentPageId = id;
-            });
-        },
-        selectPage(id) { return this.setCurrentPage(id); }, // ★ alias
-
-        addPage(name) {
-            const f = (EditorEngine as any).pages?.add;
-            if (f) return f(name);
-            let newId = `page_${Date.now()}`;
-            EditorEngine.update((draft: any) => {
-                draft.project = draft.project || {};
-                draft.project.pages = draft.project.pages || [];
-                const p = { id: newId, name: name ?? 'Untitled' };
-                draft.project.pages.push(p);
-                draft.ui = draft.ui || {};
-                draft.ui.currentPageId = p.id;
-            });
-            return newId;
-        },
-        removePage(id) {
-            const f = (EditorEngine as any).pages?.remove;
-            if (f) return f(id);
-            EditorEngine.update((draft: any) => {
-                const arr = draft.project?.pages ?? [];
-                draft.project.pages = arr.filter((p: any) => p.id !== id);
-                if (draft.ui?.currentPageId === id) {
-                    draft.ui.currentPageId = draft.project.pages?.[0]?.id ?? null;
-                }
-            });
-        },
-        duplicatePage(id) {
-            const f = (EditorEngine as any).pages?.duplicate;
-            if (f) return f(id);
-            let newId = `page_${Date.now()}`;
-            EditorEngine.update((draft: any) => {
-                const arr = draft.project?.pages ?? [];
-                const src = arr.find((p: any) => p.id === id);
-                if (!src) return;
-                const copy = { ...src, id: newId, name: `${src.name ?? 'Copy'} copy` };
-                draft.project.pages = [...arr, copy];
-                draft.ui = draft.ui || {};
-                draft.ui.currentPageId = copy.id;
-            });
-            return newId;
-        },
-        renamePage(id, name) {
-            const f = (EditorEngine as any).pages?.rename;
-            if (f) return f(id, name);
-            EditorEngine.update((draft: any) => {
-                const arr = draft.project?.pages ?? [];
-                const p = arr.find((x: any) => x.id === id);
-                if (p) p.name = name;
-            });
-        },
-
-        // Viewport / Canvas / Zoom / Preview
-        setActiveViewport(vp) {
-            const f = (EditorEngine as any).ui?.setActiveViewport;
-            if (f) return f(vp);
-            EditorEngine.update((draft: any) => {
-                draft.ui = draft.ui || {};
-                draft.ui.canvas = draft.ui.canvas || {};
-                draft.ui.canvas.activeViewport = vp;
-            });
-        },
-        setBaseViewport(vp) { // ★ 추가
-            const f = (EditorEngine as any).ui?.setBaseViewport;
-            if (f) return f(vp);
-            EditorEngine.update((draft: any) => {
-                draft.ui = draft.ui || {};
-                draft.ui.canvas = draft.ui.canvas || {};
-                draft.ui.canvas.baseViewport = vp;
-            });
-        },
-        setViewportMode(vp, mode) {
-            const f = (EditorEngine as any).ui?.setViewportMode;
-            if (typeof f === 'function') return f(vp, mode);
-
-            // 폴백: 주어진 mode 문자열을 그대로 저장 (예: 'Unified' | 'Independent')
-            EditorEngine.update((draft: any) => {
-                draft.ui = draft.ui || {};
-                draft.ui.canvas = draft.ui.canvas || {};
-                const m = draft.ui.canvas.vpMode ?? {};
-                draft.ui.canvas.vpMode = { ...m, [vp]: mode };
-            });
-        },
-        toggleViewportMode(vp) {
-            const f = (EditorEngine as any).ui?.toggleViewportMode;
-            if (f) return f(vp);
-            EditorEngine.update((draft: any) => {
-                draft.ui = draft.ui || {};
-                draft.ui.canvas = draft.ui.canvas || {};
-                const m = draft.ui.canvas.vpMode ?? {};
-                const cur = m[vp];
-                draft.ui.canvas.vpMode = { ...m, [vp]: cur === 'preview' ? 'edit' : 'preview' };
-            });
-        },
-        setCanvasSize(sizeOrW, hMaybe) {
-            const f = (EditorEngine as any).ui?.setCanvasSize;
-            if (typeof f === 'function') return f(sizeOrW, hMaybe);
-
-            // 폴백: ui.canvas.width/height 직접 갱신 (기준 소스와 동일)
-            const next =
-                typeof sizeOrW === 'object'
-                    ? { width: Number(sizeOrW.width), height: Number(sizeOrW.height) }
-                    : { width: Number(sizeOrW), height: Number(hMaybe ?? 0) };
-
-            EditorEngine.update((draft: any) => {
-                draft.ui = draft.ui || {};
-                draft.ui.canvas = draft.ui.canvas || {};
-                draft.ui.canvas.width = next.width;
-                draft.ui.canvas.height = next.height;
-            });
-        },
-
-        setCanvasZoom(zoom: number) {
-            const f = (EditorEngine as any).ui?.setCanvasZoom;
-            if (typeof f === 'function') return f(zoom);
-
-            // 폴백: 기준 PageBar와 동일 범위(0.25~4.0)로 클램프
-            const z = Math.max(0.25, Math.min(Number(zoom), 4.0));
-            EditorEngine.update((draft: any) => {
-                draft.ui = draft.ui || {};
-                draft.ui.canvas = draft.ui.canvas || {};
-                draft.ui.canvas.zoom = z;
-            });
-        },
-
-        toggleCanvasOrientation() {
-            const f = (EditorEngine as any).ui?.toggleCanvasOrientation;
-            if (typeof f === 'function') return f();
-
-            // 폴백: width/height 스왑 (기준 소스와 동일)
-            EditorEngine.update((draft: any) => {
-                draft.ui = draft.ui || {};
-                draft.ui.canvas = draft.ui.canvas || {};
-                const c = draft.ui.canvas;
-                const w = Number(c.width ?? 0);
-                const h = Number(c.height ?? 0);
-                if (w && h) {
-                    c.width = h;
-                    c.height = w;
-                } else {
-                    // 사이즈가 비어있으면 기본값이라도 보장
-                    c.width = h || 800;
-                    c.height = w || 1280;
-                }
-            });
-        },
-        zoomIn() {
-            const f = (EditorEngine as any).ui?.zoomIn;
-            if (f) return f();
-            EditorEngine.update((draft: any) => {
-                const cur = Number(draft.ui?.canvas?.zoom ?? 1);
-                draft.ui = draft.ui || {};
-                draft.ui.canvas = draft.ui.canvas || {};
-                draft.ui.canvas.zoom = Math.min(cur * 1.1, 6);
-            });
-        },
-        zoomOut() {
-            const f = (EditorEngine as any).ui?.zoomOut;
-            if (f) return f();
-            EditorEngine.update((draft: any) => {
-                const cur = Number(draft.ui?.canvas?.zoom ?? 1);
-                draft.ui = draft.ui || {};
-                draft.ui.canvas = draft.ui.canvas || {};
-                draft.ui.canvas.zoom = Math.max(cur / 1.1, 0.1);
-            });
-        },
-        resetZoom() {
-            const f = (EditorEngine as any).ui?.resetZoom;
-            if (f) return f();
-            EditorEngine.update((draft: any) => {
-                draft.ui = draft.ui || {};
-                draft.ui.canvas = draft.ui.canvas || {};
-                draft.ui.canvas.zoom = 1;
-            });
-        },
-        togglePreview() {
-            const f = (EditorEngine as any).ui?.togglePreview;
-            if (f) return f();
-            EditorEngine.update((draft: any) => {
-                draft.ui = draft.ui || {};
-                draft.ui.preview = !Boolean(draft.ui.preview);
-            });
-        },
-
-        // History
-        undo() {
-            const f = (EditorEngine as any).history?.undo;
-            if (f) return f();
-            console.info('[history.undo] fallback noop');
-        },
-        redo() {
-            const f = (EditorEngine as any).history?.redo;
-            if (f) return f();
-            console.info('[history.redo] fallback noop');
-        },
-
-        pagesFacade: (EditorEngine as any).pages,
-        uiFacade: (EditorEngine as any).ui,
-    };
-
-    return { reader: () => R, writer: () => W };
-}
+export default useTopbarController;
