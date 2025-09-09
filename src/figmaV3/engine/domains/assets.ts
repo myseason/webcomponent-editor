@@ -1,42 +1,28 @@
-'use client';
 import { EditorEngineCore } from '../EditorEngineCore';
+import type { Asset } from '../../core/types';
+import { genId } from '../../store/utils';
+import { selectAssets } from '../../store/slices/dataSlice';
 
 export function assetsDomain() {
     const R = {
-        getAssets() { return (EditorEngineCore.getState().project as any)?.assets ?? []; },
-        getGlobalCss() { return (EditorEngineCore.getState().project as any)?.globalCss ?? ''; },
-        getGlobalJs() { return (EditorEngineCore.getState().project as any)?.globalJs ?? ''; },
+        getAssets: (): Asset[] => selectAssets(EditorEngineCore.getState()),
+        getGlobalCss: (): string => EditorEngineCore.getState().project.globalCss ?? '',
+        getGlobalJs: (): string => EditorEngineCore.getState().project.globalJs ?? '',
     };
     const W = {
-        addAsset(asset: Omit<any,'id'>) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.addAsset) return s.addAsset(asset);
-            EditorEngineCore.updatePatch(({ get, patchProject }) => {
-                const prev = get();
-                const id = `asset_${Math.random().toString(36).slice(2,9)}`;
-                const assets = Array.isArray((prev.project as any).assets) ? [ ...(prev.project as any).assets ] : [];
-                assets.push({ id, ...asset }); patchProject({ assets } as any);
-            });
+        addAsset(asset: Omit<Asset, 'id'>): string {
+            const newId = genId('asset');
+            const newAsset = { ...asset, id: newId };
+            const currentAssets = R.getAssets();
+            EditorEngineCore.store.getState()._setAssets([...currentAssets, newAsset]);
+            return newId;
         },
         removeAsset(id: string) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.removeAsset) return s.removeAsset(id);
-            EditorEngineCore.updatePatch(({ get, patchProject }) => {
-                const prev = get();
-                const assets = ((prev.project as any).assets ?? []).filter((a: any) => a.id !== id);
-                patchProject({ assets } as any);
-            });
+            const currentAssets = R.getAssets();
+            EditorEngineCore.store.getState()._setAssets(currentAssets.filter(a => a.id !== id));
         },
-        updateGlobalCss(css: string) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.updateGlobalCss) return s.updateGlobalCss(css);
-            EditorEngineCore.updatePatch(({ patchProject }) => patchProject({ globalCss: css } as any));
-        },
-        updateGlobalJs(js: string) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.updateGlobalJs) return s.updateGlobalJs(js);
-            EditorEngineCore.updatePatch(({ patchProject }) => patchProject({ globalJs: js } as any));
-        },
+        updateGlobalCss: (css: string) => EditorEngineCore.store.getState()._setGlobalCss(css),
+        updateGlobalJs: (js: string) => EditorEngineCore.store.getState()._setGlobalJs(js),
     };
     return { reader: R, writer: W } as const;
 }

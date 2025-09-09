@@ -1,67 +1,113 @@
-'use client';
-import type { Page } from '../../core/types';
+import type { Page, Node } from '../../core/types';
 import { EditorEngineCore } from '../EditorEngineCore';
+import { selectPages, selectPageById, selectCurrentRootId } from '../../store/slices/pageSlice';
+import { buildNodeWithDefaults, genId, collectSubtreeIds, cloneSubtree } from '../../store/utils';
 
 export function pagesDomain() {
     const R = {
-        getPages(): Page[] { return EditorEngineCore.getState().project?.pages ?? []; },
-        getCurrentPage(): Page | null {
-            const ui = EditorEngineCore.getState().ui;
-            const id = ui?.panels?.left?.lastActivePageId ?? null;
-            return (EditorEngineCore.getState().project?.pages ?? []).find(p => p.id === id) ?? null;
+        /** 모든 페이지 목록을 가져옵니다. */
+        getPages: (): Page[] => selectPages(EditorEngineCore.getState()),
+        /** ID로 특정 페이지를 가져옵니다. */
+        getPageById: (id: string): Page | undefined => selectPageById(id)(EditorEngineCore.getState()),
+        /** 현재 활성화된 페이지를 가져옵니다. */
+        getCurrentPage: (): Page | null => {
+            const state = EditorEngineCore.getState();
+            const rootId = selectCurrentRootId(state);
+            return state.project.pages.find(p => p.rootId === rootId) ?? null;
         },
     };
+
     const W = {
-        setCurrentPage(pageId: string) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.selectPage) return s.selectPage(pageId);
-            const ui = EditorEngineCore.getState().ui;
-            EditorEngineCore.updatePatch(({ patchUI }) => {
-                patchUI({ panels: { ...ui.panels, left: { ...ui.panels.left, lastActivePageId: pageId } } } as any);
-            });
+        /** 특정 페이지를 활성화합니다. */
+        selectPage(pageId: string) {
+            const state = EditorEngineCore.store.getState();
+            const page = R.getPageById(pageId);
+            if (!page) return;
+
+            // 여러 slice setter들을 조합하여 유스케이스 실행
+            state._setRootId(page.rootId);
+            state._setSelectedId(page.rootId);
+            state._setLastActivePageId(pageId);
         },
-        addPage(name?: string) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.addPage) return s.addPage(name);
-            EditorEngineCore.updatePatch(({ get, patchProject }) => {
-                const prev = get();
-                const id = `page_${Math.random().toString(36).slice(2, 9)}`;
-                const pages = [...(prev.project.pages ?? []), { id, name: name ?? 'Untitled', rootId: prev.project.rootId } as Page];
-                patchProject({ pages });
-            });
+
+        /** 새 페이지를 추가하고 해당 페이지로 전환합니다. */
+        addPage(name?: string): string {
+            const state = EditorEngineCore.store.getState();
+            const pageId = genId('page');
+            const rootId = genId('node');
+
+            const newPage: Page = { id: pageId, name: name ?? `Page ${state.project.pages.length + 1}`, rootId };
+            const rootNode = buildNodeWithDefaults('box', rootId);
+
+            // 여러 slice setter들을 조합
+            state._setPages([...state.project.pages, newPage]);
+            state._patchNode(rootId, rootNode); // patchNode를 사용하여 추가
+            W.selectPage(pageId); // 방금 만든 페이지로 전환
+
+            return pageId;
         },
+
+        /** 페이지와 관련된 모든 노드를 삭제합니다. */
         removePage(pageId: string) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.removePage) return s.removePage(pageId);
-            EditorEngineCore.updatePatch(({ get, patchProject, patchUI }) => {
-                const prev = get();
-                const pages = (prev.project.pages ?? []).filter(p => p.id !== pageId);
-                patchProject({ pages });
-                const panels = prev.ui.panels;
-                if (panels.left.lastActivePageId === pageId) {
-                    patchUI({ panels: { ...panels, left: { ...panels.left, lastActivePageId: pages[0]?.id ?? null } } } as any);
+            const state = EditorEngineCore.store.getState();
+            if (state.project.pages.length <= 1) return; // 마지막 페이지는 삭제 불가
+
+            const pageToRemove = R.getPageById(pageId);
+            if (!pageToRemove) return;
+
+            // 여러 상태를 하나의 트랜잭션으로 변경
+            state.update(s => {
+                const idsToDelete = collectSubtreeIds(s.project.nodes, pageToRemove.rootId);
+                idsToDelete.forEach(id => delete s.project.nodes[id]);
+
+                s.project.pages = s.project.pages.filter(p => p.id !== pageId);
+
+                if (s.project.rootId === pageToRemove.rootId) {
+                    const firstPage = s.project.pages[0];
+                    if (firstPage) {
+                        s.project.rootId = firstPage.rootId;
+                        s.ui.selectedId = firstPage.rootId;
+                        s.ui.panels.left.lastActivePageId = firstPage.id;
+                    }
                 }
-            });
+            }, true);
         },
-        duplicatePage(pageId: string) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.duplicatePage) return s.duplicatePage(pageId);
-            EditorEngineCore.updatePatch(({ get, patchProject }) => {
-                const prev = get();
-                const src = (prev.project.pages ?? []).find(p => p.id === pageId);
-                if (!src) return;
-                const id = `page_${Math.random().toString(36).slice(2, 9)}`;
-                const pages = [...(prev.project.pages ?? []), { ...src, id, name: `${src.name} copy` }];
-                patchProject({ pages });
-            });
+
+        /** 페이지와 관련 노드 트리를 복제합니다. */
+        duplicatePage(pageId: string): string | undefined {
+            let newPageId: string | undefined;
+            const state = EditorEngineCore.store.getState();
+
+            state.update(s => {
+                const originalPage = s.project.pages.find(p => p.id === pageId);
+                if (!originalPage) return;
+
+                const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, originalPage.rootId);
+
+                const newPage: Page = {
+                    id: genId('page'),
+                    name: `${originalPage.name} Copy`,
+                    description: originalPage.description,
+                    slug: originalPage.slug ? `${originalPage.slug}-copy` : undefined,
+                    rootId: newRootId,
+                };
+                newPageId = newPage.id;
+
+                s.project.nodes = { ...s.project.nodes, ...clonedNodes };
+                s.project.pages.push(newPage);
+            }, true);
+            return newPageId;
         },
-        updatePageMeta(pageId: string, patch: Partial<Page>) {
-            EditorEngineCore.updatePatch(({ get, patchProject }) => {
-                const prev = get();
-                const pages = (prev.project.pages ?? []).map(p => p.id === pageId ? { ...p, ...patch } : p);
-                patchProject({ pages });
-            });
-        },
+
+        /** 페이지의 메타데이터(이름, 설명 등)를 업데이트합니다. */
+        updatePageMeta(pageId: string, patch: Partial<Omit<Page, 'id' | 'rootId'>>) {
+            const state = EditorEngineCore.store.getState();
+            const newPages = state.project.pages.map(p =>
+                p.id === pageId ? { ...p, ...patch } : p
+            );
+            state._setPages(newPages);
+        }
     };
+
     return { reader: R, writer: W } as const;
 }

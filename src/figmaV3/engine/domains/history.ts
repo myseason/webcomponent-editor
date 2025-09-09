@@ -1,57 +1,51 @@
-'use client';
-
 import { EditorEngineCore } from '../EditorEngineCore';
-import type { EditorStoreState } from '../../store/types';
-
-/** 히스토리 스택의 표준 타입: 상태 스냅샷 배열(읽기 전용) */
-export type HistoryStack = ReadonlyArray<EditorStoreState>;
+import { selectCanUndo, selectCanRedo, selectHistory } from '../../store/slices/historySlice';
 
 export function historyDomain() {
-    const reader = {
-        /** 실행 취소 가능 여부 */
-        canUndo: (): boolean => {
-            const s = EditorEngineCore.getState();
-            const past = (s as any).history?.past;
-            return Array.isArray(past) && past.length > 0;
-        },
-
-        /** 다시 실행 가능 여부 */
-        canRedo: (): boolean => {
-            const s = EditorEngineCore.getState();
-            const future = (s as any).history?.future;
-            return Array.isArray(future) && future.length > 0;
-        },
-
-        /** ✅ 과거 스택 조회 (읽기 전용) */
-        getPast: (): HistoryStack => {
-            const s = EditorEngineCore.getState();
-            const past = (s as any).history?.past ?? [];
-            return past as HistoryStack;
-        },
-
-        /** ✅ 미래 스택 조회 (읽기 전용) */
-        getFuture: (): HistoryStack => {
-            const s = EditorEngineCore.getState();
-            const future = (s as any).history?.future ?? [];
-            return future as HistoryStack;
-        },
+    const R = {
+        canUndo: (): boolean => selectCanUndo(EditorEngineCore.getState()),
+        canRedo: (): boolean => selectCanRedo(EditorEngineCore.getState()),
     };
 
-    const writer = {
-        /** 실행 취소 */
+    const W = {
         undo: () => {
-            const s = EditorEngineCore.getState() as any;
-            if (typeof s.undo === 'function') return s.undo();
-            console.warn('[historyDomain] undo fallback no-op');
-        },
+            const state = EditorEngineCore.store.getState();
+            if (!R.canUndo()) return;
 
-        /** 다시 실행 */
+            const { past, future } = selectHistory(state);
+            const previousProject = past[past.length - 1]!;
+            const newPast = past.slice(0, past.length - 1);
+
+            // 히스토리 스택 변경과 프로젝트 상태 복원을 하나의 트랜잭션으로 묶음
+            state.update(s => {
+                s.history.past = newPast;
+                s.history.future = [s.project, ...future];
+                s.project = previousProject;
+                // 선택된 노드가 사라졌을 경우 루트를 선택
+                if (!s.project.nodes[s.ui.selectedId ?? '']) {
+                    s.ui.selectedId = s.project.rootId;
+                }
+            });
+        },
         redo: () => {
-            const s = EditorEngineCore.getState() as any;
-            if (typeof s.redo === 'function') return s.redo();
-            console.warn('[historyDomain] redo fallback no-op');
+            const state = EditorEngineCore.store.getState();
+            if (!R.canRedo()) return;
+
+            const { past, future } = selectHistory(state);
+            const nextProject = future[0]!;
+            const newFuture = future.slice(1);
+
+            state.update(s => {
+                s.history.past = [...past, s.project];
+                s.history.future = newFuture;
+                s.project = nextProject;
+                // 선택된 노드가 사라졌을 경우 루트를 선택
+                if (!s.project.nodes[s.ui.selectedId ?? '']) {
+                    s.ui.selectedId = s.project.rootId;
+                }
+            });
         },
     };
 
-    return { reader, writer } as const;
+    return { reader: R, writer: W } as const;
 }

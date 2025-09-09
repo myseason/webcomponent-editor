@@ -5,7 +5,7 @@ import { pagesDomain } from './domains/pages';
 import { nodesDomain } from './domains/nodes';
 import { uiDomain } from './domains/ui';
 
-import { componentsDomain } from './domains/components';
+import { fragmentsDomain } from './domains/fragments';
 import { assetsDomain } from './domains/assets';
 import { stylesheetsDomain } from './domains/stylesheets';
 import { dataDomain } from './domains/data';
@@ -20,7 +20,7 @@ export enum EngineDomain {
     Pages = 'pages',
     Nodes = 'nodes',
     UI = 'ui',
-    Components = 'components',
+    Fragment = 'fragment',
     Assets = 'assets',
     Stylesheets = 'stylesheets',
     Data = 'data',
@@ -55,7 +55,7 @@ function getDomainPack(domain: EngineDomain): DomainPack {
         case EngineDomain.UI: return uiDomain();
 
         // optional
-        case EngineDomain.Components: return componentsDomain();
+        case EngineDomain.Fragment: return fragmentsDomain();
         case EngineDomain.Assets: return assetsDomain();
         case EngineDomain.Stylesheets: return stylesheetsDomain();
         case EngineDomain.Data: return dataDomain();

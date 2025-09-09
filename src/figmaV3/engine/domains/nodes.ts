@@ -1,131 +1,113 @@
-'use client';
-import type { Node, NodeId, CSSDict } from '../../core/types';
+import type { Node, NodeId, CSSDict, Viewport, EditorState } from '../../core/types';
 import { EditorEngineCore } from '../EditorEngineCore';
+import { selectNodes, selectNodeById } from '../../store/slices/nodeSlice';
+import { genId, buildNodeWithDefaults, chooseValidParentId, findParentId, collectSubtreeIds, cloneSubtree } from '../../store/utils';
+import {getDefinition} from "@/figmaV3/core/registry";
 
 export function nodesDomain() {
     const R = {
-        getNode(id: NodeId | null | undefined): Node | null {
+        getNodesMap: (): Record<NodeId, Node> => selectNodes(EditorEngineCore.getState()),
+        getNode: (id: NodeId | null | undefined): Node | null => {
             if (!id) return null;
-            return EditorEngineCore.getState().project?.nodes?.[id] ?? null;
+            return selectNodeById(id)(EditorEngineCore.getState()) ?? null;
         },
-        getNodes(ids?: NodeId[] | null): Node[] {
-            const map = EditorEngineCore.getState().project?.nodes ?? {};
-            return Array.isArray(ids) ? ids.map(id => map[id]).filter(Boolean) as Node[] : [];
+        getCurrentNode: (): Node | null => {
+            const state = EditorEngineCore.getState();
+            return state.ui.selectedId ? R.getNode(state.ui.selectedId) : null;
         },
-        getCurrentNode(): Node | null {
-            const id = EditorEngineCore.getState().ui?.selectedId ?? null;
-            return R.getNode(id);
-        },
-        getRootNodeId: (): NodeId | null => {
-            return EditorEngineCore.getState().project?.rootId ?? null;
-        },
-        getRootNode: (): Node | null => {
-            const rootId = R.getRootNodeId();
-            return rootId ? R.getNode(rootId) : null;
-        },
+        getRootNodeId: (): NodeId | null => EditorEngineCore.getState().project.rootId,
     };
 
     const W = {
-        setCurrentNode(id: NodeId | null) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.select) return s.select(id);
-            EditorEngineCore.updatePatch(({ patchUI, get }) => patchUI({ ...get().ui, selectedId: id } as any));
+        addNodeByDef(defId: string, parentId?: NodeId, index?: number): NodeId {
+            const newId = genId(`node_${defId}`);
+            EditorEngineCore.store.getState().update((s: EditorState) => {
+                const newNode = buildNodeWithDefaults(defId, newId);
+                s.project.nodes[newId] = newNode;
+                const desiredParentId = parentId ?? s.ui.selectedId ?? s.project.rootId;
+                const finalParentId = chooseValidParentId(s.project, desiredParentId);
+                const parentNode = s.project.nodes[finalParentId]!;
+                if (!parentNode.children) parentNode.children = [];
+                const finalIndex = Math.max(0, Math.min(index ?? parentNode.children.length, parentNode.children.length));
+                parentNode.children.splice(finalIndex, 0, newId);
+                s.ui.selectedId = newId;
+            }, true);
+            return newId;
         },
-        setNodeVisibility(id: NodeId, visible: boolean) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.setNodeVisibility) return s.setNodeVisibility(id, visible);
-            const n = R.getNode(id); if (!n) return;
-            const next = { ...n, isVisible: visible };
-            EditorEngineCore.updatePatch(({ get, patchProject }) => {
-                const prev = get(); patchProject({ nodes: { ...prev.project.nodes, [id]: next } });
-            });
-        },
-        setNodeLocked(id: NodeId, locked: boolean) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.setNodeLocked) return s.setNodeLocked(id, locked);
-            const n = R.getNode(id); if (!n) return;
-            const next = { ...n, locked };
-            EditorEngineCore.updatePatch(({ get, patchProject }) => {
-                const prev = get(); patchProject({ nodes: { ...prev.project.nodes, [id]: next } });
-            });
-        },
-        moveNode(nodeId: NodeId, newParentId: NodeId, newIndex = 0) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.moveNode) return s.moveNode(nodeId, newParentId, newIndex);
-            EditorEngineCore.updatePatch(({ get, patchProject }) => {
-                const prev = get();
-                const nodes = { ...prev.project.nodes };
-                const node = nodes[nodeId];
-                const parent = nodes[newParentId];
-                if (!node || !parent) return;
-                // 모든 부모에서 제거
-                Object.keys(nodes).forEach((k) => {
-                    const nk = nodes[k];
-                    if (Array.isArray(nk.children) && nk.children.includes(nodeId)) {
-                        nodes[k] = { ...nk, children: nk.children.filter((cid: string) => cid !== nodeId) };
-                    }
-                });
-                const kids = Array.isArray(parent.children) ? [...parent.children] : [];
-                const idx = Math.max(0, Math.min(newIndex ?? kids.length, kids.length));
-                kids.splice(idx, 0, nodeId);
-                nodes[newParentId] = { ...parent, children: kids };
-                patchProject({ nodes });
-            });
-        },
-        removeNode(nodeId: NodeId) {
-            const n = R.getNode(nodeId); if (!n) return;
-            EditorEngineCore.updatePatch(({ get, patchProject }) => {
-                const prev = get();
-                const nodes = { ...prev.project.nodes };
-                // 부모들에서 분리
-                Object.keys(nodes).forEach((k) => {
-                    const nk = nodes[k];
-                    if (Array.isArray(nk.children) && nk.children.includes(nodeId)) {
-                        nodes[k] = { ...nk, children: nk.children.filter((cid: string) => cid !== nodeId) };
-                    }
-                });
-                delete nodes[nodeId];
-                patchProject({ nodes });
-            });
+        moveNode(nodeId: NodeId, newParentId: NodeId, newIndex: number) {
+            const state = EditorEngineCore.store.getState();
+            if (nodeId === state.project.rootId) return;
+
+            const oldParentId = findParentId(state.project.nodes, nodeId);
+
+            state.update((s: EditorState) => {
+                if (oldParentId) {
+                    const oldParent = s.project.nodes[oldParentId]!;
+                    oldParent.children = (oldParent.children ?? []).filter(id => id !== nodeId);
+                }
+
+                const newParent = s.project.nodes[newParentId]!;
+                if (!newParent.children) newParent.children = [];
+                const finalIndex = Math.max(0, Math.min(newIndex, newParent.children.length));
+                newParent.children.splice(finalIndex, 0, nodeId);
+            }, true);
         },
         removeNodeCascade(nodeId: NodeId) {
-            EditorEngineCore.updatePatch(({ get, patchProject }) => {
-                const prev = get();
-                const nodes = { ...prev.project.nodes };
-                const detach = (id: NodeId) => {
-                    Object.keys(nodes).forEach((k) => {
-                        const nk = nodes[k];
-                        if (Array.isArray(nk.children) && nk.children.includes(id)) {
-                            nodes[k] = { ...nk, children: nk.children.filter((cid: string) => cid !== id) };
-                        }
-                    });
-                };
-                const removeDeep = (id: NodeId) => {
-                    const n = nodes[id]; if (!n) return;
-                    if (Array.isArray(n.children)) n.children.forEach(removeDeep);
-                    delete nodes[id];
-                };
-                detach(nodeId); removeDeep(nodeId);
-                patchProject({ nodes });
-            });
+            EditorEngineCore.store.getState().update((s: EditorState) => {
+                if (nodeId === s.project.rootId) return;
+                const parentId = findParentId(s.project.nodes, nodeId);
+                if (parentId) {
+                    const parent = s.project.nodes[parentId]!;
+                    parent.children = (parent.children ?? []).filter(id => id !== nodeId);
+                }
+                const idsToDelete = collectSubtreeIds(s.project.nodes, nodeId);
+                idsToDelete.forEach(id => delete s.project.nodes[id]);
+                if (s.ui.selectedId && idsToDelete.includes(s.ui.selectedId)) {
+                    s.ui.selectedId = parentId ?? s.project.rootId;
+                }
+            }, true);
         },
-        updateNodeProps(nodeId: NodeId, props: Record<string, unknown>) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.updateNodeProps) return s.updateNodeProps(nodeId, props);
-            const n = R.getNode(nodeId); if (!n) return;
-            const next = { ...n, props: { ...n.props, ...props } };
-            EditorEngineCore.updatePatch(({ get, patchProject }) => {
-                const prev = get(); patchProject({ nodes: { ...prev.project.nodes, [nodeId]: next } });
-            });
+        saveNodeAsComponent(nodeId: NodeId, name: string, description: string, isPublic: boolean) {
+            EditorEngineCore.store.getState().update((s: EditorState) => {
+                const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, nodeId);
+                const newFragment = { id: genId('comp'), name, description, rootId: newRootId, isPublic };
+                s.project.nodes = { ...s.project.nodes, ...clonedNodes };
+                s.project.fragments.push(newFragment);
+            }, true);
         },
-        updateNodeStyles(nodeId: NodeId, styles: CSSDict) {
-            const s = EditorEngineCore.getState() as any;
-            if (s.updateNodeStyles) return s.updateNodeStyles(nodeId, styles);
-            const n = R.getNode(nodeId); if (!n) return;
-            const next = { ...n, styles: { ...n.styles, ...(styles as any) } };
-            EditorEngineCore.updatePatch(({ get, patchProject }) => {
-                const prev = get(); patchProject({ nodes: { ...prev.project.nodes, [nodeId]: next } });
-            });
+        insertComponent(fragmentId: string, parentId?: NodeId) {
+            EditorEngineCore.store.getState().update((s: EditorState) => {
+                const fragment = s.project.fragments.find(f => f.id === fragmentId);
+                if (!fragment) return;
+                const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, fragment.rootId);
+                s.project.nodes = { ...s.project.nodes, ...clonedNodes };
+                const desiredParentId = parentId ?? s.ui.selectedId ?? s.project.rootId;
+                const finalParentId = chooseValidParentId(s.project, desiredParentId);
+                const parentNode = s.project.nodes[finalParentId]!;
+                if (!parentNode.children) parentNode.children = [];
+                parentNode.children.push(newRootId);
+                s.ui.selectedId = newRootId;
+            }, true);
+        },
+        updateNodeProps: (id: NodeId, props: Record<string, unknown>) => EditorEngineCore.store.getState()._updateNodeProps(id, props),
+        updateNodeStyles: (id: NodeId, styles: CSSDict, viewport?: Viewport) => EditorEngineCore.store.getState()._updateNodeStyles(id, styles, viewport),
+        toggleNodeVisibility: (nodeId: NodeId) => EditorEngineCore.store.getState()._patchNode(nodeId, { isVisible: !R.getNode(nodeId)?.isVisible }),
+        toggleNodeLock: (nodeId: NodeId) => EditorEngineCore.store.getState()._patchNode(nodeId, { locked: !R.getNode(nodeId)?.locked }),
+        hydrateDefaults() {
+            EditorEngineCore.store.getState().update(s => {
+                for (const id in s.project.nodes) {
+                    const node = s.project.nodes[id]!;
+                    const def = getDefinition(node.componentId);
+                    if (!def) continue;
+                    const defProps = def.defaults?.props ?? {};
+                    const nextProps = { ...defProps, ...(node.props ?? {}) };
+                    const element = node.styles?.element ?? {};
+                    const defBase = def.defaults?.styles?.element?.base ?? {};
+                    const curBase = (element as any).base ?? {};
+                    const nextElement = { ...element, base: { ...defBase, ...curBase } };
+                    s.project.nodes[id] = { ...node, props: nextProps, styles: { ...node.styles, element: nextElement } };
+                }
+            }, true);
         },
     };
 

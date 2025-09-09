@@ -1,5 +1,3 @@
-// src/figmaV3/store/types.ts
-
 import type {
     EditorState, Project, NodeId, Node, FlowEdge, CSSDict, Viewport,
     ViewportMode, EditorMode, ProjectHubTab, Asset, Page, Fragment, ComponentPolicy
@@ -8,73 +6,55 @@ import type {
 // --- Slice Action Types ---
 
 export interface DataSlice {
-    addAsset: (asset: Omit<Asset, 'id'>) => string;
-    removeAsset: (assetId: string) => void;
-    updateGlobalCss: (css: string) => void;
-    updateGlobalJs: (js: string) => void;
-    addFlowEdge: (edge: FlowEdge) => void;
-    updateFlowEdge: (edgeId: string, patch: Partial<FlowEdge>) => void;
-    removeFlowEdge: (edgeId: string) => void;
-    getEffectiveDecl: (nodeId: string) => CSSDict | null;
-    setData: (path: string, value: unknown) => void;
-    setSetting: (key: string, value: unknown) => void;
-    updateComponentPolicy: (componentId: string, patch: Partial<ComponentPolicy>) => void;
+    _setAssets: (assets: Asset[]) => void;
+    _setGlobalCss: (css: string) => void;
+    _setGlobalJs: (js: string) => void;
+    _setFlowEdges: (edges: Record<string, FlowEdge>) => void;
+    _setData: (data: Record<string, unknown>) => void;
+    _setComponentPolicy: (componentId: string, policy: ComponentPolicy) => void;
 }
 
 export interface FragmentSlice {
-    openFragment: (fragmentId?: string) => void;
-    closeFragment: (fragmentId?: string) => void;
-    addFragment: (name?: string) => string;
-    removeFragment: (fragmentId: string) => void;
-    updateFragment: (fragmentId: string, patch: Partial<Omit<Fragment, 'id' | 'rootId'>>) => void;
-    publishComponent: () => void;
+    _setFragments: (fragments: Fragment[]) => void;
+    _setOverlays: (overlays: string[]) => void;
 }
 
 export interface HistorySlice {
-    undo: () => void;
-    redo: () => void;
+    _setHistory: (history: { past: Project[]; future: Project[] }) => void;
 }
 
 export interface NodeSlice {
-    addByDef: (defId: string, parentId?: NodeId) => NodeId;
-    addByDefAt: (defId: string, parentId: NodeId, index: number) => void;
-    patchNode: (id: NodeId, patch: Partial<Node>) => void;
-    updateNodeProps: (id: NodeId, props: Record<string, unknown>) => void;
-    updateNodeStyles: (id: NodeId, styles: CSSDict, viewport?: Viewport) => void;
-    moveNode: (nodeId: NodeId, newParentId: NodeId, newIndex: number) => void;
-    removeNodeCascade: (nodeId: NodeId) => void;
-    toggleNodeVisibility: (nodeId: NodeId) => void;
-    toggleNodeLock: (nodeId: NodeId) => void;
-    saveNodeAsComponent: (nodeId: NodeId, name: string, description: string, isPublic: boolean) => void;
-    insertComponent: (fragmentId: string, parentId?: NodeId) => void;
-    hydrateDefaults: () => void;
+    _setNodes: (nodes: Record<NodeId, Node>) => void;
+    _patchNode: (id: NodeId, patch: Partial<Node>) => void;
+    _updateNodeProps: (id: NodeId, props: Record<string, unknown>) => void;
+    _updateNodeStyles: (id: NodeId, styles: CSSDict, viewport?: Viewport) => void;
+    _setNodeChildren: (id: NodeId, children: NodeId[]) => void;
 }
 
 export interface PageSlice {
-    selectPage: (pageId: string) => void;
-    addPage: (name?: string) => string;
-    removePage: (pageId: string) => void;
-    duplicatePage: (pageId: string) => void;
+    _setPages: (pages: Page[]) => void;
+    _setRootId: (rootId: NodeId) => void;
 }
 
 export interface UiSlice {
-    select: (id: NodeId | null) => void;
-    setEditorMode: (mode: EditorMode) => void;
-    setCanvasSize: (size: { width: number, height: number }) => void;
-    setCanvasZoom: (zoom: number) => void;
-    toggleCanvasOrientation: () => void;
-    toggleBottomDock: () => void;
-    setActiveViewport: (viewport: Viewport) => void;
-    setBaseViewport: (viewport: Viewport) => void;
-    setViewportMode: (viewport: Viewport, mode: ViewportMode) => void;
-    setActiveHubTab: (tab: ProjectHubTab) => void;
-    openComponentEditor: (fragmentId: string) => void;
-    closeComponentEditor: () => void;
-    setNotification: (message: string) => void;
-    toggleLeftPanelSplit: () => void;
-    setLeftPanelSplitPercentage: (percentage: number) => void;
+    _setSelectedId: (id: NodeId | null) => void;
+    _setEditorMode: (mode: EditorMode) => void;
+    _setExpertMode: (expertMode: boolean) => void;
+    _setCanvasSize: (size: { width: number; height: number }) => void;
+    _setCanvasZoom: (zoom: number) => void;
+    _setCanvasOrientation: (orientation: 'portrait' | 'landscape') => void;
+    _toggleBottomDock: () => void;
+    _setActiveViewport: (viewport: Viewport) => void;
+    _setBaseViewport: (viewport: Viewport) => void;
+    _setViewportMode: (viewport: Viewport, mode: ViewportMode) => void;
+    _setActiveHubTab: (tab: ProjectHubTab) => void;
+    _setEditingFragmentId: (fragmentId: string | null) => void;
+    _setNotification: (message: string | null) => void;
+    _toggleLeftPanelSplit: () => void;
+    _setLeftPanelSplitPercentage: (percentage: number) => void;
+    _setLastActivePageId: (pageId: string | null) => void;
+    _setLastActiveFragmentId: (fragmentId: string | null) => void;
 }
-
 
 // --- Main Store Type ---
 export type EditorStoreState = EditorState &
