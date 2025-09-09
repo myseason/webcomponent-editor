@@ -20,3 +20,10 @@ figmaV3/
       RightControllerFactory.ts
       TopControllerFactory.ts
       BottomControllerFactory.ts
+
+핵심 역할 요약
+	•	EditorStore: 상태 원천(Zustand/Redux 등). “데이터베이스”.
+	•	EditorCore: Store를 감싸 계약/권한/Undo·Redo/Validation 제공(시스템 안정성).
+	•	Ports: Core가 UI/외부에 제공하는 도메인별 인터페이스(Port).
+	•	Domain Service: 유즈케이스 구현(여러 Port 조합, 규칙/정합성 보장).
+	•	Controller(Factory): UI 전용 얇은 표면. Service/Port를 받아 makeSmartController로 필요한 함수만 노출.
