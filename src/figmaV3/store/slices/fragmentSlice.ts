@@ -1,5 +1,3 @@
-// src/figmaV3/store/slices/fragmentSlice.ts
-
 import { StateCreator } from 'zustand';
 import { EditorStoreState, FragmentSlice } from '../types';
 

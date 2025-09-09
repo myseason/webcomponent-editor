@@ -1,5 +1,3 @@
-// src/figmaV3/store/slices/pageSlice.ts
-
 import { StateCreator } from 'zustand';
 import { EditorStoreState, PageSlice } from '../types';
 

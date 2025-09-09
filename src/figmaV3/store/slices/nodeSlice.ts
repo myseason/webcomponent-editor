@@ -1,5 +1,3 @@
-// src/figmaV3/store/slices/nodeSlice.ts
-
 import { StateCreator } from 'zustand';
 import { EditorStoreState, NodeSlice } from '../types';
 import { Node, NodeId, CSSDict, Viewport } from '../../core/types';

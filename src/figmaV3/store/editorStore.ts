@@ -7,6 +7,7 @@ import { createHistorySlice } from './slices/historySlice';
 import { createNodeSlice } from './slices/nodeSlice';
 import { createPageSlice } from './slices/pageSlice';
 import { createUiSlice } from './slices/uiSlice';
+import {createBaseSlice} from "@/figmaV3/store/slices/baseSlice";
 
 const initialProject: Project = {
     pages: [{ id: 'page_home', name: 'Home', rootId: 'node_root_home', slug: '/' }],
@@ -102,6 +103,7 @@ export const editorStore: StoreApi<EditorStoreState> = createStore<EditorStoreSt
         ...initialState,
         update,
         // 각 슬라이스 생성 함수에 set, get, api 세 인자를 모두 전달합니다.
+        ...createBaseSlice(set, get, api),
         ...createDataSlice(set, get, api),
         ...createFragmentSlice(set, get, api),
         ...createHistorySlice(set, get, api),

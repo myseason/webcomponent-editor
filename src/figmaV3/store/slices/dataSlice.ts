@@ -1,5 +1,3 @@
-// src/figmaV3/store/slices/dataSlice.ts
-
 import { StateCreator } from 'zustand';
 import { EditorStoreState, DataSlice } from '../types';
 import { deepMerge } from '../../runtime/deepMerge';

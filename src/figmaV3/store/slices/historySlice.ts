@@ -1,5 +1,3 @@
-// src/figmaV3/store/slices/historySlice.ts
-
 import { StateCreator } from 'zustand';
 import { EditorStoreState, HistorySlice } from '../types';
 import { Project } from '../../core/types';

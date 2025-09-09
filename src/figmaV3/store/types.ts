@@ -4,6 +4,9 @@ import type {
 } from '../core/types';
 
 // --- Slice Action Types ---
+export interface BaseSlice {
+    _hydrateDefaults: () => void;
+}
 
 export interface DataSlice {
     _setAssets: (assets: Asset[]) => void;
@@ -58,6 +61,7 @@ export interface UiSlice {
 
 // --- Main Store Type ---
 export type EditorStoreState = EditorState &
+    BaseSlice &
     DataSlice &
     FragmentSlice &
     HistorySlice &
