@@ -1,0 +1,22 @@
+figmaV3/
+  store/
+    EditorStore.ts                // 상태 원천
+  core/
+    EditorCore.ts                 // Store 위 안전한 계약·트랜잭션·권한·히스토리
+    ports/                        // 헥사고날 포트
+      PagesPort.ts
+      NodesPort.ts
+      ...
+  services/
+    pages/
+      PagesService.ts             // 도메인 서비스(유즈케이스)
+    nodes/
+      NodesService.ts
+    ...
+  controllers/
+    makeSmartController.ts        // (이미 사용중) Expose Builder
+    factories/
+      LeftControllerFactory.ts    // UI별 Factory (Left/Right/Top/Bottom)
+      RightControllerFactory.ts
+      TopControllerFactory.ts
+      BottomControllerFactory.ts
