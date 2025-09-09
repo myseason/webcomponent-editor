@@ -266,7 +266,7 @@ export const StylePolicyService = {
 
 예시: Left(이미 사용중인 패턴 유지)
 	•	useLeftPanelController(domains: LeftDomain[])
-	•	reader 공통: getProject/getUi/getNodeById/getNode/isAdmin
+	•	reader 공통: getProject/getUI/getNodeById/getNode/isAdmin
 	•	writer 공통: update(mutator), setNotification()
 	•	도메인별 read/write를 얕게 머지(충돌가드 유지)
 
