@@ -15,7 +15,7 @@
 import React from 'react';
 import { useEditor } from '../useEditor';
 import type {Fragment, NodeId} from '../../core/types';
-import { editorStore } from '../../store/editStore';
+import { editorStore } from '../../store/editorStore';
 import { getRenderer } from '../../core/registry';
 
 function RenderNode({ id }: { id: NodeId }) {

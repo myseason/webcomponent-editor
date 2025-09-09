@@ -1,4 +1,4 @@
-import { EditorEngineCore } from '../EditorEngineCore';
+import { EditorCore } from '../EditorCore';
 import type { ActionStep, EditorState, NodeId, SupportedEvent } from '../../core/types';
 
 type ActionsBag = Partial<Record<SupportedEvent, { steps: ActionStep[] }>>;
@@ -7,7 +7,7 @@ export function actionsDomain() {
     const R = {
         /** 특정 노드의 특정 이벤트에 대한 액션 스텝 목록을 가져옵니다. */
         getActionSteps(nodeId: NodeId, event: SupportedEvent): ReadonlyArray<ActionStep> {
-            const node = EditorEngineCore.getState().project.nodes[nodeId];
+            const node = EditorCore.getState().project.nodes[nodeId];
             if (!node) return [];
             const bag = (node.props as Record<string, any>).__actions as ActionsBag | undefined;
             return bag?.[event]?.steps ?? [];
@@ -17,9 +17,9 @@ export function actionsDomain() {
     const W = {
         /** 특정 노드의 이벤트에 대한 액션 스텝 목록 전체를 설정합니다. */
         setActionSteps(nodeId: NodeId, event: SupportedEvent, steps: ActionStep[]) {
-            EditorEngineCore.store.getState()._updateNodeProps(nodeId, {
+            EditorCore.store.getState()._updateNodeProps(nodeId, {
                 __actions: {
-                    ...((EditorEngineCore.store.getState().project.nodes[nodeId]?.props as any)?.__actions ?? {}),
+                    ...((EditorCore.store.getState().project.nodes[nodeId]?.props as any)?.__actions ?? {}),
                     [event]: { steps },
                 },
             });

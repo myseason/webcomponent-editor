@@ -1,27 +1,27 @@
 import type { Node, NodeId, CSSDict, Viewport, EditorState } from '../../core/types';
-import { EditorEngineCore } from '../EditorEngineCore';
+import { EditorCore } from '../EditorCore';
 import { selectNodes, selectNodeById } from '../../store/slices/nodeSlice';
 import { genId, buildNodeWithDefaults, chooseValidParentId, findParentId, collectSubtreeIds, cloneSubtree } from '../../store/utils';
 import {getDefinition} from "@/figmaV3/core/registry";
 
 export function nodesDomain() {
     const R = {
-        getNodesMap: (): Record<NodeId, Node> => selectNodes(EditorEngineCore.getState()),
+        getNodesMap: (): Record<NodeId, Node> => selectNodes(EditorCore.getState()),
         getNode: (id: NodeId | null | undefined): Node | null => {
             if (!id) return null;
-            return selectNodeById(id)(EditorEngineCore.getState()) ?? null;
+            return selectNodeById(id)(EditorCore.getState()) ?? null;
         },
         getCurrentNode: (): Node | null => {
-            const state = EditorEngineCore.getState();
+            const state = EditorCore.getState();
             return state.ui.selectedId ? R.getNode(state.ui.selectedId) : null;
         },
-        getRootNodeId: (): NodeId | null => EditorEngineCore.getState().project.rootId,
+        getRootNodeId: (): NodeId | null => EditorCore.getState().project.rootId,
     };
 
     const W = {
         addNodeByDef(defId: string, parentId?: NodeId, index?: number): NodeId {
             const newId = genId(`node_${defId}`);
-            EditorEngineCore.store.getState().update((s: EditorState) => {
+            EditorCore.store.getState().update((s: EditorState) => {
                 const newNode = buildNodeWithDefaults(defId, newId);
                 s.project.nodes[newId] = newNode;
                 const desiredParentId = parentId ?? s.ui.selectedId ?? s.project.rootId;
@@ -35,7 +35,7 @@ export function nodesDomain() {
             return newId;
         },
         moveNode(nodeId: NodeId, newParentId: NodeId, newIndex: number) {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             if (nodeId === state.project.rootId) return;
 
             const oldParentId = findParentId(state.project.nodes, nodeId);
@@ -53,7 +53,7 @@ export function nodesDomain() {
             }, true);
         },
         removeNodeCascade(nodeId: NodeId) {
-            EditorEngineCore.store.getState().update((s: EditorState) => {
+            EditorCore.store.getState().update((s: EditorState) => {
                 if (nodeId === s.project.rootId) return;
                 const parentId = findParentId(s.project.nodes, nodeId);
                 if (parentId) {
@@ -68,7 +68,7 @@ export function nodesDomain() {
             }, true);
         },
         saveNodeAsComponent(nodeId: NodeId, name: string, description: string, isPublic: boolean) {
-            EditorEngineCore.store.getState().update((s: EditorState) => {
+            EditorCore.store.getState().update((s: EditorState) => {
                 const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, nodeId);
                 const newFragment = { id: genId('comp'), name, description, rootId: newRootId, isPublic };
                 s.project.nodes = { ...s.project.nodes, ...clonedNodes };
@@ -76,7 +76,7 @@ export function nodesDomain() {
             }, true);
         },
         insertComponent(fragmentId: string, parentId?: NodeId) {
-            EditorEngineCore.store.getState().update((s: EditorState) => {
+            EditorCore.store.getState().update((s: EditorState) => {
                 const fragment = s.project.fragments.find(f => f.id === fragmentId);
                 if (!fragment) return;
                 const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, fragment.rootId);
@@ -89,12 +89,12 @@ export function nodesDomain() {
                 s.ui.selectedId = newRootId;
             }, true);
         },
-        updateNodeProps: (id: NodeId, props: Record<string, unknown>) => EditorEngineCore.store.getState()._updateNodeProps(id, props),
-        updateNodeStyles: (id: NodeId, styles: CSSDict, viewport?: Viewport) => EditorEngineCore.store.getState()._updateNodeStyles(id, styles, viewport),
-        toggleNodeVisibility: (nodeId: NodeId) => EditorEngineCore.store.getState()._patchNode(nodeId, { isVisible: !R.getNode(nodeId)?.isVisible }),
-        toggleNodeLock: (nodeId: NodeId) => EditorEngineCore.store.getState()._patchNode(nodeId, { locked: !R.getNode(nodeId)?.locked }),
+        updateNodeProps: (id: NodeId, props: Record<string, unknown>) => EditorCore.store.getState()._updateNodeProps(id, props),
+        updateNodeStyles: (id: NodeId, styles: CSSDict, viewport?: Viewport) => EditorCore.store.getState()._updateNodeStyles(id, styles, viewport),
+        toggleNodeVisibility: (nodeId: NodeId) => EditorCore.store.getState()._patchNode(nodeId, { isVisible: !R.getNode(nodeId)?.isVisible }),
+        toggleNodeLock: (nodeId: NodeId) => EditorCore.store.getState()._patchNode(nodeId, { locked: !R.getNode(nodeId)?.locked }),
         hydrateDefaults() {
-            EditorEngineCore.store.getState().update(s => {
+            EditorCore.store.getState().update(s => {
                 for (const id in s.project.nodes) {
                     const node = s.project.nodes[id]!;
                     const def = getDefinition(node.componentId);

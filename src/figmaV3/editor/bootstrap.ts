@@ -1,7 +1,7 @@
 'use client';
 
 import './components/registerBasics';
-import { editorStore } from '../store/editStore';
+import { editorStore } from '../store/editorStore';
 import {
     loadProjectFromLocal,
     loadUiFromLocal,

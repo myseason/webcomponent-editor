@@ -1,4 +1,4 @@
-import { EditorEngineCore } from '../EditorEngineCore';
+import { EditorCore } from '../EditorCore';
 import type { EditorState, CSSDict } from '../../core/types';
 
 export function selectorsDomain() {
@@ -34,12 +34,12 @@ export function selectorsDomain() {
     const R = {
         /** 프로젝트 노드 개요를 가져옵니다. (for Layers panel) */
         getOutline() {
-            return selectOutline(EditorEngineCore.getState());
+            return selectOutline(EditorCore.getState());
         },
 
         /** 특정 노드에 적용된 최종 스타일을 가져옵니다. (for Inspector) */
         getEffectiveDecl(nodeId: string) {
-            return selectEffectiveDecl(EditorEngineCore.getState(), nodeId);
+            return selectEffectiveDecl(EditorCore.getState(), nodeId);
         },
     };
 

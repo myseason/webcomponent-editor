@@ -1,17 +1,17 @@
 import type { Page, Node } from '../../core/types';
-import { EditorEngineCore } from '../EditorEngineCore';
+import { EditorCore } from '../EditorCore';
 import { selectPages, selectPageById, selectCurrentRootId } from '../../store/slices/pageSlice';
 import { buildNodeWithDefaults, genId, collectSubtreeIds, cloneSubtree } from '../../store/utils';
 
 export function pagesDomain() {
     const R = {
         /** 모든 페이지 목록을 가져옵니다. */
-        getPages: (): Page[] => selectPages(EditorEngineCore.getState()),
+        getPages: (): Page[] => selectPages(EditorCore.getState()),
         /** ID로 특정 페이지를 가져옵니다. */
-        getPageById: (id: string): Page | undefined => selectPageById(id)(EditorEngineCore.getState()),
+        getPageById: (id: string): Page | undefined => selectPageById(id)(EditorCore.getState()),
         /** 현재 활성화된 페이지를 가져옵니다. */
         getCurrentPage: (): Page | null => {
-            const state = EditorEngineCore.getState();
+            const state = EditorCore.getState();
             const rootId = selectCurrentRootId(state);
             return state.project.pages.find(p => p.rootId === rootId) ?? null;
         },
@@ -20,7 +20,7 @@ export function pagesDomain() {
     const W = {
         /** 특정 페이지를 활성화합니다. */
         selectPage(pageId: string) {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             const page = R.getPageById(pageId);
             if (!page) return;
 
@@ -32,7 +32,7 @@ export function pagesDomain() {
 
         /** 새 페이지를 추가하고 해당 페이지로 전환합니다. */
         addPage(name?: string): string {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             const pageId = genId('page');
             const rootId = genId('node');
 
@@ -49,7 +49,7 @@ export function pagesDomain() {
 
         /** 페이지와 관련된 모든 노드를 삭제합니다. */
         removePage(pageId: string) {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             if (state.project.pages.length <= 1) return; // 마지막 페이지는 삭제 불가
 
             const pageToRemove = R.getPageById(pageId);
@@ -76,7 +76,7 @@ export function pagesDomain() {
         /** 페이지와 관련 노드 트리를 복제합니다. */
         duplicatePage(pageId: string): string | undefined {
             let newPageId: string | undefined;
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
 
             state.update(s => {
                 const originalPage = s.project.pages.find(p => p.id === pageId);
@@ -101,7 +101,7 @@ export function pagesDomain() {
 
         /** 페이지의 메타데이터(이름, 설명 등)를 업데이트합니다. */
         updatePageMeta(pageId: string, patch: Partial<Omit<Page, 'id' | 'rootId'>>) {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             const newPages = state.project.pages.map(p =>
                 p.id === pageId ? { ...p, ...patch } : p
             );

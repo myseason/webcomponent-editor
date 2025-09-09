@@ -1,12 +1,12 @@
 import type { FlowEdge } from '../../core/types';
-import { EditorEngineCore } from '../EditorEngineCore';
+import { EditorCore } from '../EditorCore';
 import { selectFlowEdges } from '../../store/slices/dataSlice';
 import { genId } from '../../store/utils';
 
 export function flowDomain() {
     const R = {
         /** 모든 플로우 엣지 맵을 가져옵니다. */
-        getFlowEdges: (): Record<string, FlowEdge> => selectFlowEdges(EditorEngineCore.getState()),
+        getFlowEdges: (): Record<string, FlowEdge> => selectFlowEdges(EditorCore.getState()),
     };
 
     const W = {
@@ -15,7 +15,7 @@ export function flowDomain() {
             const id = genId('edge');
             const currentEdges = R.getFlowEdges();
             const newEdges = { ...currentEdges, [id]: { ...edge, id } };
-            EditorEngineCore.store.getState()._setFlowEdges(newEdges);
+            EditorCore.store.getState()._setFlowEdges(newEdges);
             return id;
         },
         /** 플로우 엣지를 업데이트합니다. */
@@ -23,13 +23,13 @@ export function flowDomain() {
             const currentEdges = R.getFlowEdges();
             if (!currentEdges[edgeId]) return;
             const newEdges = { ...currentEdges, [edgeId]: { ...currentEdges[edgeId]!, ...patch } };
-            EditorEngineCore.store.getState()._setFlowEdges(newEdges);
+            EditorCore.store.getState()._setFlowEdges(newEdges);
         },
         /** 플로우 엣지를 제거합니다. */
         removeFlowEdge(edgeId: string) {
             const currentEdges = R.getFlowEdges();
             const { [edgeId]: _, ...newEdges } = currentEdges;
-            EditorEngineCore.store.getState()._setFlowEdges(newEdges);
+            EditorCore.store.getState()._setFlowEdges(newEdges);
         },
     };
 

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useEngine, EngineDomain } from '../../engine/Engine';
+import { useEditor, EditorDomain } from '../../engine/EditorApi';
 import { useStoreTick } from '../adapters/useStoreTick';
 import { makeSmartController } from '../makeSmartController';
 import { withLog } from '../adapters/aspect';
@@ -19,12 +19,12 @@ export enum LeftDomain {
 
 /** 외부에 노출되는 것은 이 훅 "하나" 뿐입니다. */
 export function useLeftControllerFactory(domain?: LeftDomain): { reader: any; writer: any } {
-    const { reader: RE, writer: WE } = useEngine([
-        EngineDomain.Components,
-        EngineDomain.Assets,
-        EngineDomain.Stylesheets,
-        EngineDomain.Selectors,
-        EngineDomain.History,
+    const { reader: RE, writer: WE } = useEditor([
+        EditorDomain.Fragment,
+        EditorDomain.Assets,
+        EditorDomain.Stylesheets,
+        EditorDomain.Selectors,
+        EditorDomain.History,
     ]);
     useStoreTick();
 

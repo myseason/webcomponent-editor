@@ -2,7 +2,7 @@
 
 import type { NodeId } from '../../core/types';
 import { useMemo } from 'react';
-import { useEngine, EngineDomain } from '../../engine/Engine';
+import { useEditor, EditorDomain } from '../../engine/EditorApi';
 import { useStoreTick } from '../adapters/useStoreTick';
 import { makeSmartController } from '../makeSmartController';
 import { withLog, withCommand } from '../adapters/aspect';
@@ -22,9 +22,9 @@ type RightPanelReaderExtras = {
 
 export function useRightPanelController() {
     // 1) 엔진에서 필요한 도메인만 로드
-    const { reader: RE, writer: WE } = useEngine([
-        EngineDomain.Policy,
-        EngineDomain.Selectors,
+    const { reader: RE, writer: WE } = useEditor([
+        EditorDomain.Policy,
+        EditorDomain.Selectors,
     ]);
     // 2) 스토어 틱 바인딩 (리렌더 트리거)
     useStoreTick();

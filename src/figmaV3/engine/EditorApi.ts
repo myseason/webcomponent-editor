@@ -15,7 +15,7 @@ import { flowDomain } from './domains/flow';
 import { selectorsDomain } from './domains/selectors';
 import { historyDomain } from './domains/history';
 
-export enum EngineDomain {
+export enum EditorDomain {
     Project = 'project',
     Pages = 'pages',
     Nodes = 'nodes',
@@ -36,7 +36,7 @@ export type DomainPack = {
     writer: Record<string, any>;
 };
 
-const BaseEngineDomains = [EngineDomain.Project, EngineDomain.UI, EngineDomain.Pages, EngineDomain.Nodes];
+const BaseEngineDomains = [EditorDomain.Project, EditorDomain.UI, EditorDomain.Pages, EditorDomain.Nodes];
 
 function mergeWithGuard(base: Record<string, any>, ext: Record<string, any>, label: string, side: 'reader'|'writer') {
     for (const k of Object.keys(ext)) {
@@ -46,24 +46,24 @@ function mergeWithGuard(base: Record<string, any>, ext: Record<string, any>, lab
     }
 }
 
-function getDomainPack(domain: EngineDomain): DomainPack {
+function getDomainPack(domain: EditorDomain): DomainPack {
     switch (domain) {
         // based
-        case EngineDomain.Project: return projectDomain();
-        case EngineDomain.Pages: return pagesDomain();
-        case EngineDomain.Nodes: return nodesDomain();
-        case EngineDomain.UI: return uiDomain();
+        case EditorDomain.Project: return projectDomain();
+        case EditorDomain.Pages: return pagesDomain();
+        case EditorDomain.Nodes: return nodesDomain();
+        case EditorDomain.UI: return uiDomain();
 
         // optional
-        case EngineDomain.Fragment: return fragmentsDomain();
-        case EngineDomain.Assets: return assetsDomain();
-        case EngineDomain.Stylesheets: return stylesheetsDomain();
-        case EngineDomain.Data: return dataDomain();
-        case EngineDomain.Actions: return actionsDomain();
-        case EngineDomain.Policy: return policyDomain();
-        case EngineDomain.Flow: return flowDomain();
-        case EngineDomain.Selectors: return selectorsDomain();
-        case EngineDomain.History: return historyDomain();
+        case EditorDomain.Fragment: return fragmentsDomain();
+        case EditorDomain.Assets: return assetsDomain();
+        case EditorDomain.Stylesheets: return stylesheetsDomain();
+        case EditorDomain.Data: return dataDomain();
+        case EditorDomain.Actions: return actionsDomain();
+        case EditorDomain.Policy: return policyDomain();
+        case EditorDomain.Flow: return flowDomain();
+        case EditorDomain.Selectors: return selectorsDomain();
+        case EditorDomain.History: return historyDomain();
         default: throw new Error(`[getDomainPack] unsupported domain: ${domain}`);
     }
 }
@@ -73,7 +73,7 @@ function getDomainPack(domain: EngineDomain): DomainPack {
  * - 인자를 생략하거나 단일/배열로 제공 가능
  * - 항상 Project/Pages/Nodes 포함
  */
-export function useEngine(domains?: EngineDomain | EngineDomain[]) {
+export function useEditor(domains?: EditorDomain | EditorDomain[]) {
     const reader: Record<string, any> = {};
     const writer: Record<string, any> = {};
 

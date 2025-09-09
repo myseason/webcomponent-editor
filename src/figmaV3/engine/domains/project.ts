@@ -1,10 +1,10 @@
 import type { Project, ComponentSchemaOverrides } from '../../core/types';
-import { EditorEngineCore } from '../EditorEngineCore';
+import { EditorCore } from '../EditorCore';
 
 export function projectDomain() {
     const R = {
         /** 전체 프로젝트 객체를 가져옵니다. */
-        getProject: (): Project => EditorEngineCore.getState().project,
+        getProject: (): Project => EditorCore.getState().project,
         /** 프로젝트의 스키마 오버라이드 정보를 가져옵니다. */
         getSchemaOverrides: (): ComponentSchemaOverrides | undefined => R.getProject().schemaOverrides,
     };
@@ -12,7 +12,7 @@ export function projectDomain() {
     const W = {
         /** 프로젝트의 일부 속성을 업데이트합니다. */
         patchProject(patch: Partial<Project>) {
-            EditorEngineCore.store.getState().update(s => {
+            EditorCore.store.getState().update(s => {
                 s.project = { ...s.project, ...patch };
             }, true);
         },

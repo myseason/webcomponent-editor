@@ -1,22 +1,22 @@
 import type { Fragment } from '../../core/types';
-import { EditorEngineCore } from '../EditorEngineCore';
+import { EditorCore } from '../EditorCore';
 import { selectFragments, selectFragmentById, selectOverlays } from '../../store/slices/fragmentSlice';
 import { genId, buildNodeWithDefaults, collectSubtreeIds } from '../../store/utils';
 
 export function fragmentsDomain() {
     const R = {
         /** 모든 프래그먼트 목록을 가져옵니다. */
-        getFragments: (): Fragment[] => selectFragments(EditorEngineCore.getState()),
+        getFragments: (): Fragment[] => selectFragments(EditorCore.getState()),
         /** ID로 특정 프래그먼트를 가져옵니다. */
-        getFragmentById: (id: string): Fragment | undefined => selectFragmentById(id)(EditorEngineCore.getState()),
+        getFragmentById: (id: string): Fragment | undefined => selectFragmentById(id)(EditorCore.getState()),
         /** 현재 열려있는 오버레이(프래그먼트) 목록을 가져옵니다. */
-        getOverlays: (): string[] => selectOverlays(EditorEngineCore.getState()),
+        getOverlays: (): string[] => selectOverlays(EditorCore.getState()),
     };
 
     const W = {
         /** 새 프래그먼트와 그 루트 노드를 함께 생성합니다. */
         addFragment(name?: string): string {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             const newId = genId('comp');
             const rootId = genId('node');
 
@@ -37,7 +37,7 @@ export function fragmentsDomain() {
 
         /** 프래그먼트와 관련된 모든 노드를 재귀적으로 삭제합니다. */
         removeFragment(fragmentId: string) {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             const frag = R.getFragmentById(fragmentId);
             if (!frag) return;
 
@@ -58,7 +58,7 @@ export function fragmentsDomain() {
 
         /** 프래그먼트의 메타데이터(이름, 설명, 공개 여부 등)를 업데이트합니다. */
         updateFragment(fragmentId: string, patch: Partial<Omit<Fragment, 'id' | 'rootId'>>) {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             const newFragments = state.project.fragments.map(f =>
                 f.id === fragmentId ? { ...f, ...patch } : f
             );
@@ -72,7 +72,7 @@ export function fragmentsDomain() {
 
         /** 프래그먼트를 오버레이로 엽니다. */
         openFragment(fragmentId: string) {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             const overlays = R.getOverlays();
             if (!overlays.includes(fragmentId)) {
                 state._setOverlays([...overlays, fragmentId]);
@@ -81,7 +81,7 @@ export function fragmentsDomain() {
 
         /** 프래그먼트 오버레이를 닫습니다. ID가 없으면 최상단 오버레이를 닫습니다. */
         closeFragment(fragmentId?: string) {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             const overlays = R.getOverlays();
             if (overlays.length === 0) return;
             const newOverlays = fragmentId ? overlays.filter(id => id !== fragmentId) : overlays.slice(0, -1);

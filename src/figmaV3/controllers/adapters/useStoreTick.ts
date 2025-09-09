@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useSyncExternalStore } from 'react';
-import { EditorEngineCore } from '../../engine/EditorEngineCore';
+import { EditorCore } from '../../engine/EditorCore';
 
 /**
  * 전역 스토어 변경마다 항상 증가하는 로컬 카운터를 스냅샷으로 사용.
@@ -14,7 +14,7 @@ export function useStoreTick(): number {
     const verRef = useRef(0);
 
     const subscribe = (cb: () => void) =>
-        EditorEngineCore.subscribe(() => {
+        EditorCore.subscribe(() => {
             verRef.current += 1;
             cb();
         });

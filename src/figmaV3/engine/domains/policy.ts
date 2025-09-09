@@ -1,4 +1,4 @@
-import { EditorEngineCore } from '../EditorEngineCore';
+import { EditorCore } from '../EditorCore';
 import type { ComponentPolicy } from '../../core/types';
 import { getDefinition } from '../../core/registry';
 import { GLOBAL_STYLE_POLICY } from '../../policy/globalStylePolicy';
@@ -20,7 +20,7 @@ export function policyDomain() {
          * @param patch - 변경할 정책 내용
          */
         updateComponentPolicy(componentId: string, patch: Partial<ComponentPolicy>) {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             const currentPolicies = state.project.policies?.components ?? {};
             const existingPolicy = currentPolicies[componentId];
             const def = getDefinition(componentId);

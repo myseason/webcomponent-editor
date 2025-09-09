@@ -1,16 +1,16 @@
-import { EditorEngineCore } from '../EditorEngineCore';
+import { EditorCore } from '../EditorCore';
 import { genId } from '../../store/utils';
 import { Stylesheet } from '../../core/types';
 
 export function stylesheetsDomain() {
     const R = {
         /** 프로젝트의 모든 스타일시트 목록을 가져옵니다. */
-        getStylesheets: () => EditorEngineCore.getState().project.stylesheets ?? [],
+        getStylesheets: () => EditorCore.getState().project.stylesheets ?? [],
     };
     const W = {
         /** 스타일시트 목록 전체를 설정합니다. (내부용) */
         _setStylesheets: (stylesheets: Stylesheet[]) => {
-            EditorEngineCore.store.getState().update(s => { s.project.stylesheets = stylesheets; }, true);
+            EditorCore.store.getState().update(s => { s.project.stylesheets = stylesheets; }, true);
         },
 
         /** 새 스타일시트를 추가합니다. */

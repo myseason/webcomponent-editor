@@ -1,16 +1,16 @@
 'use client';
 
-import { useEngine, EngineDomain } from '../../engine/Engine';
+import { useEditor, EditorDomain } from '../../engine/EditorApi';
 import { useStoreTick } from '../adapters/useStoreTick';
 import { makeSmartController } from '../makeSmartController';
 import { withLog } from '../adapters/aspect';
 
 export function useLeftPanelController() {
-    const { reader: RE, writer: WE } = useEngine([
-        EngineDomain.Components,
-        EngineDomain.Assets,
-        EngineDomain.Stylesheets,
-        EngineDomain.Selectors, // ← ✅ 추가 (레이어 트리/검색 등 조회 전용)
+    const { reader: RE, writer: WE } = useEditor([
+        EditorDomain.Fragment,
+        EditorDomain.Assets,
+        EditorDomain.Stylesheets,
+        EditorDomain.Selectors, // ← ✅ 추가 (레이어 트리/검색 등 조회 전용)
     ]);
     useStoreTick();
 

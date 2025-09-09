@@ -1,15 +1,15 @@
-import { EditorEngineCore } from '../EditorEngineCore';
+import { EditorCore } from '../EditorCore';
 import { selectCanUndo, selectCanRedo, selectHistory } from '../../store/slices/historySlice';
 
 export function historyDomain() {
     const R = {
-        canUndo: (): boolean => selectCanUndo(EditorEngineCore.getState()),
-        canRedo: (): boolean => selectCanRedo(EditorEngineCore.getState()),
+        canUndo: (): boolean => selectCanUndo(EditorCore.getState()),
+        canRedo: (): boolean => selectCanRedo(EditorCore.getState()),
     };
 
     const W = {
         undo: () => {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             if (!R.canUndo()) return;
 
             const { past, future } = selectHistory(state);
@@ -28,7 +28,7 @@ export function historyDomain() {
             });
         },
         redo: () => {
-            const state = EditorEngineCore.store.getState();
+            const state = EditorCore.store.getState();
             if (!R.canRedo()) return;
 
             const { past, future } = selectHistory(state);

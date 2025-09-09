@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useEngine, EngineDomain } from '../../engine/Engine';
+import { useEditor, EditorDomain } from '../../engine/EditorApi';
 import { useStoreTick } from '../adapters/useStoreTick';
 import { makeSmartController } from '../makeSmartController';
 import { withLog } from '../adapters/aspect';
@@ -13,10 +13,10 @@ export enum RightDomain {
 
 /** 단 하나의 훅만 노출 */
 export function useRightControllerFactory(domain?: RightDomain): { reader: any; writer: any } {
-    const { reader: RE, writer: WE } = useEngine([
-        EngineDomain.Policy,
-        EngineDomain.Components,
-        EngineDomain.Selectors,
+    const { reader: RE, writer: WE } = useEditor([
+        EditorDomain.Policy,
+        EditorDomain.Fragment,
+        EditorDomain.Selectors,
     ]);
     useStoreTick();
 

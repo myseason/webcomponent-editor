@@ -1,15 +1,15 @@
 'use client';
 
-import {EngineDomain, useEngine} from '../../engine/Engine';
+import {EditorDomain, useEditor} from '../../engine/EditorApi';
 import {useStoreTick} from '../adapters/useStoreTick';
 import {makeSmartController} from '../makeSmartController';
 import {withLog} from '../adapters/aspect';
 
 export function useBottomPanelController() {
-    const { reader: RE, writer: WE } = useEngine([
-        EngineDomain.Flow,
-        EngineDomain.Data,
-        EngineDomain.Actions,
+    const { reader: RE, writer: WE } = useEditor([
+        EditorDomain.Flow,
+        EditorDomain.Data,
+        EditorDomain.Actions,
     ]);
     useStoreTick();
 

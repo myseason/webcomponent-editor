@@ -2,7 +2,7 @@
 
 import type { EditorStoreState } from '../store/types';
 import type { EditorState, EditorUI, Project } from '../core/types';
-import { editorStore as store } from '../store/editStore';
+import { editorStore as store } from '../store/editorStore';
 
 export type Unsubscribe = () => void;
 
@@ -35,7 +35,7 @@ function applyPatchBuffer(buf: PatchBuffer) {
     });
 }
 
-export const EditorEngineCore = {
+export const EditorCore = {
     // 슬라이스 액션 직접 접근이 필요할 때
     store,
     // Store access
