@@ -255,7 +255,7 @@ type Store = {
 - [ ] `runtime/flow.ts` (FlowEdge 매칭/전이)
 
 ### C. Store(Zustand)
-- [ ] `store/editStore.ts` 노드 API + 페이지/프래그먼트 + 플로우 API
+- [ ] `store/EditorStore.ts` 노드 API + 페이지/프래그먼트 + 플로우 API
 - [ ] 루트 가드/페이지 전환/데이터 반영 셀렉터
 
 ### D. Editor UI

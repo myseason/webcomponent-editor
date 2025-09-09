@@ -108,7 +108,7 @@ interface ComponentPolicy {
 interface Preset { id: string; label: string; css: Record<string, string | number>; group: 'typo'|'spacing'|'border'|'effects'|'background'|'layout'; }
 ```
 
-B. store/editStore.ts (추가 액션/셀렉터)
+B. store/EditorStore.ts (추가 액션/셀렉터)
 ```ts
 // UI
 toggleInspectorExpert(): void;

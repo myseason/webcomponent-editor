@@ -47,7 +47,7 @@ src/figmaV3/
     globalStylePolicy.ts                 // 상수(SSOT)
     stylePresets.ts                      // 상수(SSOT)
   store/
-    editStore.ts
+    EditorStore.ts
     slices/
       nodeSlice.ts
       pageSlice.ts

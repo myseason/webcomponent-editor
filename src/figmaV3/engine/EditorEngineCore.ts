@@ -36,6 +36,8 @@ function applyPatchBuffer(buf: PatchBuffer) {
 }
 
 export const EditorEngineCore = {
+    // 슬라이스 액션 직접 접근이 필요할 때
+    store,
     // Store access
     getState(): EditorStoreState {
         return store.getState();
@@ -54,7 +56,4 @@ export const EditorEngineCore = {
         mutator({ get: () => prev, set, patchProject, patchUI });
         applyPatchBuffer(buf);
     },
-
-    // 슬라이스 액션 직접 접근이 필요할 때
-    store,
 } as const;

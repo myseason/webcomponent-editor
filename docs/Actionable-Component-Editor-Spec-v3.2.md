@@ -92,7 +92,7 @@ src/figmaV3/
 
 ### B. Core/Runtime/Store 스캐폴딩
 - [x] **SSOT 타입** 초안 파일 제공 (`core/types.ts`)
-- [x] **Zustand store(얕은 복사)** 스켈레톤 제공 (`store/editStore.ts`)
+- [x] **Zustand store(얕은 복사)** 스켈레톤 제공 (`store/EditorStore.ts`)
 - [x] **binding/actions/flow** 스켈레톤 제공 (`runtime/*`)
 - [ ] Editor UI 골격 (`ComponentEditor`/패널) 생성
 
