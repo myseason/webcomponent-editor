@@ -42,7 +42,7 @@ function getDisplayName(node: Node): string {
 const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
     const { reader, writer } = useLeftPanelController();
     const project = reader.getProject();
-    const ui = reader.getUi();
+    const ui = reader.getUI();
     const node = project.nodes[id];
 
     const { attributes, listeners, setNodeRef: draggableRef, isDragging } = useDraggable({ id, data: { kind: 'layers-node', nodeId: id } });
@@ -116,8 +116,8 @@ const Tree: React.FC<{ id: NodeId; depth: number }> = ({ id, depth }) => {
 export function Layers() {
     const { reader } = useLeftPanelController();
     const project = reader.getProject();
-    const mode = reader.getUi().mode;
-    const editingFragmentId = reader.getUi().editingFragmentId;
+    const mode = reader.getUI().mode;
+    const editingFragmentId = reader.getUI().editingFragmentId;
 
     const rootId =
         mode === 'Component' && editingFragmentId

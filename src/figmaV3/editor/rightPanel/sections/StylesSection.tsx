@@ -30,7 +30,7 @@ export function StylesSection(): JSX.Element {
 
     const { reader, writer } = useRightPanelController();
     const project = reader.getProject();
-    const ui = reader.getUi();
+    const ui = reader.getUI();
     const expert = ui.expertMode;
 
     // 현재 선택 노드 (없으면 루트)

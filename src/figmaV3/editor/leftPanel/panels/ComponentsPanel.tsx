@@ -11,7 +11,7 @@ import { useLeftPanelController } from '../../../controllers/left/LeftPanelContr
 function ComponentEditorCard({ frag }: { frag: Fragment }) {
     const { reader, writer } = useLeftPanelController();
 
-    const ui = reader.getUi();
+    const ui = reader.getUI();
     const [name, setName] = useState(frag.name);
     const [description, setDescription] = useState(frag.description ?? '');
     const isEditing = ui.editingFragmentId === frag.id;
@@ -155,5 +155,5 @@ function PageBuildPanel() {
 
 export function ComponentsPanel() {
     const { reader } = useLeftPanelController();
-    return reader.getUi().mode === 'Component' ? <ComponentDevelopmentPanel /> : <PageBuildPanel />;
+    return reader.getUI().mode === 'Component' ? <ComponentDevelopmentPanel /> : <PageBuildPanel />;
 }

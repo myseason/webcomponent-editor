@@ -62,7 +62,7 @@ function ComponentInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }
 export function Inspector() {
 
     const { reader, writer } = useRightPanelController();
-    const { mode, selectedId, editingFragmentId, expertMode } = reader.getUi();
+    const { mode, selectedId, editingFragmentId, expertMode } = reader.getUI();
     const { rootId, fragments, nodes } = reader.getProject();
 
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);

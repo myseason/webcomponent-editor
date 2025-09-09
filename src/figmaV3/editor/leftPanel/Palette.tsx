@@ -31,7 +31,7 @@ export function Palette({ query = '' }: { query?: string }) {
     );
 
     const onInsertCore = (defId: string) => {
-        const parent = reader.getUi().selectedId ?? project.rootId;
+        const parent = reader.getUI().selectedId ?? project.rootId;
         writer.addByDef(defId, parent);
     };
 

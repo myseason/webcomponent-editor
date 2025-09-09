@@ -12,8 +12,8 @@ export function FragmentsPanel() {
     // 최상위 훅들만 사용
     const { reader, writer } = useBottomPanelController();
 
-    // 호환 접근(getUi/getProject 우선, 구형 시그니처 폴백)
-    const ui = (reader as any).getUi?.() ?? (reader as any).ui?.();
+    // 호환 접근(getUI/getProject 우선, 구형 시그니처 폴백)
+    const ui = (reader as any).getUI?.() ?? (reader as any).ui?.();
     const project = (reader as any).getProject?.() ?? (reader as any).project?.();
     const flowEdges: Record<string, FlowEdge> =
         (reader as any).flowEdges?.() ?? {};

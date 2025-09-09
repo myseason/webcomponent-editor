@@ -7,7 +7,6 @@ import {withLog} from '../adapters/aspect';
 
 export function useBottomPanelController() {
     const { reader: RE, writer: WE } = useEngine([
-        EngineDomain.UI,
         EngineDomain.Flow,
         EngineDomain.Data,
         EngineDomain.Actions,
@@ -28,7 +27,7 @@ export function useBottomPanelController() {
             updateAction: withLog('updateAction'),
             removeAction: withLog('removeAction'),
         }
-    });
+    }).build();
 
     return { reader, writer } as const;
 }

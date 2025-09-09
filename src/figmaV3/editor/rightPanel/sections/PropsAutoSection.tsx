@@ -47,7 +47,7 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
 
     // ✅ 공통 읽기
     const project = reader.getProject();
-    const ui = reader.getUi();
+    const ui = reader.getUI();
 
     // ✅ 쓰기 액션
     const { updateNodeProps, setNotification } = writer as {

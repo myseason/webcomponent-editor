@@ -26,8 +26,8 @@ const TAB_BAR_HEIGHT_REM = '2rem'; // 32px
 export function BottomDock() {
     const { reader, writer } = useBottomPanelController();
 
-    // reader 호환: getUi / getProject 우선 사용, 구형 시그니처(ui()/project()) 폴백
-    const ui = (reader as any).getUi?.() ?? (reader as any).ui?.();
+    // reader 호환: getUI / getProject 우선 사용, 구형 시그니처(ui()/project()) 폴백
+    const ui = (reader as any).getUI?.() ?? (reader as any).ui?.();
     const project = (reader as any).getProject?.() ?? (reader as any).project?.();
 
     // UI 상태 보호 가드

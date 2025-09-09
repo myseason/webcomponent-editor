@@ -15,7 +15,7 @@ type AssetTab = 'Media' | 'Scripts' | 'Styles';
 export function AssetsPanel() {
     const { reader, writer } = useLeftPanelController();
     const project = reader.getProject();
-    const ui = reader.getUi();
+    const ui = reader.getUI();
 
     const expertMode = ui.expertMode;
 

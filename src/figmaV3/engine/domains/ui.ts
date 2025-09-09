@@ -2,7 +2,7 @@
 
 import type { DomainPack } from '../Engine';
 import { EditorEngineCore } from '../EditorEngineCore';
-import type {EditorUI, NodeId, Viewport, ViewportMode} from '../../core/types';
+import type {EditorState, EditorUI, NodeId, Viewport, ViewportMode} from '../../core/types';
 
 /**
  * UI Domain
@@ -11,12 +11,11 @@ import type {EditorUI, NodeId, Viewport, ViewportMode} from '../../core/types';
  */
 export function uiDomain(): DomainPack {
     const getUI = (): EditorUI => EditorEngineCore.getState().ui as EditorUI;
-    const getUi = (): EditorUI => EditorEngineCore.getState().ui as EditorUI;
+    //const getUI = (): EditorUI => EditorEngineCore.getState().ui as EditorUI;
 
     const reader = {
         /** 전체 UI 객체 */
         getUI,
-        getUi, //fallback
         /** 캔버스 파생 값들 */
         zoom: (): number => getUI()?.canvas?.zoom ?? 1,
         activeViewport: (): Viewport => (getUI()?.canvas?.activeViewport ?? 'desktop') as Viewport,
@@ -64,8 +63,8 @@ export function uiDomain(): DomainPack {
             const s = EditorEngineCore.getState() as any;
             if (s.setCanvasSize) return s.setCanvasSize(size);
             const ui = getUI();
-            EditorEngineCore.updatePatch(({ patchUI }) =>
-                patchUI({ canvas: { ...ui.canvas, width: size.width, height: size.height } })
+            EditorEngineCore.updatePatch(({patchUI}) =>
+                patchUI({canvas: {...ui.canvas, width: size.width, height: size.height}})
             );
         },
 
@@ -73,8 +72,8 @@ export function uiDomain(): DomainPack {
             const s = EditorEngineCore.getState() as any;
             if (s.setCanvasZoom) return s.setCanvasZoom(zoom);
             const ui = getUI();
-            EditorEngineCore.updatePatch(({ patchUI }) =>
-                patchUI({ canvas: { ...ui.canvas, zoom } })
+            EditorEngineCore.updatePatch(({patchUI}) =>
+                patchUI({canvas: {...ui.canvas, zoom}})
             );
         },
 
@@ -82,8 +81,8 @@ export function uiDomain(): DomainPack {
             const s = EditorEngineCore.getState() as any;
             if (s.setActiveViewport) return s.setActiveViewport(vp);
             const ui = getUI();
-            EditorEngineCore.updatePatch(({ patchUI }) =>
-                patchUI({ canvas: { ...ui.canvas, activeViewport: vp } })
+            EditorEngineCore.updatePatch(({patchUI}) =>
+                patchUI({canvas: {...ui.canvas, activeViewport: vp}})
             );
         },
 
@@ -91,8 +90,8 @@ export function uiDomain(): DomainPack {
             const s = EditorEngineCore.getState() as any;
             if (s.setBaseViewport) return s.setBaseViewport(vp);
             const ui = getUI();
-            EditorEngineCore.updatePatch(({ patchUI }) =>
-                patchUI({ canvas: { ...ui.canvas, baseViewport: vp } })
+            EditorEngineCore.updatePatch(({patchUI}) =>
+                patchUI({canvas: {...ui.canvas, baseViewport: vp}})
             );
         },
 
@@ -101,8 +100,8 @@ export function uiDomain(): DomainPack {
             if (s.setViewportMode) return s.setViewportMode(vp, mode);
             const ui = getUI();
             const prev = ui.canvas?.vpMode ?? ({} as Record<Viewport, ViewportMode>);
-            EditorEngineCore.updatePatch(({ patchUI }) =>
-                patchUI({ canvas: { ...ui.canvas, vpMode: { ...prev, [vp]: mode } } })
+            EditorEngineCore.updatePatch(({patchUI}) =>
+                patchUI({canvas: {...ui.canvas, vpMode: {...prev, [vp]: mode}}})
             );
         },
 
@@ -112,8 +111,8 @@ export function uiDomain(): DomainPack {
             const ui = getUI();
             const curr = ui.canvas?.orientation ?? 'portrait';
             const next = curr === 'portrait' ? 'landscape' : 'portrait';
-            EditorEngineCore.updatePatch(({ patchUI }) =>
-                patchUI({ canvas: { ...ui.canvas, orientation: next as 'portrait' | 'landscape' } })
+            EditorEngineCore.updatePatch(({patchUI}) =>
+                patchUI({canvas: {...ui.canvas, orientation: next as 'portrait' | 'landscape'}})
             );
         },
 
@@ -121,18 +120,18 @@ export function uiDomain(): DomainPack {
         setEditorMode(mode: EditorUI['mode']) {
             const s = EditorEngineCore.getState() as any;
             if (s.setEditorMode) return s.setEditorMode(mode);
-            EditorEngineCore.updatePatch(({ patchUI }) => patchUI({ mode }));
+            EditorEngineCore.updatePatch(({patchUI}) => patchUI({mode}));
         },
 
         setActiveHubTab(tab: any) {
             const s = EditorEngineCore.getState() as any;
             if (s.setActiveHubTab) return s.setActiveHubTab(tab);
             const ui = getUI();
-            EditorEngineCore.updatePatch(({ patchUI }) =>
+            EditorEngineCore.updatePatch(({patchUI}) =>
                 patchUI({
                     panels: {
                         ...ui.panels,
-                        left: { ...ui.panels.left, activeHubTab: tab },
+                        left: {...ui.panels.left, activeHubTab: tab},
                     } as EditorUI['panels'],
                 })
             );
@@ -144,11 +143,11 @@ export function uiDomain(): DomainPack {
             if (s.toggleLeftPanelSplit) return s.toggleLeftPanelSplit();
             const ui = getUI();
             const curr = !!ui.panels?.left?.isSplit;
-            EditorEngineCore.updatePatch(({ patchUI }) =>
+            EditorEngineCore.updatePatch(({patchUI}) =>
                 patchUI({
                     panels: {
                         ...ui.panels,
-                        left: { ...ui.panels.left, isSplit: !curr },
+                        left: {...ui.panels.left, isSplit: !curr},
                     } as EditorUI['panels'],
                 })
             );
@@ -158,11 +157,11 @@ export function uiDomain(): DomainPack {
             const s = EditorEngineCore.getState() as any;
             if (s.setLeftPanelSplitPercentage) return s.setLeftPanelSplitPercentage(pct);
             const ui = getUI();
-            EditorEngineCore.updatePatch(({ patchUI }) =>
+            EditorEngineCore.updatePatch(({patchUI}) =>
                 patchUI({
                     panels: {
                         ...ui.panels,
-                        left: { ...ui.panels.left, splitPercentage: pct },
+                        left: {...ui.panels.left, splitPercentage: pct},
                     } as EditorUI['panels'],
                 })
             );
@@ -172,17 +171,24 @@ export function uiDomain(): DomainPack {
         setExpertMode(enabled: boolean) {
             const s = EditorEngineCore.getState() as any;
             if (s.setExpertMode) return s.setExpertMode(enabled);
-            EditorEngineCore.updatePatch(({ patchUI }) => patchUI({ expertMode: !!enabled } as any));
+            EditorEngineCore.updatePatch(({patchUI}) => patchUI({expertMode: !!enabled} as any));
         },
 
         toggleExpertMode() {
             const s = EditorEngineCore.getState() as any;
             if (s.toggleExpertMode) return s.toggleExpertMode();
             const curr = !!reader.getExpertMode();
-            EditorEngineCore.updatePatch(({ patchUI }) => patchUI({ expertMode: !curr } as any));
+            EditorEngineCore.updatePatch(({patchUI}) => patchUI({expertMode: !curr} as any));
         },
-    } as const;
-
+        setNotification(message: string) {
+            const state = EditorEngineCore.getState() as any;
+            // 1) slice 액션이 있는 경우(권장)
+            if (typeof state.setNotification === 'function') {
+                state.setNotification(message);
+                return;
+            }
+        }
+    }
     return { reader, writer };
 }
 

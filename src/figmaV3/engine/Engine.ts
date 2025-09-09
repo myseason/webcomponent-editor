@@ -36,20 +36,25 @@ export type DomainPack = {
     writer: Record<string, any>;
 };
 
+const BaseEngineDomains = [EngineDomain.Project, EngineDomain.UI, EngineDomain.Pages, EngineDomain.Nodes];
+
 function mergeWithGuard(base: Record<string, any>, ext: Record<string, any>, label: string, side: 'reader'|'writer') {
     for (const k of Object.keys(ext)) {
-        if (k in base) throw new Error(`[useEngine] ${side} key collision "${k}" from ${label}`);
+        if (k in base)
+            throw new Error(`[useEngine] ${side} key collision ${k} from ${label}`);
         base[k] = ext[k];
     }
 }
 
 function getDomainPack(domain: EngineDomain): DomainPack {
     switch (domain) {
+        // based
         case EngineDomain.Project: return projectDomain();
         case EngineDomain.Pages: return pagesDomain();
         case EngineDomain.Nodes: return nodesDomain();
         case EngineDomain.UI: return uiDomain();
 
+        // optional
         case EngineDomain.Components: return componentsDomain();
         case EngineDomain.Assets: return assetsDomain();
         case EngineDomain.Stylesheets: return stylesheetsDomain();
@@ -73,7 +78,7 @@ export function useEngine(domains?: EngineDomain | EngineDomain[]) {
     const writer: Record<string, any> = {};
 
     // 기본 도메인 병합
-    for (const d of [EngineDomain.Project, EngineDomain.Pages, EngineDomain.Nodes]) {
+    for (const d of BaseEngineDomains) {
         const pack = getDomainPack(d);
         mergeWithGuard(reader, pack.reader, d, 'reader');
         mergeWithGuard(writer, pack.writer, d, 'writer');
@@ -82,7 +87,10 @@ export function useEngine(domains?: EngineDomain | EngineDomain[]) {
     // 선택 도메인 병합
     const list = Array.isArray(domains) ? domains : (domains ? [domains] : []);
     for (const d of list) {
-        if (d === EngineDomain.Project || d === EngineDomain.Pages || d === EngineDomain.Nodes) continue;
+        // BaseEngineDomain skipped
+        if (BaseEngineDomains.includes(d))
+            continue;
+
         const pack = getDomainPack(d);
         mergeWithGuard(reader, pack.reader, d, 'reader');
         mergeWithGuard(writer, pack.writer, d, 'writer');

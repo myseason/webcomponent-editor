@@ -7,9 +7,6 @@ import { withLog } from '../adapters/aspect';
 
 export function useLeftPanelController() {
     const { reader: RE, writer: WE } = useEngine([
-        EngineDomain.UI,
-        EngineDomain.Pages,
-        EngineDomain.Nodes,
         EngineDomain.Components,
         EngineDomain.Assets,
         EngineDomain.Stylesheets,
@@ -34,7 +31,7 @@ export function useLeftPanelController() {
             addAsset: withLog('addAsset'),
             removeAsset: withLog('removeAsset'),
         },
-    });
+    }).build();
 
     return { reader, writer } as const;
 }

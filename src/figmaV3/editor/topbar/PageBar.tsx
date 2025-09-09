@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Viewport, Page, ViewportMode } from '../../core/types';
 import { Monitor, Tablet, Smartphone, RotateCw, Plus, Minus, Undo, Redo, Info } from 'lucide-react';
-import {useTopbarController} from "@/figmaV3/controllers/topbar/TopbarController";
+import { useTopbarControllerFactory, TopbarDomain } from "@/figmaV3/controllers/topbar/TopbarControllerFactory";
 
 const VIEWPORT_SIZES: Record<Viewport, { w: number; h: number }> = {
     base:   { w: 1280, h: 800 },
@@ -20,7 +20,7 @@ const VP_LIST: Viewport[] = ['base', 'tablet', 'mobile'];
 const ZOOM_MIN = 0.25, ZOOM_MAX = 4.0, ZOOM_STEP = 0.25;
 
 export default function PageBar() {
-    const { reader, writer } = useTopbarController();
+    const { reader, writer } = useTopbarControllerFactory(TopbarDomain.Topbar);
 
     const project = reader.getProject();
     const ui = reader.getUI();
@@ -122,7 +122,12 @@ export default function PageBar() {
                             type="radio"
                             name="vp-mode"
                             checked={vpMode[activeViewport] === 'Unified'}
-                            onChange={() => { writer.setViewportMode(activeViewport, 'Unified'); writer.setNotification(`Mode: Unified (${activeViewport})`); }}
+                            onChange={
+                                () => {
+                                    writer.setViewportMode(activeViewport, 'Unified');
+                                    writer.setNotification(`Mode: Unified (${activeViewport})`);
+                                }
+                            }
                         />
                         통합
                     </label>
@@ -131,7 +136,12 @@ export default function PageBar() {
                             type="radio"
                             name="vp-mode"
                             checked={vpMode[activeViewport] === 'Independent'}
-                            onChange={() => { writer.setViewportMode(activeViewport, 'Independent'); writer.setNotification(`Mode: Independent (${activeViewport})`); }}
+                            onChange={
+                                () => {
+                                    writer.setViewportMode(activeViewport, 'Independent');
+                                    writer.setNotification(`Mode: Independent (${activeViewport})`);
+                                }
+                            }
                         />
                         개별
                     </label>
@@ -154,7 +164,12 @@ export default function PageBar() {
                                 name="vp-base"
                                 className="accent-blue-600"
                                 checked={baseViewport === vp}
-                                onChange={() => { writer.setBaseViewport(vp); writer.setNotification(`Base viewport: ${vp}`); }}
+                                onChange={
+                                    () => {
+                                        writer.setBaseViewport(vp);
+                                        writer.setNotification(`Base viewport: ${vp}`);
+                                    }
+                                }
                                 title="Set as Base"
                             />
                         </div>

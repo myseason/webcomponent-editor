@@ -88,7 +88,7 @@ export function PagesPanel() {
         }
     }, [project.rootId, project.pages]);
 
-    const ui = reader.getUi();
+    const ui = reader.getUI();
     if (ui.mode !== 'Page') {
         return <div className="p-4 text-sm text-gray-500">Page management is available in Page Build Mode.</div>;
     }

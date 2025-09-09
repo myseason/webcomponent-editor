@@ -26,8 +26,8 @@ export function FlowsPanel() {
     // 1) 훅은 최상위에서만 호출
     const { reader, writer } = useBottomPanelController();
 
-    // 호환 접근(getUi/getProject 우선, 구형 시그니처 폴백)
-    const ui = (reader as any).getUi?.() ?? (reader as any).ui?.();
+    // 호환 접근(getUI/getProject 우선, 구형 시그니처 폴백)
+    const ui = (reader as any).getUI?.() ?? (reader as any).ui?.();
     const project = (reader as any).getProject?.() ?? (reader as any).project?.();
     const flowEdgesMap: Record<string, FlowEdge> = (reader as any).flowEdges?.() ?? {};
 

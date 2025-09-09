@@ -151,7 +151,7 @@ export function LeftSidebar() {
     const { reader, writer } = useLeftPanelController();
 
     // ── 모드 UI(기존 유지) ────────────────────────────────────────────────
-    const ui = reader.getUi();
+    const ui = reader.getUI();
     const mode = (ui?.mode ?? 'Page') as EditorMode;
 
     const handleModeChange = React.useCallback((newMode: EditorMode) => {

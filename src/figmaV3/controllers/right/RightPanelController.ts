@@ -1,4 +1,3 @@
-// src/figmaV3/controllers/right/RightPanelController.ts
 'use client';
 
 import type { NodeId } from '../../core/types';
@@ -24,12 +23,9 @@ type RightPanelReaderExtras = {
 export function useRightPanelController() {
     // 1) 엔진에서 필요한 도메인만 로드
     const { reader: RE, writer: WE } = useEngine([
-        EngineDomain.UI,
-        EngineDomain.Nodes,
         EngineDomain.Policy,
         EngineDomain.Selectors,
     ]);
-
     // 2) 스토어 틱 바인딩 (리렌더 트리거)
     useStoreTick();
 
@@ -51,7 +47,7 @@ export function useRightPanelController() {
             setNotification: withLog('setNotification'),
             setExpertMode: withLog('setExpertMode'),
         },
-    });
+    }).build();
 
     // 4) 확장 리더(= 엔진 리더 + 인스펙터 전용 헬퍼)
     type EngineReader = typeof RE; // ✅ 엔진이 준 reader의 정확한 타입 보존

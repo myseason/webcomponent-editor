@@ -12,7 +12,7 @@
  *   ]);
  *
  *   const { reader, writer } = makeSmartController('LeftPanelBasic', RE, WE)
- *     .pickReader('getUi', 'getProject')
+ *     .pickReader('getUI', 'getProject')
  *     .pickWriter('addPage', 'removePage')
  *     .build();
  *
@@ -36,7 +36,7 @@
  *       }),
  *     },
  *   })
- *     .pickReader('getProject', 'getUi')
+ *     .pickReader('getProject', 'getUI')
  *     .pickWriter('addPage', 'removePage', 'duplicatePage')
  *     .build();
  *
@@ -126,7 +126,7 @@
  *       moveNode: withCommand('moveNode', mkMoveCmd as any, push),
  *     },
  *   })
- *     .pickReader('getProject', 'getNodeById', 'getUi')
+ *     .pickReader('getProject', 'getNodeById', 'getUI')
  *     .pickWriter('moveNode')
  *     .build();
  *
@@ -140,7 +140,7 @@
  *   const { reader: RE, writer: WE } = useEngine([EngineDomain.UI, EngineDomain.Pages]);
  *
  *   const { reader, writer } = makeSmartController('Topbar', RE, WE)
- *     .pickReader('getUi')               // 최소 조회만
+ *     .pickReader('getUI')               // 최소 조회만
  *     .pickWriter('setEditorMode', 'selectPage') // 조작만 노출
  *     .build();
  *
@@ -161,11 +161,11 @@
  *   // 컨트롤러 내부 helper: 도메인 함수 조합
  *   const helpers = {
  *     getSelectedNode() {
- *       const ui = RE.getUi();
+ *       const ui = RE.getUI();
  *       return ui.selectedId ? RE.getNodeById(ui.selectedId) : null;
  *     },
  *     isExpert() {
- *       return !!RE.getUi()?.expertMode;
+ *       return !!RE.getUI()?.expertMode;
  *     },
  *   };
  *

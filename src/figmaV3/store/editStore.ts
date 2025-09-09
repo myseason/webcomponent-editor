@@ -16,7 +16,14 @@ const initialProject: Project = {
             id: 'node_root_home',
             componentId: 'box',
             props: {},
-            styles: { element: { base: { minHeight: '100%', width: '100%' } } },
+            styles: {
+                element: {
+                    base: {
+                        minHeight: '100%',
+                        width: '100%'
+                    }
+                }
+            },
             children: [],
             locked: false,
             isVisible: true,
@@ -38,18 +45,33 @@ const initialState: EditorState = {
         editingFragmentId: null,
         notification: null,
         canvas: {
-            width: 1280, height: 800, zoom: 1, orientation: 'landscape',
-            activeViewport: 'base', baseViewport: 'base',
+            width: 1280,
+            height: 800,
+            zoom: 1,
+            orientation: 'landscape',
+            activeViewport: 'base',
+            baseViewport: 'base',
+            // @deprecated
             vpMode: { base: 'Unified', tablet: 'Unified', mobile: 'Unified' },
             viewportMode: { base: 'Unified', tablet: 'Unified', mobile: 'Unified' },
         },
         panels: {
             left: {
-                activeHubTab: 'Pages', widthPx: 320, lastActivePageId: null, lastActiveFragmentId: null,
-                isSplit: false, splitPercentage: 50,
+                activeHubTab: 'Pages',
+                widthPx: 320,
+                lastActivePageId: null,
+                lastActiveFragmentId: null,
+                isSplit: false,
+                splitPercentage: 50,
             },
-            right: { widthPx: 320 },
-            bottom: { heightPx: 240, isCollapsed: false, advanced: null },
+            right: {
+                widthPx: 320
+            },
+            bottom: {
+                heightPx: 240,
+                isCollapsed: false,
+                advanced: null
+            },
         },
     },
     data: {},
