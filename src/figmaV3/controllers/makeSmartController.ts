@@ -252,7 +252,13 @@
  *
  */
 
-import {AnyFn} from "./types";
+'use client';
+
+import type { AnyFn } from './types';
+
+/* ========================
+ * Types
+ * ====================== */
 
 export type AspectCtx = {
     ctrlName: string;
@@ -266,88 +272,126 @@ export type Aspect = {
     onError?: (ctx: AspectCtx, args: unknown[], error: unknown) => void;
 };
 
-/**
- * MethodWrapper
- * - aspect.ts의 withLog/withAfter/withCommand 형태( (orig)=>wrapped )를 그대로 허용
- * - 필요 시 meta(ctrlName/method)까지 받고 싶으면 (orig, meta)=>wrapped로 작성 가능
- */
-export type MethodWrapper = (orig: AnyFn, meta?: { ctrlName: string; method: string }) => AnyFn;
+/** 기존 withLog('name')처럼 (orig)=>wrapped 를 지원하기 위한 타입 */
+export type MethodWrapper<F extends AnyFn = AnyFn> = (orig: F) => F;
 
+/** per-method로 적용되는 항목: Aspect 또는 MethodWrapper 둘 다 허용 */
 type WrapEntry = Aspect | MethodWrapper;
-type WrapMap = Record<string, WrapEntry | undefined>;
 
-function createAspectProxy<T extends object>(
+/* 내부: wrap엔트리를 두 갈래로 나눠 관리 */
+type WrapMaps = {
+    methodAspects: Record<string, Aspect | undefined>;
+    methodWrappers: Record<string, MethodWrapper | undefined>;
+};
+
+function splitWrapEntry(entry?: WrapEntry): { aspect?: Aspect; wrapper?: MethodWrapper } {
+    if (!entry) return {};
+    // Aspect signature heuristic: object with any of before/after/onError
+    const maybeAspect = entry as Partial<Aspect>;
+    const looksAspect =
+        typeof entry === 'object' &&
+        (typeof maybeAspect.before === 'function' ||
+            typeof maybeAspect.after === 'function' ||
+            typeof maybeAspect.onError === 'function');
+
+    if (looksAspect) return { aspect: entry as Aspect };
+    if (typeof entry === 'function') return { wrapper: entry as MethodWrapper };
+    return {};
+}
+
+/* ========================
+ * Proxy(Reader/Writer) 생성
+ *  - per-method wrapper -> 먼저 적용
+ *  - aspect(before/after/onError) -> 호출 전/후에 실행
+ *  - globalAspect도 병행 적용
+ * ====================== */
+
+function createHybridProxy<T extends object>(
     bag: T,
     ctrlName: string,
-    perMethod: WrapMap,
+    perMethod: WrapMaps,
     globalAspect?: Aspect
 ): T {
     return new Proxy(bag, {
         get(target, p, receiver) {
             const v = Reflect.get(target, p, receiver) as unknown;
-            if (typeof p !== 'string') return v as any;
-            if (typeof v !== 'function') return v as any;
+            if (typeof p !== 'string') return v as T[Extract<keyof T, symbol>];
+            if (typeof v !== 'function') return v as T[Extract<keyof T, string>];
 
             const methodName = p;
-            const entry = perMethod[methodName];
+            const aspect = perMethod.methodAspects[methodName];
+            const wrapper = perMethod.methodWrappers[methodName];
 
-            // 메서드 래핑 로직
-            const callWrapped = (fn: AnyFn, args: unknown[]) => {
-                const base = { ctrlName, method: methodName } as const;
-                try {
-                    globalAspect?.before?.({ ...base, when: 'before' }, args);
-                    const result = fn.apply(target, args);
-                    globalAspect?.after?.({ ...base, when: 'after' }, args, result);
-                    return result;
-                } catch (err) {
-                    globalAspect?.onError?.({ ...base, when: 'error' }, args, err);
-                    throw err;
-                }
-            };
+            // 1) this 바인딩 유지
+            let fn = (v as Function).bind(target) as AnyFn;
 
-            // ① 함수 래퍼인 경우: 원본을 감싸서 반환
-            if (typeof entry === 'function') {
-                const wrapped = (entry as MethodWrapper)(v as AnyFn, { ctrlName, method: methodName });
-                return (...args: unknown[]) => callWrapped(wrapped, args);
+            // 2) MethodWrapper 먼저 적용 (원본을 감싸서 기능 확장/치환)
+            if (wrapper) {
+                fn = wrapper(fn);
             }
 
-            // ② Aspect 훅인 경우
-            const methodAspect = entry as Aspect | undefined;
+            // 3) Aspect 적용 (before/after/onError)
+            if (!globalAspect && !aspect) {
+                // 아무 부가 처리 없으면 그대로 반환 (최단 경로)
+                return fn as T[Extract<keyof T, string>];
+            }
 
-            return (...args: unknown[]) => {
+            // Aspect가 있으면 래퍼를 한 번 더 씌움
+            return ((...args: unknown[]) => {
                 const base = { ctrlName, method: methodName } as const;
                 try {
                     globalAspect?.before?.({ ...base, when: 'before' }, args);
-                    methodAspect?.before?.({ ...base, when: 'before' }, args);
+                    aspect?.before?.({ ...base, when: 'before' }, args);
 
-                    const result = (v as Function).apply(target, args);
+                    const result = fn(...args);
 
-                    globalAspect?.after?.({ ...base, when: 'after' }, args, result);
-                    methodAspect?.after?.({ ...base, when: 'after' }, args, result);
-
-                    return result;
+                    // 동기/비동기 모두 지원
+                    if (result && typeof (result as any).then === 'function') {
+                        return (result as Promise<unknown>)
+                            .then((res) => {
+                                globalAspect?.after?.({ ...base, when: 'after' }, args, res);
+                                aspect?.after?.({ ...base, when: 'after' }, args, res);
+                                return res;
+                            })
+                            .catch((err) => {
+                                globalAspect?.onError?.({ ...base, when: 'error' }, args, err);
+                                aspect?.onError?.({ ...base, when: 'error' }, args, err);
+                                throw err;
+                            });
+                    } else {
+                        globalAspect?.after?.({ ...base, when: 'after' }, args, result);
+                        aspect?.after?.({ ...base, when: 'after' }, args, result);
+                        return result;
+                    }
                 } catch (err) {
                     globalAspect?.onError?.({ ...base, when: 'error' }, args, err);
-                    methodAspect?.onError?.({ ...base, when: 'error' }, args, err);
+                    aspect?.onError?.({ ...base, when: 'error' }, args, err);
                     throw err;
                 }
-            };
+            }) as T[Extract<keyof T, string>];
         },
     });
 }
 
-/* ──────────────────────────────────────────────
- * Expose Builder (체이닝)
- *  - pickReader / pickWriter : 필요한 키만 남김
- *  - wrapReader / wrapWriter : 특정 메서드 Aspect/Wrapper
- *  - build : Proxy 적용된 { reader, writer } 객체 반환
- * ────────────────────────────────────────────── */
+/* ========================
+ * Expose Builder
+ *  - pickReader / pickWriter: 필요한 키만
+ *  - exposeReaderAll / exposeWriterAll / exposeAll: 전부 노출
+ *  - wrapReader / wrapWriter: per-method에 MethodWrapper/Aspect 부착
+ *  - requireReader / requireWriter: 런타임 검증
+ *  - build: Proxy 적용한 객체 반환
+ * ====================== */
 
 export type ExposeBuilder<R extends object, W extends object> = {
     pickReader: <K extends keyof R>(...keys: K[]) => ExposeBuilder<Pick<R, K>, W>;
     pickWriter: <K extends keyof W>(...keys: K[]) => ExposeBuilder<R, Pick<W, K>>;
-    wrapReader: <K extends keyof R & string>(key: K, entry: Aspect | MethodWrapper) => ExposeBuilder<R, W>;
-    wrapWriter: <K extends keyof W & string>(key: K, entry: Aspect | MethodWrapper) => ExposeBuilder<R, W>;
+    exposeReaderAll: () => ExposeBuilder<R, W>;
+    exposeWriterAll: () => ExposeBuilder<R, W>;
+    exposeAll: () => ExposeBuilder<R, W>;
+    wrapReader: <K extends keyof R & string>(key: K, entry: WrapEntry) => ExposeBuilder<R, W>;
+    wrapWriter: <K extends keyof W & string>(key: K, entry: WrapEntry) => ExposeBuilder<R, W>;
+    requireReader: (...keys: (keyof R & string)[]) => ExposeBuilder<R, W>;
+    requireWriter: (...keys: (keyof W & string)[]) => ExposeBuilder<R, W>;
     build: () => { reader: R; writer: W };
 };
 
@@ -356,31 +400,157 @@ function makeBuilder<R extends object, W extends object>(
     curReader: R,
     curWriter: W,
     globalAspect?: Aspect,
-    readerWraps: WrapMap = {},
-    writerWraps: WrapMap = {}
+    readerWraps: WrapMaps = { methodAspects: {}, methodWrappers: {} },
+    writerWraps: WrapMaps = { methodAspects: {}, methodWrappers: {} },
+    // 원본 전체(전체 노출용)
+    fullReader?: object,
+    fullWriter?: object
 ): ExposeBuilder<R, W> {
     return {
         pickReader: (...keys) => {
             const next: Partial<R> = {};
             for (const k of keys) if (k in curReader) (next as any)[k] = (curReader as any)[k];
-            return makeBuilder(controllerName, next as Pick<R, (typeof keys)[number]>, curWriter, globalAspect, readerWraps, writerWraps) as any;
+            return makeBuilder(
+                controllerName,
+                next as Pick<R, (typeof keys)[number]>,
+                curWriter,
+                globalAspect,
+                readerWraps,
+                writerWraps,
+                fullReader ?? curReader,
+                fullWriter ?? curWriter
+            ) as any;
         },
+
         pickWriter: (...keys) => {
             const next: Partial<W> = {};
             for (const k of keys) if (k in curWriter) (next as any)[k] = (curWriter as any)[k];
-            return makeBuilder(controllerName, curReader, next as Pick<W, (typeof keys)[number]>, globalAspect, readerWraps, writerWraps) as any;
+            return makeBuilder(
+                controllerName,
+                curReader,
+                next as Pick<W, (typeof keys)[number]>,
+                globalAspect,
+                readerWraps,
+                writerWraps,
+                fullReader ?? curReader,
+                fullWriter ?? curWriter
+            ) as any;
         },
+
+        exposeReaderAll: () => {
+            const source = (fullReader ?? curReader) as R;
+            return makeBuilder(
+                controllerName,
+                source,
+                curWriter,
+                globalAspect,
+                readerWraps,
+                writerWraps,
+                source,
+                fullWriter ?? curWriter
+            );
+        },
+
+        exposeWriterAll: () => {
+            const source = (fullWriter ?? curWriter) as W;
+            return makeBuilder(
+                controllerName,
+                curReader,
+                source,
+                globalAspect,
+                readerWraps,
+                writerWraps,
+                fullReader ?? curReader,
+                source
+            );
+        },
+
+        exposeAll: () => {
+            const srcR = (fullReader ?? curReader) as R;
+            const srcW = (fullWriter ?? curWriter) as W;
+            return makeBuilder(
+                controllerName,
+                srcR,
+                srcW,
+                globalAspect,
+                readerWraps,
+                writerWraps,
+                srcR,
+                srcW
+            );
+        },
+
         wrapReader: (key, entry) => {
-            readerWraps[key] = entry;
-            return makeBuilder(controllerName, curReader, curWriter, globalAspect, readerWraps, writerWraps);
+            const { aspect, wrapper } = splitWrapEntry(entry);
+            if (aspect) readerWraps.methodAspects[key] = aspect;
+            if (wrapper) readerWraps.methodWrappers[key] = wrapper;
+            return makeBuilder(
+                controllerName,
+                curReader,
+                curWriter,
+                globalAspect,
+                readerWraps,
+                writerWraps,
+                fullReader ?? curReader,
+                fullWriter ?? curWriter
+            );
         },
+
         wrapWriter: (key, entry) => {
-            writerWraps[key] = entry;
-            return makeBuilder(controllerName, curReader, curWriter, globalAspect, readerWraps, writerWraps);
+            const { aspect, wrapper } = splitWrapEntry(entry);
+            if (aspect) writerWraps.methodAspects[key] = aspect;
+            if (wrapper) writerWraps.methodWrappers[key] = wrapper;
+            return makeBuilder(
+                controllerName,
+                curReader,
+                curWriter,
+                globalAspect,
+                readerWraps,
+                writerWraps,
+                fullReader ?? curReader,
+                fullWriter ?? curWriter
+            );
         },
+
+        requireReader: (...keys) => {
+            for (const k of keys) {
+                if (typeof (curReader as any)[k] !== 'function' && (curReader as any)[k] === undefined) {
+                    throw new Error(`[${controllerName}] reader.${String(k)} is missing. Check useEngine domains or method name.`);
+                }
+            }
+            return makeBuilder(
+                controllerName,
+                curReader,
+                curWriter,
+                globalAspect,
+                readerWraps,
+                writerWraps,
+                fullReader ?? curReader,
+                fullWriter ?? curWriter
+            );
+        },
+
+        requireWriter: (...keys) => {
+            for (const k of keys) {
+                if (typeof (curWriter as any)[k] !== 'function' && (curWriter as any)[k] === undefined) {
+                    throw new Error(`[${controllerName}] writer.${String(k)} is missing. Check useEngine domains or method name.`);
+                }
+            }
+            return makeBuilder(
+                controllerName,
+                curReader,
+                curWriter,
+                globalAspect,
+                readerWraps,
+                writerWraps,
+                fullReader ?? curReader,
+                fullWriter ?? curWriter
+            );
+        },
+
         build: () => {
-            const r = createAspectProxy(curReader, `${controllerName}.reader`, readerWraps, globalAspect);
-            const w = createAspectProxy(curWriter, `${controllerName}.writer`, writerWraps, globalAspect);
+            const r = createHybridProxy(curReader, `${controllerName}.reader`, readerWraps, globalAspect);
+            const w = createHybridProxy(curWriter, `${controllerName}.writer`, writerWraps, globalAspect);
             return { reader: r, writer: w };
         },
     };
@@ -388,24 +558,33 @@ function makeBuilder<R extends object, W extends object>(
 
 /**
  * makeSmartController
- * @param controllerName 컨트롤러 표시명 (로그/디버깅용)
- * @param RE useEngine(...).reader  그대로 전달
- * @param WE useEngine(...).writer  그대로 전달
- * @param opts { aspect, wrap } 전역/개별 메서드 Aspect/Wrapper (선택)
+ * - opts.wrap: { [methodName]: Aspect | MethodWrapper }  ← 둘 다 지원
+ * - opts.aspect: 전역 Aspect(before/after/onError)
  */
 export function makeSmartController<R extends object, W extends object>(
     controllerName: string,
     RE: R,
     WE: W,
-    opts?: { aspect?: Aspect; wrap?: Record<string, Aspect | MethodWrapper> }
+    opts?: { aspect?: Aspect; wrap?: Record<string, WrapEntry> }
 ): ExposeBuilder<R, W> {
-    const readerWraps: WrapMap = {};
-    const writerWraps: WrapMap = {};
+    const readerWraps: WrapMaps = { methodAspects: {}, methodWrappers: {} };
+    const writerWraps: WrapMaps = { methodAspects: {}, methodWrappers: {} };
+
     if (opts?.wrap) {
         for (const k of Object.keys(opts.wrap)) {
-            readerWraps[k] = opts.wrap[k];
-            writerWraps[k] = opts.wrap[k];
+            const entry = opts.wrap[k];
+            const { aspect, wrapper } = splitWrapEntry(entry);
+            if (aspect) {
+                readerWraps.methodAspects[k] = aspect;
+                writerWraps.methodAspects[k] = aspect;
+            }
+            if (wrapper) {
+                readerWraps.methodWrappers[k] = wrapper;
+                writerWraps.methodWrappers[k] = wrapper;
+            }
         }
     }
-    return makeBuilder(controllerName, RE, WE, opts?.aspect, readerWraps, writerWraps);
+
+    // 최초 builder는 RE/WE를 "현재 선택 집합"이자 "전체 집합"으로 등록
+    return makeBuilder(controllerName, RE, WE, opts?.aspect, readerWraps, writerWraps, RE, WE);
 }

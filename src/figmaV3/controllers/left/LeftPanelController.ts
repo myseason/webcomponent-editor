@@ -1,12 +1,12 @@
 'use client';
 
-import { useEditor, EditorDomain } from '../../engine/EditorApi';
+import { useEditorApi, EditorDomain } from '../../engine/EditorApi';
 import { useStoreTick } from '../adapters/useStoreTick';
 import { makeSmartController } from '../makeSmartController';
 import { withLog } from '../adapters/aspect';
 
 export function useLeftPanelController() {
-    const { reader: RE, writer: WE } = useEditor([
+    const { reader: RE, writer: WE } = useEditorApi([
         EditorDomain.Fragment,
         EditorDomain.Assets,
         EditorDomain.Stylesheets,

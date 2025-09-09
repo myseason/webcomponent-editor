@@ -57,6 +57,7 @@ export interface UiSlice {
     _setLeftPanelSplitPercentage: (percentage: number) => void;
     _setLastActivePageId: (pageId: string | null) => void;
     _setLastActiveFragmentId: (fragmentId: string | null) => void;
+    _setLeftWidthPx: (px: number) => void;
 }
 
 // --- Main Store Type ---

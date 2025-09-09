@@ -36,6 +36,7 @@ export const createUiSlice: StateCreator<EditorStoreState, [], [], UiSlice> = (s
     _setLeftPanelSplitPercentage: (percentage) => get().update(s => {
         s.ui.panels.left.splitPercentage = Math.max(20, Math.min(80, percentage));
     }),
+    _setLeftWidthPx: (px: number) => get().update(s => {s.ui.panels.left.widthPx = px; }),
     _setLastActivePageId: (pageId) => get().update(s => { s.ui.panels.left.lastActivePageId = pageId; }),
     _setLastActiveFragmentId: (fragmentId) => get().update(s => { s.ui.panels.left.lastActiveFragmentId = fragmentId; }),
 });

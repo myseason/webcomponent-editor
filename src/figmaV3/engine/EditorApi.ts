@@ -73,7 +73,7 @@ function getDomainPack(domain: EditorDomain): DomainPack {
  * - 인자를 생략하거나 단일/배열로 제공 가능
  * - 항상 Project/Pages/Nodes 포함
  */
-export function useEditor(domains?: EditorDomain | EditorDomain[]) {
+export function useEditorApi(domains?: EditorDomain | EditorDomain[]) {
     const reader: Record<string, any> = {};
     const writer: Record<string, any> = {};
 

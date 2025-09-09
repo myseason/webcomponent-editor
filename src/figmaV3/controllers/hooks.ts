@@ -6,8 +6,8 @@
 // - UI/UX/데이터 흐름 변경 없음
 
 import { useMemo } from 'react';
-import { useEditor } from '../editor/useEditor';
 import type { NodeId } from '../core/types';
+import {useEditorApi} from "@/figmaV3/engine/EditorApi";
 
 export type InspectorVM = {
     target: null | { nodeId: NodeId; componentId: string | null };
@@ -20,12 +20,12 @@ export type InspectorVM = {
  * - UI/UX/마크업 변경 없음
  */
 export function useInspectorViewModel(): InspectorVM {
-    const state = useEditor();
+    const {reader, writer } = useEditorApi();
 
     // 기존 로직: 선택 노드 기준으로 componentId 확인
-    const nodeId: NodeId | null = (state.ui?.selectedId as NodeId | undefined) ?? null;
+    const nodeId: NodeId | null = (reader.getUI()?.selectedId as NodeId | undefined) ?? null;
     const componentId: string | null =
-        nodeId ? ((state.project?.nodes?.[nodeId]?.componentId as string | undefined) ?? null) : null;
+        nodeId ? ((reader.getProject()?.nodes?.[nodeId]?.componentId as string | undefined) ?? null) : null;
 
     return useMemo<InspectorVM>(() => {
         if (!nodeId) return { target: null };

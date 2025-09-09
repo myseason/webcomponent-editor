@@ -72,6 +72,7 @@ export function uiDomain() {
             }
         },
         setLeftPanelSplitPercentage: (percentage: number) => EditorCore.store.getState()._setLeftPanelSplitPercentage(percentage),
+        setLeftWidthPx: (px: number) => EditorCore.store.getState()._setLeftWidthPx(px)
     };
 
     return { reader: R, writer: W } as const;
