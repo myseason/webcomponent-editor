@@ -4,7 +4,7 @@ import React from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import { modeBorderClass } from './common';
-import { useRightPanelController } from '@/figmaV3/controllers/right/RightPanelController';
+import {RightDomain, useRightControllerFactory} from '@/figmaV3/controllers/right/RightControllerFactory';
 
 // 나머지 MiniInputV1, MiniSelectV1 등 기존 export 들은 그대로 두세요.
 // 아래는 SectionShellV1만 교체/갱신한 것입니다.
@@ -30,7 +30,7 @@ type SectionShellV1Props = {
  */
 
 export function SectionShellV1({ title, open, onToggle, children, className }: SectionShellV1Props) {
-    const { reader } = useRightPanelController();
+    const { reader } = useRightControllerFactory(RightDomain.Inspector);
     const R = reader;
 
     const ui = R.getUI();

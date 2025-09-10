@@ -17,7 +17,7 @@ import {
     IconBtnV1,
 } from './styles/layoutV1';
 
-import { useRightPanelController } from '../../../controllers/right/RightPanelController';
+import {RightDomain, useRightControllerFactory} from '../../../controllers/right/RightControllerFactory';
 
 const RESERVED_PROP_KEYS = new Set([
     'as',
@@ -43,7 +43,7 @@ function filterByTagAndDef(defTitle: string, selTag: string, entries: any[]) {
 
 export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     // ✅ Right 패널 컨트롤러 사용
-    const { reader, writer } = useRightPanelController();
+    const { reader, writer } = useRightControllerFactory(RightDomain.Policy);
 
     // ✅ 공통 읽기
     const project = reader.getProject();

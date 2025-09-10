@@ -3,7 +3,7 @@
 import React from 'react';
 import { getDefinition } from '../../../core/registry';
 import type { EditorUI, Project, NodeId, PropSchemaEntry } from '../../../core/types';
-import { useRightPanelController } from '../../../controllers/right/RightPanelController';
+import {RightDomain, useRightControllerFactory} from '../../../controllers/right/RightControllerFactory';
 
 type Row = PropSchemaEntry<Record<string, unknown>>;
 type RowText = Extract<Row, { type: 'text' }>;
@@ -98,7 +98,7 @@ function parseOptionsJson(src: string): RowSelect['options'] | null {
 }
 
 export function SchemaEditor({ nodeId }: { nodeId: NodeId }) {
-    const { reader, writer } = useRightPanelController();
+    const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
 
     // 프로젝트/노드/컴포넌트 정의
     const project = reader.getProject();

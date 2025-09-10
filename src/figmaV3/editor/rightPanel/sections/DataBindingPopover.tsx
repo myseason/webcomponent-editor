@@ -3,8 +3,8 @@
 import React, { useEffect, useRef } from 'react';
 import type { NodeId } from '../../../core/types';
 
-// ✅ 컨트롤러 교체
-import { useRightPanelController } from '../../../controllers/right/RightPanelController';
+import {RightDomain, useRightControllerFactory} from '../../../controllers/right/RightControllerFactory';
+
 
 interface DataBindingPopoverProps {
     nodeId: NodeId;
@@ -15,7 +15,7 @@ interface DataBindingPopoverProps {
 
 export function DataBindingPopover({ nodeId, propKey, anchorEl, onClose }: DataBindingPopoverProps) {
     // ✅ RightPanelController 사용
-    const { reader, writer } = useRightPanelController();
+    const { reader, writer } = useRightControllerFactory(RightDomain.Policy);
     const R = reader;
     const W = writer;
 

@@ -73,7 +73,7 @@ function createLayersController(RE: any, WE: any) {
     });
 
     return ctl
-        .pickReader('getProject', 'getUI', 'getNodeById')
+        .pickReader('getProject', 'getUI', 'getNodeById', 'getNode')
         .pickWriter('select', 'moveNode', 'toggleNodeVisibility', 'toggleNodeLock', 'removeNodeCascade')
         .build();
 }

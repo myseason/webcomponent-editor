@@ -31,8 +31,7 @@ import {
 import { ShadowStack } from './ShadowStack';
 import { FilterStack } from './FilterStack';
 
-// ✅ 변경: RightPanelController 사용
-import { useRightPanelController } from '@/figmaV3/controllers/right/RightPanelController';
+import {RightDomain, useRightControllerFactory} from '@/figmaV3/controllers/right/RightControllerFactory';
 
 /* utils */
 function s(v: unknown): string {
@@ -99,7 +98,7 @@ export function EffectsGroup(props: {
     componentId: string;
 }) {
     // ✅ 컨트롤러 도입 (reader만 사용)
-    const { reader } = useRightPanelController();
+    const { reader } = useRightControllerFactory(RightDomain.Inspector);
     const R = reader;
 
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;

@@ -1,35 +1,14 @@
 'use client';
 
 import React from 'react';
-import type {
-    CSSDict,
-    InspectorFilter,
-    TagPolicy,
-    TagPolicyMap,
-    NodeId,
-} from '../../../../core/types';
+import type {CSSDict, InspectorFilter, NodeId, TagPolicy, TagPolicyMap,} from '../../../../core/types';
 
-import {
-    useAllowed,
-    DisabledHint,
-    type DisallowReason,
-    PermissionLock,
-    reasonForKey,
-    ColorField,
-} from './common';
+import {ColorField, DisabledHint, type DisallowReason, PermissionLock, reasonForKey, useAllowed,} from './common';
 
 // 인스펙터 공통 레이아웃 프리미티브 (라벨 80px + 우측 6그리드)
-import {
-    SectionShellV1,
-    RowV1,
-    RowLeftV1,
-    RowRightGridV1,
-    MiniInputV1,
-    MiniSelectV1,
-} from './layoutV1';
+import {MiniInputV1, MiniSelectV1, RowLeftV1, RowRightGridV1, RowV1, SectionShellV1,} from './layoutV1';
 
-// ✅ 컨트롤러 교체
-import { useRightPanelController } from '@/figmaV3/controllers/right/RightPanelController';
+import {RightDomain, useRightControllerFactory} from '@/figmaV3/controllers/right/RightControllerFactory';
 
 // 안전 문자열 헬퍼
 function s(v: unknown): string {
@@ -58,7 +37,7 @@ export function BackgroundGroup(props: {
     componentId: string;
 }) {
     // ✅ RightPanelController 사용
-    const { reader } = useRightPanelController();
+    const { reader } = useRightControllerFactory(RightDomain.Inspector);
     const R = reader;
 
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;

@@ -6,7 +6,7 @@ import type { Fragment } from '../../core/types';
 import { Trash2 } from 'lucide-react';
 
 // ✅ 도메인 인자 제거
-import { useLeftPanelController } from '../../controllers/left/LeftPanelController';
+import {LeftDomain, useLeftControllerFactory} from '../../controllers/left/LeftControllerFactory';
 
 function itemMatch(title: string, id: string, q: string): boolean {
     const qq = q.trim().toLowerCase();
@@ -16,7 +16,7 @@ function itemMatch(title: string, id: string, q: string): boolean {
 
 export function Palette({ query = '' }: { query?: string }) {
     // ✅ 인자 없이 컨트롤러 사용
-    const { reader, writer } = useLeftPanelController();
+    const { reader, writer } = useLeftControllerFactory(LeftDomain.Palette);
 
     const project = reader.getProject();
     const coreDefs = listDefinitions().filter((d) => itemMatch(d.title, d.id, query));

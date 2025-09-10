@@ -1,17 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
-import { getDefinition } from '../../core/registry';
-import type { NodeId, Fragment, EditorState } from '../../core/types';
+import React, {useState} from 'react';
+import {getDefinition} from '../../core/registry';
+import type {Fragment, NodeId} from '../../core/types';
 
-import { CommonSection } from './sections/CommonSection';
-import { PropsAutoSection } from './sections/PropsAutoSection';
-import { StylesSection } from './sections/StylesSection';
-import { SchemaEditor } from './sections/SchemaEditor';
-import { SaveAsComponentDialog } from './sections/SaveAsComponentDialog';
+import {CommonSection} from './sections/CommonSection';
+import {PropsAutoSection} from './sections/PropsAutoSection';
+import {StylesSection} from './sections/StylesSection';
+import {SchemaEditor} from './sections/SchemaEditor';
+import {SaveAsComponentDialog} from './sections/SaveAsComponentDialog';
 
-//import { useInspectorViewModel } from '../../controllers/hooks';
-import { useRightPanelController } from '../../controllers/right/RightPanelController';
+import {RightDomain, useRightControllerFactory} from '../../controllers/right/RightControllerFactory';
 
 function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     // def는 필요 시 참조만, propsSchema 유무와 무관하게 PropsAutoSection을 항상 렌더
@@ -61,7 +60,7 @@ function ComponentInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }
 
 export function Inspector() {
 
-    const { reader, writer } = useRightPanelController();
+    const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
     const { mode, selectedId, editingFragmentId, expertMode } = reader.getUI();
     const { rootId, fragments, nodes } = reader.getProject();
 

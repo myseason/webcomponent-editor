@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { EditorState, Page } from '../../../core/types';
 import { Copy, MoreHorizontal, Trash2 } from 'lucide-react';
 
-import { useLeftPanelController } from '../../../controllers/left/LeftPanelController';
+import {LeftDomain, useLeftControllerFactory} from '../../../controllers/left/LeftControllerFactory';
 
 function slugify(s: string): string {
     return s.trim().toLowerCase().replace(/[\s_]+/g, '-').slice(0, 64);
@@ -74,7 +74,7 @@ const PageActions = ({
 };
 
 export function PagesPanel() {
-    const { reader, writer } = useLeftPanelController();
+    const { reader, writer } = useLeftControllerFactory(LeftDomain.Pages);
 
     const project = reader.getProject();
     const [selectedPageIdForDetails, setSelectedPageIdForDetails] = useState<string | null>(

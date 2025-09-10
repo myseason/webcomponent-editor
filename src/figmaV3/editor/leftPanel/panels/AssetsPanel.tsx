@@ -8,12 +8,12 @@
 import React, { useCallback, useState } from 'react';
 import type { Asset } from '../../../core/types';
 
-import { useLeftPanelController } from '../../../controllers/left/LeftPanelController';
+import {LeftDomain, useLeftControllerFactory} from '../../../controllers/left/LeftControllerFactory';
 
 type AssetTab = 'Media' | 'Scripts' | 'Styles';
 
 export function AssetsPanel() {
-    const { reader, writer } = useLeftPanelController();
+    const { reader, writer } = useLeftControllerFactory(LeftDomain.Assets);
     const project = reader.getProject();
     const ui = reader.getUI();
 

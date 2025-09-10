@@ -5,6 +5,7 @@ import { useEditorApi, EditorDomain } from '../../engine/EditorApi';
 import { useStoreTick } from '../adapters/useStoreTick';
 import { makeSmartController } from '../makeSmartController';
 import { withLog } from '../adapters/aspect';
+import { getDefinition } from "@/figmaV3/core/registry";
 
 export enum RightDomain {
     Inspector = 'Inspector',
@@ -41,8 +42,29 @@ function createInspectorController(RE: any, WE: any) {
         },
     });
 
+    const getViewModel = () => {
+        //const selectedId = RE.getCurrentNode().id;
+        const node = RE.getCurrentNode();
+        if (!node)
+            return null;
+
+        const definition = getDefinition(node.componentId);
+        const policy = RE.getGlobalStylePolicy(); // 혹은 컴포넌트별 정책
+        const effectiveStyles = RE.getEffectiveDecl(node.id);
+        const schemaOverrides = RE.getSchemaOverrides()?.[node.componentId];
+
+        return {
+            key: node.id,
+            node,
+            definition,
+            policy,
+            effectiveStyles,
+            schemaOverrides,
+        };
+    };
+
     return ctl
-        .pickReader('getProject', 'getUI', 'getNodeById', 'getEffectiveDecl')
+        .pickReader('getProject', 'getUI', 'getNodeById', 'getEffectiveDecl', 'getInspectorTarget')
         .pickWriter('updateNodeStyles', 'updateNodeProps', 'setNotification', 'updateComponentPolicy')
         .build();
 }

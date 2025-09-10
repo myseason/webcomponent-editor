@@ -37,6 +37,6 @@ function createTopbarController(RE: any, WE: any) {
 
     return ctl
         .pickReader('getUI', 'getProject', 'pages', 'getPast', 'getFuture')
-        .pickWriter('setEditorMode', 'setViewportMode', 'selectPage', 'setNotification')
+        .pickWriter('setEditorMode', 'setViewportMode', 'selectPage', 'setNotification', 'undo', 'redo')
         .build();
 }

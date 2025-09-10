@@ -43,7 +43,6 @@ function createDockController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Dock', RE, WE, {
         wrap: { toggleBottomDock: withLog('toggleBottomDock'), update: withLog('update') },
     });
-
     return ctl
         .pickReader('getUI', 'getProject', 'data', 'history', 'getEffectiveDecl', 'flowEdges')
         .pickWriter('toggleBottomDock', 'update')

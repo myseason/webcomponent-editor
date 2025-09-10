@@ -1,17 +1,11 @@
 'use client';
 
 import React from 'react';
-import type {
-    ComponentPolicy,
-    CSSDict,
-    EditorUI,
-    NodeId,
-    Project,
-} from '../../../../core/types';
-import { getAllowedStyleKeysForNode, getEffectivePoliciesForNode } from '../../../../runtime/capabilities';
-import { Lock, Unlock } from 'lucide-react';
+import type {ComponentPolicy, EditorUI, NodeId, Project,} from '../../../../core/types';
+import {getAllowedStyleKeysForNode, getEffectivePoliciesForNode} from '../../../../runtime/capabilities';
+import {Lock, Unlock} from 'lucide-react';
 import styles from '../../../ui/theme.module.css';
-import { useRightPanelController } from '@/figmaV3/controllers/right/RightPanelController';
+import {RightDomain, useRightControllerFactory} from '@/figmaV3/controllers/right/RightControllerFactory';
 
 /* ────────────────────────────────────────────────────
  * 공통 레이아웃 컴포넌트
@@ -55,7 +49,7 @@ export const PermissionLock: React.FC<{
     componentId: string;
     controlKey: string;
 }> = ({ componentId, controlKey }) => {
-    const { reader, writer } = useRightPanelController();
+    const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
     const R = reader; const W = writer;
 
     const project = R.getProject();
@@ -229,7 +223,7 @@ export const ColorField: React.FC<{
 export type DisallowReason = 'template' | 'tag' | 'component' | null;
 
 export function useAllowed(nodeId: NodeId): Set<string> {
-    const { reader } = useRightPanelController();
+    const { reader } = useRightControllerFactory(RightDomain.Policy);
     const R = reader;
 
     const project = R.getProject();

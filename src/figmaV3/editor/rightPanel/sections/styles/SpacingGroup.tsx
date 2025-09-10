@@ -29,8 +29,7 @@ import {
     ChipBtnV1,
 } from './layoutV1';
 
-// ✅ 컨트롤러 교체: RightPanelController 사용
-import { useRightPanelController } from '../../../../controllers/right/RightPanelController';
+import {RightDomain, useRightControllerFactory} from '@/figmaV3/controllers/right/RightControllerFactory';
 
 export function SpacingGroup(props: {
     el: Record<string, any>;
@@ -45,7 +44,7 @@ export function SpacingGroup(props: {
     nodeId: NodeId;
     componentId: string;
 }) {
-    const { reader } = useRightPanelController();
+    const { reader } = useRightControllerFactory(RightDomain.Inspector);
     const R = reader;
 
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;

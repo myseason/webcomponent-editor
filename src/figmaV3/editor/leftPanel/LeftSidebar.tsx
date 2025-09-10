@@ -1,18 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import type { EditorMode, ProjectHubTab } from '../../core/types';
+import type {EditorMode, ProjectHubTab} from '../../core/types';
 
 // 패널들
-import { PagesPanel } from './panels/PagesPanel';
-import { AssetsPanel } from './panels/AssetsPanel';
-import { ComponentsPanel } from './panels/ComponentsPanel';
-import { Layers as LayersPanel } from './Layers';
+import {PagesPanel} from './panels/PagesPanel';
+import {AssetsPanel} from './panels/AssetsPanel';
+import {ComponentsPanel} from './panels/ComponentsPanel';
+import {Layers as LayersPanel} from './Layers';
 
-import { modeBorderClass } from '../rightPanel/sections/styles/common';
-
-// ✅ LeftDomain 제거
-import { useLeftPanelController } from '../../controllers/left/LeftPanelController';
+import {modeBorderClass} from '../rightPanel/sections/styles/common';
+import {LeftDomain, useLeftControllerFactory} from '../../controllers/left/LeftControllerFactory';
 
 // 아이콘 (lucide-react)
 import {
@@ -23,7 +21,7 @@ import {
     Layers as LayersIcon,
     Settings as SettingsIcon,
 } from 'lucide-react';
-import { PanelTitle } from "@/figmaV3/editor/common/PanelTitle";
+import {PanelTitle} from "@/figmaV3/editor/common/PanelTitle";
 
 // 임시 Settings 패널(기존에 없다면 유지)
 const SettingsPanel = () => (
@@ -148,7 +146,7 @@ function SinglePanel({ tab }: { tab: HubTab }) {
 
 export function LeftSidebar() {
     // ✅ 도메인 인자 삭제
-    const { reader, writer } = useLeftPanelController();
+    const { reader, writer } = useLeftControllerFactory(LeftDomain.Sidebar);
 
     // ── 모드 UI(기존 유지) ────────────────────────────────────────────────
     const ui = reader.getUI();

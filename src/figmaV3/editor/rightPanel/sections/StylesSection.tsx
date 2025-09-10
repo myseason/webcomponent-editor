@@ -13,7 +13,7 @@ import { BorderGroup } from './styles/BorderGroup';
 import { BackgroundGroup } from './styles/BackgroundGroup';
 import { EffectsGroup } from './styles/EffectsGroup';
 import { CustomGroup } from './styles/CustomGroup';
-import { useRightPanelController } from "../../../controllers/right/RightPanelController";
+import {RightDomain, useRightControllerFactory} from '@/figmaV3/controllers/right/RightControllerFactory';
 
 type OpenState = {
     layout: boolean;
@@ -28,7 +28,7 @@ type OpenState = {
 
 export function StylesSection(): JSX.Element {
 
-    const { reader, writer } = useRightPanelController();
+    const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
     const project = reader.getProject();
     const ui = reader.getUI();
     const expert = ui.expertMode;

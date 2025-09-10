@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useCallback } from 'react';
-import { getDefinition } from '../../../core/registry';
-import type { NodeId } from '../../../core/types';
-import type { ComponentInspectorPolicyV2, InspectorModePolicy } from '../../../policy/types.local';
-import { useRightPanelController } from '@/figmaV3/controllers/right/RightPanelController';
+import {useCallback, useMemo} from 'react';
+import {getDefinition} from '../../../core/registry';
+import type {NodeId} from '../../../core/types';
+import type {ComponentInspectorPolicyV2, InspectorModePolicy} from '../../../policy/types.local';
+import {RightDomain, useRightControllerFactory} from '../../../controllers/right/RightControllerFactory';
 
 type AllowSpec = {
     allowAllProps: boolean;
@@ -75,7 +75,7 @@ export function useTagBasedPropFilter(defTitle: string | undefined, selTag: stri
 
 /** Prop 표시 여부 훅 */
 export function usePropVisibility(nodeId: NodeId, defId: string) {
-    const { reader, writer } = useRightPanelController();
+    const { reader, writer } = useRightControllerFactory(RightDomain.Policy);
     const R = reader; const W = writer;
 
     const project = R.getProject();
@@ -118,7 +118,7 @@ export function usePropVisibility(nodeId: NodeId, defId: string) {
 
 /** Style 표시 여부 훅 */
 export function useStyleVisibility(nodeId: NodeId, defId: string) {
-    const { reader, writer } = useRightPanelController();
+    const { reader, writer } = useRightControllerFactory(RightDomain.Policy);
     const R = reader; const W = writer;
 
     const project = R.getProject();

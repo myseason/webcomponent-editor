@@ -1,12 +1,13 @@
 'use client';
-import React, { memo, useCallback, useMemo } from 'react';
-import type { NodeId, Node, Fragment } from '../../core/types';
-import { getDefinition } from '../../core/registry';
-import { Lock, Unlock, Eye, EyeOff, Trash2, GripVertical } from 'lucide-react';
-import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { PanelTitle } from "@/figmaV3/editor/common/PanelTitle";
+import React, {memo, useCallback, useMemo} from 'react';
+import type {Fragment, Node, NodeId} from '../../core/types';
+import {getDefinition} from '../../core/registry';
+import {Eye, EyeOff, GripVertical, Lock, Trash2, Unlock} from 'lucide-react';
+import {useDraggable, useDroppable} from '@dnd-kit/core';
+import {PanelTitle} from "@/figmaV3/editor/common/PanelTitle";
 
-import { useLeftPanelController } from '../../controllers/left/LeftPanelController';
+import {LeftDomain, useLeftControllerFactory} from '../../controllers/left/LeftControllerFactory';
+import {useRightControllerFactory} from "@/figmaV3/controllers/right/RightControllerFactory";
 
 const LINE_COLOR = '#e5e7eb';
 
@@ -40,7 +41,7 @@ function getDisplayName(node: Node): string {
 }
 
 const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
-    const { reader, writer } = useLeftPanelController();
+    const { reader, writer } = useLeftControllerFactory(LeftDomain.Layers);
     const project = reader.getProject();
     const ui = reader.getUI();
     const node = project.nodes[id];
@@ -96,7 +97,7 @@ const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
 Row.displayName = 'Row';
 
 const Tree: React.FC<{ id: NodeId; depth: number }> = ({ id, depth }) => {
-    const { reader } = useLeftPanelController();
+    const { reader } = useLeftControllerFactory(LeftDomain.Layers);
     const project = reader.getProject();
     const node = reader.getNode(id);
 
@@ -114,7 +115,7 @@ const Tree: React.FC<{ id: NodeId; depth: number }> = ({ id, depth }) => {
 };
 
 export function Layers() {
-    const { reader } = useLeftPanelController();
+    const { reader } = useLeftControllerFactory(LeftDomain.Layers);
     const project = reader.getProject();
     const mode = reader.getUI().mode;
     const editingFragmentId = reader.getUI().editingFragmentId;

@@ -12,14 +12,13 @@ import {
     MiniInputV1,
 } from './styles/layoutV1';
 
-// ✅ 변경점: RightPanelController 사용
-import { useRightPanelController } from '../../../controllers/right/RightPanelController';
+import {RightDomain, useRightControllerFactory} from '../../../controllers/right/RightControllerFactory';
 
 type AttrMap = Record<string, string>;
 
 export function CommonSection({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     // ✅ 컨트롤러 교체 (호출 패턴 동일)
-    const { reader, writer } = useRightPanelController();
+    const { reader, writer } = useRightControllerFactory(RightDomain.Policy);
     const R = reader; const W = writer;
 
     // ✅ 기존 state 구성 유지 (reader/writer에서 동일 기능 바인딩)

@@ -29,8 +29,7 @@ import {
     MiniSelectV1,
 } from './layoutV1';
 
-// ✅ 변경: RightPanelController 사용
-import { useRightPanelController } from '@/figmaV3/controllers/right/RightPanelController';
+import {RightDomain, useRightControllerFactory} from '@/figmaV3/controllers/right/RightControllerFactory';
 
 export function PositionGroup(props: {
     el: Record<string, any>;
@@ -46,7 +45,7 @@ export function PositionGroup(props: {
     componentId: string;
 }) {
     // ✅ 변경: 컨트롤러 교체
-    const { reader } = useRightPanelController();
+    const { reader } = useRightControllerFactory(RightDomain.Inspector);
     const R = reader;
 
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;

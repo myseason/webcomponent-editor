@@ -6,10 +6,10 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import type { EditorState } from '@/figmaV3/core/types';
-import { useBottomPanelController } from '@/figmaV3/controllers/bottom/BottomPanelController';
+import {BottomDomain, useBottomControllerFactory} from '@/figmaV3/controllers/bottom/BottomControllerFactory';
 
 export function DataPanel() {
-    const { reader, writer } = useBottomPanelController();
+    const { reader, writer } = useBottomControllerFactory(BottomDomain.Data);
 
     // 호환 접근(getData 우선, 구형 시그니처 폴백)
     const dataObj = useMemo<Record<string, unknown>>(

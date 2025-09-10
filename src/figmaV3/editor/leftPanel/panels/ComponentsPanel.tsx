@@ -1,15 +1,15 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { TemplatesPanel } from '../TemplatesPanel';
-import { Palette } from '../Palette';
-import type { Fragment } from '../../../core/types';
-import { Trash2, UploadCloud } from 'lucide-react';
+import React, {useEffect, useState} from 'react';
+import {TemplatesPanel} from '../TemplatesPanel';
+import {Palette} from '../Palette';
+import type {Fragment} from '../../../core/types';
+import {Trash2, UploadCloud} from 'lucide-react';
 
-import { useLeftPanelController } from '../../../controllers/left/LeftPanelController';
+import {LeftDomain, useLeftControllerFactory} from '../../../controllers/left/LeftControllerFactory';
 
 function ComponentEditorCard({ frag }: { frag: Fragment }) {
-    const { reader, writer } = useLeftPanelController();
+    const { reader, writer } = useLeftControllerFactory(LeftDomain.Components);
 
     const ui = reader.getUI();
     const [name, setName] = useState(frag.name);
@@ -105,7 +105,7 @@ function ComponentEditorCard({ frag }: { frag: Fragment }) {
 }
 
 function ComponentDevelopmentPanel() {
-    const { reader, writer } = useLeftPanelController();
+    const { reader, writer } = useLeftControllerFactory(LeftDomain.Components);
     const project = reader.getProject();
     const { fragments } = project;
 
@@ -154,6 +154,6 @@ function PageBuildPanel() {
 }
 
 export function ComponentsPanel() {
-    const { reader } = useLeftPanelController();
+    const { reader } = useLeftControllerFactory(LeftDomain.Components);
     return reader.getUI().mode === 'Component' ? <ComponentDevelopmentPanel /> : <PageBuildPanel />;
 }

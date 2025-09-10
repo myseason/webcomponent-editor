@@ -7,14 +7,14 @@
  */
 
 import React from 'react';
-import { ActionsPanel } from './panels/ActionsPanel';
-import { DataPanel } from './panels/DataPanel';
-import { FlowsPanel } from './panels/FlowsPanel';
-import { FragmentsPanel } from './panels/FragmentsPanel';
-import { SchemaEditor } from '../rightPanel/sections/SchemaEditor';
-import type { BottomRightPanelKind, EditorState } from '../../core/types';
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useBottomPanelController } from '@/figmaV3/controllers/bottom/BottomPanelController';
+import {ActionsPanel} from './panels/ActionsPanel';
+import {DataPanel} from './panels/DataPanel';
+import {FlowsPanel} from './panels/FlowsPanel';
+import {FragmentsPanel} from './panels/FragmentsPanel';
+import {SchemaEditor} from '../rightPanel/sections/SchemaEditor';
+import type {BottomRightPanelKind, EditorState} from '../../core/types';
+import {ChevronDown, ChevronUp} from 'lucide-react';
+import {BottomDomain, useBottomControllerFactory} from "@/figmaV3/controllers/bottom/BottomControllerFactory";
 
 type Tab = 'actions' | 'data' | 'flows' | 'fragments';
 
@@ -24,7 +24,7 @@ const COLLAPSED_HEIGHT_PX = 40; // 리사이저(8px) + 탭바(32px)
 const TAB_BAR_HEIGHT_REM = '2rem'; // 32px
 
 export function BottomDock() {
-    const { reader, writer } = useBottomPanelController();
+    const { reader, writer } = useBottomControllerFactory(BottomDomain.Dock);
 
     // reader 호환: getUI / getProject 우선 사용, 구형 시그니처(ui()/project()) 폴백
     const ui = (reader as any).getUI?.() ?? (reader as any).ui?.();

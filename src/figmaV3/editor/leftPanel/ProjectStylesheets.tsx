@@ -5,7 +5,7 @@ import type { EditorState, Stylesheet } from '../../core/types';
 import styles from '../ui/theme.module.css';
 
 // ✅ 도메인 인자 제거
-import { useLeftPanelController } from '../../controllers/left/LeftPanelController';
+import {LeftDomain, useLeftControllerFactory} from '../../controllers/left/LeftControllerFactory';
 
 /**
  * ProjectStylesheets
@@ -14,7 +14,7 @@ import { useLeftPanelController } from '../../controllers/left/LeftPanelControll
  */
 export function ProjectStylesheets() {
     // ✅ 인자 없이 컨트롤러 사용
-    const { reader, writer } = useLeftPanelController();
+    const { reader, writer } = useLeftControllerFactory(LeftDomain.Stylesheets);
     const project = reader.getProject();
 
     const sheets: Stylesheet[] = React.useMemo(

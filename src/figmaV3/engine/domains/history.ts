@@ -5,6 +5,16 @@ export function historyDomain() {
     const R = {
         canUndo: (): boolean => selectCanUndo(EditorCore.getState()),
         canRedo: (): boolean => selectCanRedo(EditorCore.getState()),
+        getPast: () => {
+            const state = EditorCore.store.getState();
+            const { past } = selectHistory(state);
+            return past;
+        },
+        getFuture: () => {
+            const state = EditorCore.store.getState();
+            const { future } = selectHistory(state);
+            return future;
+        }
     };
 
     const W = {
@@ -44,7 +54,7 @@ export function historyDomain() {
                     s.ui.selectedId = s.project.rootId;
                 }
             });
-        },
+        }
     };
 
     return { reader: R, writer: W } as const;

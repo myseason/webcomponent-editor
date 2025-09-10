@@ -1,4 +1,3 @@
-// src/figmaV3/editor/bootstrap.ts
 'use client';
 
 import './components/registerBasics';

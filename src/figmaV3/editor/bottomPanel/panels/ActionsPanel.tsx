@@ -9,9 +9,9 @@
  * - Page/Fragment 스코프는 골격만(향후 Flows·FragmentsPanel 연계)
  */
 import * as React from 'react';
-import { getDefinition } from '../../../core/registry';
-import type {SupportedEvent, ActionStep, NodeId, EditorState, Node, Page} from '../../../core/types';
-import { useBottomPanelController } from '@/figmaV3/controllers/bottom/BottomPanelController';
+import {getDefinition} from '../../../core/registry';
+import type {ActionStep, EditorState, Node, NodeId, Page, SupportedEvent} from '../../../core/types';
+import {BottomDomain, useBottomControllerFactory} from '@/figmaV3/controllers/bottom/BottomControllerFactory';
 
 const EVENTS: SupportedEvent[] = ['onLoad', 'onClick', 'onChange', 'onSubmit'];
 type ActionsBag = Partial<Record<SupportedEvent, { steps: ActionStep[] }>>;
@@ -167,7 +167,7 @@ function NodeAttrsDynamicSection({
 
 /* ───────────── 메인 패널 ───────────── */
 export function ActionsPanel() {
-    const { reader, writer } = useBottomPanelController();
+    const { reader, writer } = useBottomControllerFactory(BottomDomain.Actions);
 
     // 스냅샷
     const ui = reader.getUI();

@@ -6,11 +6,11 @@
  */
 import React, { useMemo, useState } from 'react';
 import type { ActionStep, EditorState, FlowEdge, Fragment, Node } from '../../../core/types';
-import { useBottomPanelController } from '@/figmaV3/controllers/bottom/BottomPanelController';
+import {BottomDomain, useBottomControllerFactory} from '@/figmaV3/controllers/bottom/BottomControllerFactory';
 
 export function FragmentsPanel() {
     // 최상위 훅들만 사용
-    const { reader, writer } = useBottomPanelController();
+    const { reader, writer } = useBottomControllerFactory(BottomDomain.Fragments);
 
     // 호환 접근(getUI/getProject 우선, 구형 시그니처 폴백)
     const ui = (reader as any).getUI?.() ?? (reader as any).ui?.();

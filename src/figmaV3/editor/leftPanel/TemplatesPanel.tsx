@@ -3,12 +3,11 @@ import React from 'react';
 import type { Fragment } from '../../core/types';
 import { Trash2 } from 'lucide-react';
 
-// ✅ 도메인 인자 제거: LeftDomain 사용 안 함
-import { useLeftPanelController } from '../../controllers/left/LeftPanelController';
+import {LeftDomain, useLeftControllerFactory} from '../../controllers/left/LeftControllerFactory';
 
 export function TemplatesPanel({ query = '' }: { query?: string }) {
     // ✅ 도메인 인자 없이 컨트롤러 사용
-    const { reader, writer } = useLeftPanelController();
+    const { reader, writer } = useLeftControllerFactory(LeftDomain.Templates);
 
     const project = reader.getProject();
 

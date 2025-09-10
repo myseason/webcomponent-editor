@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import type { NodeId } from '../../../core/types';
-import { useRightPanelController } from '../../../controllers/right/RightPanelController';
+import {RightDomain, useRightControllerFactory} from '../../../controllers/right/RightControllerFactory';
 
 interface SaveAsComponentDialogProps {
     nodeId: NodeId;
@@ -11,7 +11,7 @@ interface SaveAsComponentDialogProps {
 
 export function SaveAsComponentDialog({ nodeId, onClose }: SaveAsComponentDialogProps) {
     // ✅ Right 패널 컨트롤러 사용
-    const { reader, writer } = useRightPanelController();
+    const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
 
     // writer에서 필요한 액션만 구조분해
     const { saveNodeAsComponent, setNotification } = writer as {

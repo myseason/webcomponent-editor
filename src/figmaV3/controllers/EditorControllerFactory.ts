@@ -8,7 +8,7 @@ import {withLog} from "@/figmaV3/controllers/adapters/aspect";
 
 /** 단 하나의 훅만 노출 */
 export function useEditorControllerFactory(): { reader: any; writer: any } {
-    const { reader: RE, writer: WE } = useEditorApi([EditorDomain.History]);
+    const { reader: RE, writer: WE } = useEditorApi([EditorDomain.Selectors, EditorDomain.History, EditorDomain.Fragment]);
     useStoreTick();
 
     return React.useMemo(() => {
