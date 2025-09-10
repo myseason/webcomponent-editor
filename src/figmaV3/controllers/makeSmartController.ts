@@ -1,263 +1,10 @@
 'use client';
 
-/**
- * 사용법
- * =====================================================================================================================
- * 1) 가장 기본: 필요한 키만 얇게 노출 (pick)
- * =====================================================================================================================
- * export function useLeftPanelControllerBasic() {
- *   const { reader: RE, writer: WE } = useEngine([
- *     EngineDomain.UI,
- *     EngineDomain.Pages,
- *   ]);
- *
- *   const { reader, writer } = makeSmartController('LeftPanelBasic', RE, WE)
- *     .pickReader('getUI', 'getProject')
- *     .pickWriter('addPage', 'removePage')
- *     .build();
- *
- *   return { reader, writer } as const;
- * }
- *
- * =====================================================================================================================
- * 2) per-method 로깅(withLog) + after 훅(withAfter)
- * =====================================================================================================================
- * export function usePagesController() {
- *   const { reader: RE, writer: WE } = useEngine([EngineDomain.Pages, EngineDomain.History]);
- *
- *   const { reader, writer } = makeSmartController('Pages', RE, WE, {
- *     wrap: {
- *       addPage: withLog('addPage'),
- *       removePage: withLog('removePage'),
- *       duplicatePage: withAfter((ret) => {
- *         // ret 에는 원본 함수 반환값
- *         // ex: 성공 알림 or 도메인 이벤트 푸시
- *         // toast.success('Duplicated!');
- *       }),
- *     },
- *   })
- *     .pickReader('getProject', 'getUI')
- *     .pickWriter('addPage', 'removePage', 'duplicatePage')
- *     .build();
- *
- *   return { reader, writer } as const;
- * }
- *
- * =====================================================================================================================
- * 3) 전역 Aspect(before/after/error) + 개별 래퍼 섞어쓰기
- * =====================================================================================================================
- * const globalAspect: Aspect = {
- *   before: ({ ctrlName, method }, args) => {
- *     // console.debug(`[${ctrlName}.${method}]`, 'args:', args);
- *   },
- *   onError: ({ method }, _args, err) => {
- *     // Sentry.captureException(err, { tags: { method } });
- *   },
- * };
- *
- * export function useAssetsController() {
- *   const { reader: RE, writer: WE } = useEngine([EngineDomain.Assets]);
- *
- *   const { reader, writer } = makeSmartController('Assets', RE, WE, {
- *     aspect: globalAspect,
- *     wrap: {
- *       addAsset: withLog('addAsset'),
- *       removeAsset: withLog('removeAsset'),
- *     },
- *   })
- *     .pickReader('getProject', 'assets') // 도메인에 따라 이름 다를 수 있음
- *     .pickWriter('addAsset', 'removeAsset')
- *     .build();
- *
- *   return { reader, writer } as const;
- * }
- *
- * =====================================================================================================================
- * 4) MethodWrapper(meta 활용) — 메서드명/컨트롤러명 기반 공통 태깅
- * =====================================================================================================================
- * // meta(ctrlName/method)를 쓰는 고급 래퍼
- * const withMetric: MethodWrapper = (orig, meta) => {
- *   return (...a: any[]) => {
- *     const t0 = performance.now();
- *     try {
- *       return orig(...a);
- *     } finally {
- *       const t1 = performance.now();
- *       // metrics.log({ name: `${meta?.ctrlName}.${meta?.method}`, durMs: +(t1-t0).toFixed(1) });
- *     }
- *   };
- * };
- *
- * export function useNodesController() {
- *   const { reader: RE, writer: WE } = useEngine([EngineDomain.Nodes]);
- *
- *   const { reader, writer } = makeSmartController('Nodes', RE, WE, {
- *     wrap: {
- *       addNode: withMetric,
- *       removeNode: withMetric,
- *       moveNode: withMetric,
- *     },
- *   })
- *     .pickReader('getNodeById', 'getProject')
- *     .pickWriter('addNode', 'removeNode', 'moveNode')
- *     .build();
- *
- *   return { reader, writer } as const;
- * }
- *
- * =====================================================================================================================
- * 5) Command 패턴과 결합(withCommand)
- * =====================================================================================================================
- * // history.push 를 주입해 커맨드 기록 (undo/redo)
- * const push = (cmd: { undo(): void; redo(): void }) => {
- *   // editHistory.push(cmd)
- * };
- *
- * const mkMoveCmd = (id: string, from: string, to: string) => ({
- *   undo() { ... },
- *   redo() { ... },
- * });
- *
- * export function useLayersController() {
- *   const { reader: RE, writer: WE } = useEngine([EngineDomain.Nodes, EngineDomain.History]);
- *
- *   const { reader, writer } = makeSmartController('Layers', RE, WE, {
- *     wrap: {
- *       moveNode: withCommand('moveNode', mkMoveCmd as any, push),
- *     },
- *   })
- *     .pickReader('getProject', 'getNodeById', 'getUI')
- *     .pickWriter('moveNode')
- *     .build();
- *
- *   return { reader, writer } as const;
- * }
- *
- * =====================================================================================================================
- * 6) Reader는 가볍게, Writer만 특정 메서드 노출
- * =====================================================================================================================
- * export function useTopbarController() {
- *   const { reader: RE, writer: WE } = useEngine([EngineDomain.UI, EngineDomain.Pages]);
- *
- *   const { reader, writer } = makeSmartController('Topbar', RE, WE)
- *     .pickReader('getUI')               // 최소 조회만
- *     .pickWriter('setEditorMode', 'selectPage') // 조작만 노출
- *     .build();
- *
- *   return { reader, writer } as const;
- * }
- *
- * =====================================================================================================================
- * 7) 다중 도메인 병합 + 도메인간 합성 API (컨트롤러 내부 helper 추가)
- * =====================================================================================================================
- * export function useInspectorController() {
- *   const { reader: RE, writer: WE } = useEngine([
- *     EngineDomain.UI,
- *     EngineDomain.Nodes,
- *     EngineDomain.Policy,
- *     EngineDomain.Project,
- *   ]);
- *
- *   // 컨트롤러 내부 helper: 도메인 함수 조합
- *   const helpers = {
- *     getSelectedNode() {
- *       const ui = RE.getUI();
- *       return ui.selectedId ? RE.getNodeById(ui.selectedId) : null;
- *     },
- *     isExpert() {
- *       return !!RE.getUI()?.expertMode;
- *     },
- *   };
- *
- *   const { reader, writer } = makeSmartController('Inspector', { ...RE, ...helpers }, WE, {
- *     wrap: { updateNodeStyles: withLog('updateNodeStyles') },
- *   })
- *     .pickReader('getSelectedNode', 'isExpert', 'getProject')
- *     .pickWriter('updateNodeStyles', 'updateNodeProps', 'setNotification')
- *     .build();
- *
- *   return { reader, writer } as const;
- * }
- *
- * =====================================================================================================================
- * 8) Presenter-lite: UI 전용 Selector만 노출
- * =====================================================================================================================
- * export function useLayersPresenter() {
- *   const { reader: RE, writer: WE } = useEngine([EngineDomain.Nodes, EngineDomain.UI, EngineDomain.Project]);
- *
- *   // UI 최적화된 selector
- *   const selectors = {
- *     // 트리 변환/필터링/정렬 등 UI 친화 로직
- *     flatTree(): { id: string; depth: number }[] {
- *       const proj = RE.getProject();
- *       const root = proj.rootId;
- *       const out: any[] = [];
- *       const walk = (id: string, depth: number) => {
- *         out.push({ id, depth });
- *         (proj.nodes[id]?.children ?? []).forEach((cid: string) => walk(cid, depth + 1));
- *       };
- *       root && walk(root, 0);
- *       return out;
- *     },
- *   };
- *
- *   const { reader, writer } = makeSmartController('LayersPresenter', selectors as any, WE)
- *     .pickReader('flatTree') // UI에서 딱 이것만 씀
- *     .pickWriter('select')   // 선택만 필요
- *     .build();
- *
- *   return { reader, writer } as const;
- * }
- *
- * =====================================================================================================================
- * 9) Worker-friendly: 읽기 전용 컨트롤러
- * =====================================================================================================================
- *  export function useReadOnlyReportController() {
- *   const { reader: RE } = useEngine([
- *     EngineDomain.Project,
- *     EngineDomain.Pages,
- *     EngineDomain.Nodes,
- *     EngineDomain.Data,
- *   ]);
- *
- *   const { reader } = makeSmartController('ReportRO', RE, {} as any)
- *     .pickReader('getProject', 'pages', 'getNodeById', 'data')
- *     .build();
- *
- *   return { reader } as const;
- * }
- *
- * =====================================================================================================================
- * 10) 테스트 더블/스파이 삽입 — wrap으로 목킹
- * =====================================================================================================================
- * export function useActionsTestableController(spy: (name: string, args: any[]) => void) {
- *   const { reader: RE, writer: WE } = useEngine([EngineDomain.Actions]);
- *
- *   const spyWrap: MethodWrapper = (orig, meta) => {
- *     return (...a: any[]) => {
- *       spy(`${meta?.ctrlName}.${meta?.method}`, a);
- *       return orig(...a);
- *     };
- *   };
- *
- *   const { reader, writer } = makeSmartController('Actions', RE, WE, {
- *     wrap: { runActionSteps: spyWrap },
- *   })
- *     .pickReader('getActionSteps')
- *     .pickWriter('setActionSteps', 'runActionSteps')
- *     .build();
- *
- *   return { reader, writer } as const;
- * }
- *
- */
-
-'use client';
-
 import type { AnyFn } from './types';
+import { requestRerenderTick } from './adapters/uiRerender';
 
 /* ========================
- * Types
+ * Aspect & Wrapper Types
  * ====================== */
 
 export type AspectCtx = {
@@ -273,7 +20,7 @@ export type Aspect = {
 };
 
 /** 기존 withLog('name')처럼 (orig)=>wrapped 를 지원하기 위한 타입 */
-export type MethodWrapper<F extends AnyFn = AnyFn> = (orig: F) => F;
+export type MethodWrapper<F extends AnyFn = AnyFn> = (orig: F, meta?: { ctrlName?: string; method?: string }) => F;
 
 /** per-method로 적용되는 항목: Aspect 또는 MethodWrapper 둘 다 허용 */
 type WrapEntry = Aspect | MethodWrapper;
@@ -286,7 +33,6 @@ type WrapMaps = {
 
 function splitWrapEntry(entry?: WrapEntry): { aspect?: Aspect; wrapper?: MethodWrapper } {
     if (!entry) return {};
-    // Aspect signature heuristic: object with any of before/after/onError
     const maybeAspect = entry as Partial<Aspect>;
     const looksAspect =
         typeof entry === 'object' &&
@@ -298,6 +44,15 @@ function splitWrapEntry(entry?: WrapEntry): { aspect?: Aspect; wrapper?: MethodW
     if (typeof entry === 'function') return { wrapper: entry as MethodWrapper };
     return {};
 }
+
+/* =========================================
+ * 기본 제공 Aspect: writer 호출 후 리렌더
+ *  - 컨트롤러에서 opts.writerAspect: writerRerenderAspect 로 켜면 됩니다.
+ * ======================================= */
+export const writerRerenderAspect: Aspect = {
+    after: () => { requestRerenderTick(); },
+    onError: () => { requestRerenderTick(); },
+};
 
 /* ========================
  * Proxy(Reader/Writer) 생성
@@ -327,7 +82,7 @@ function createHybridProxy<T extends object>(
 
             // 2) MethodWrapper 먼저 적용 (원본을 감싸서 기능 확장/치환)
             if (wrapper) {
-                fn = wrapper(fn);
+                fn = wrapper(fn, { ctrlName, method: methodName });
             }
 
             // 3) Aspect 적용 (before/after/onError)
@@ -379,6 +134,7 @@ function createHybridProxy<T extends object>(
  *  - exposeReaderAll / exposeWriterAll / exposeAll: 전부 노출
  *  - wrapReader / wrapWriter: per-method에 MethodWrapper/Aspect 부착
  *  - requireReader / requireWriter: 런타임 검증
+ *  - attachReader / attachWriter: 컨트롤러 내부 정의 함수 레지스트리에 추가
  *  - build: Proxy 적용한 객체 반환
  * ====================== */
 
@@ -392,6 +148,8 @@ export type ExposeBuilder<R extends object, W extends object> = {
     wrapWriter: <K extends keyof W & string>(key: K, entry: WrapEntry) => ExposeBuilder<R, W>;
     requireReader: (...keys: (keyof R & string)[]) => ExposeBuilder<R, W>;
     requireWriter: (...keys: (keyof W & string)[]) => ExposeBuilder<R, W>;
+    attachReader: <N extends string, F extends AnyFn>(name: N, fn: F) => ExposeBuilder<R & Record<N, F>, W>;
+    attachWriter: <N extends string, F extends AnyFn>(name: N, fn: F) => ExposeBuilder<R, W & Record<N, F>>;
     build: () => { reader: R; writer: W };
 };
 
@@ -399,10 +157,11 @@ function makeBuilder<R extends object, W extends object>(
     controllerName: string,
     curReader: R,
     curWriter: W,
-    globalAspect?: Aspect,
+    readerGlobalAspect?: Aspect,
+    writerGlobalAspect?: Aspect,
     readerWraps: WrapMaps = { methodAspects: {}, methodWrappers: {} },
     writerWraps: WrapMaps = { methodAspects: {}, methodWrappers: {} },
-    // 원본 전체(전체 노출용)
+    // 원본 전체(전체 노출/attach 누적용)
     fullReader?: object,
     fullWriter?: object
 ): ExposeBuilder<R, W> {
@@ -414,7 +173,8 @@ function makeBuilder<R extends object, W extends object>(
                 controllerName,
                 next as Pick<R, (typeof keys)[number]>,
                 curWriter,
-                globalAspect,
+                readerGlobalAspect,
+                writerGlobalAspect,
                 readerWraps,
                 writerWraps,
                 fullReader ?? curReader,
@@ -429,7 +189,8 @@ function makeBuilder<R extends object, W extends object>(
                 controllerName,
                 curReader,
                 next as Pick<W, (typeof keys)[number]>,
-                globalAspect,
+                readerGlobalAspect,
+                writerGlobalAspect,
                 readerWraps,
                 writerWraps,
                 fullReader ?? curReader,
@@ -443,7 +204,8 @@ function makeBuilder<R extends object, W extends object>(
                 controllerName,
                 source,
                 curWriter,
-                globalAspect,
+                readerGlobalAspect,
+                writerGlobalAspect,
                 readerWraps,
                 writerWraps,
                 source,
@@ -457,7 +219,8 @@ function makeBuilder<R extends object, W extends object>(
                 controllerName,
                 curReader,
                 source,
-                globalAspect,
+                readerGlobalAspect,
+                writerGlobalAspect,
                 readerWraps,
                 writerWraps,
                 fullReader ?? curReader,
@@ -472,7 +235,8 @@ function makeBuilder<R extends object, W extends object>(
                 controllerName,
                 srcR,
                 srcW,
-                globalAspect,
+                readerGlobalAspect,
+                writerGlobalAspect,
                 readerWraps,
                 writerWraps,
                 srcR,
@@ -488,7 +252,8 @@ function makeBuilder<R extends object, W extends object>(
                 controllerName,
                 curReader,
                 curWriter,
-                globalAspect,
+                readerGlobalAspect,
+                writerGlobalAspect,
                 readerWraps,
                 writerWraps,
                 fullReader ?? curReader,
@@ -504,7 +269,8 @@ function makeBuilder<R extends object, W extends object>(
                 controllerName,
                 curReader,
                 curWriter,
-                globalAspect,
+                readerGlobalAspect,
+                writerGlobalAspect,
                 readerWraps,
                 writerWraps,
                 fullReader ?? curReader,
@@ -522,7 +288,8 @@ function makeBuilder<R extends object, W extends object>(
                 controllerName,
                 curReader,
                 curWriter,
-                globalAspect,
+                readerGlobalAspect,
+                writerGlobalAspect,
                 readerWraps,
                 writerWraps,
                 fullReader ?? curReader,
@@ -540,7 +307,8 @@ function makeBuilder<R extends object, W extends object>(
                 controllerName,
                 curReader,
                 curWriter,
-                globalAspect,
+                readerGlobalAspect,
+                writerGlobalAspect,
                 readerWraps,
                 writerWraps,
                 fullReader ?? curReader,
@@ -548,9 +316,41 @@ function makeBuilder<R extends object, W extends object>(
             );
         },
 
+        attachReader: (name, fn) => {
+            const nextFullReader = { ...((fullReader ?? curReader) as any), [name]: fn } as object;
+            const nextCurReader = { ...(curReader as any), [name]: fn } as any;
+            return makeBuilder(
+                controllerName,
+                nextCurReader,
+                curWriter,
+                readerGlobalAspect,
+                writerGlobalAspect,
+                readerWraps,
+                writerWraps,
+                nextFullReader,
+                fullWriter ?? curWriter
+            ) as any;
+        },
+
+        attachWriter: (name, fn) => {
+            const nextFullWriter = { ...((fullWriter ?? curWriter) as any), [name]: fn } as object;
+            const nextCurWriter = { ...(curWriter as any), [name]: fn } as any;
+            return makeBuilder(
+                controllerName,
+                curReader,
+                nextCurWriter,
+                readerGlobalAspect,
+                writerGlobalAspect,
+                readerWraps,
+                writerWraps,
+                fullReader ?? curReader,
+                nextFullWriter
+            ) as any;
+        },
+
         build: () => {
-            const r = createHybridProxy(curReader, `${controllerName}.reader`, readerWraps, globalAspect);
-            const w = createHybridProxy(curWriter, `${controllerName}.writer`, writerWraps, globalAspect);
+            const r = createHybridProxy(curReader, `${controllerName}.reader`, readerWraps, readerGlobalAspect);
+            const w = createHybridProxy(curWriter, `${controllerName}.writer`, writerWraps, writerGlobalAspect);
             return { reader: r, writer: w };
         },
     };
@@ -558,14 +358,19 @@ function makeBuilder<R extends object, W extends object>(
 
 /**
  * makeSmartController
- * - opts.wrap: { [methodName]: Aspect | MethodWrapper }  ← 둘 다 지원
- * - opts.aspect: 전역 Aspect(before/after/onError)
+ * - opts.aspect:    Reader 전역 Aspect(before/after/onError)
+ * - opts.writerAspect: Writer 전역 Aspect(Writer 전용)  ← 신규
+ * - opts.wrap:      { [methodName]: Aspect | MethodWrapper } (reader/writer 이름 기준 공통 매핑)
  */
 export function makeSmartController<R extends object, W extends object>(
     controllerName: string,
     RE: R,
     WE: W,
-    opts?: { aspect?: Aspect; wrap?: Record<string, WrapEntry> }
+    opts?: {
+        aspect?: Aspect;               // Reader 전역 Aspect
+        writerAspect?: Aspect;         // Writer 전용 전역 Aspect (writer 호출 후 리렌더 등)
+        wrap?: Record<string, WrapEntry>;
+    }
 ): ExposeBuilder<R, W> {
     const readerWraps: WrapMaps = { methodAspects: {}, methodWrappers: {} };
     const writerWraps: WrapMaps = { methodAspects: {}, methodWrappers: {} };
@@ -585,6 +390,22 @@ export function makeSmartController<R extends object, W extends object>(
         }
     }
 
+    // rerender을 위한 aspect
+    const resolvedWriterAspect: Aspect | undefined =
+        opts?.writerAspect === undefined
+            ? writerRerenderAspect
+            : opts.writerAspect ?? undefined;
+
     // 최초 builder는 RE/WE를 "현재 선택 집합"이자 "전체 집합"으로 등록
-    return makeBuilder(controllerName, RE, WE, opts?.aspect, readerWraps, writerWraps, RE, WE);
+    return makeBuilder(
+        controllerName,
+        RE,
+        WE,
+        opts?.aspect,          // Reader 글로벌 Aspect
+        resolvedWriterAspect,    // Writer 전용 글로벌 Aspect
+        readerWraps,
+        writerWraps,
+        RE,
+        WE
+    );
 }

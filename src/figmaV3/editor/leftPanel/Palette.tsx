@@ -32,7 +32,7 @@ export function Palette({ query = '' }: { query?: string }) {
 
     const onInsertCore = (defId: string) => {
         const parent = reader.getUI().selectedId ?? project.rootId;
-        writer.addByDef(defId, parent);
+        writer.addNodeByDef(defId, parent);
     };
 
     const handleDeleteShared = (componentId: string, componentName: string) => {

@@ -31,7 +31,7 @@ function RenderNode({ id, reader, writer }: { id: NodeId; reader: any; writer: a
     const def = getDefinition(node.componentId);
     const defaultStyle = toReactStyle(def?.defaults?.styles?.element?.base as CSSDict | undefined);
 
-    const selected = reader.getCurrentNode().id === id;
+    const selected = reader.getCurrentNode() === reader.getNode(id);
     const selectionStyle: React.CSSProperties = selected
         ? { outline: '2px solid var(--mdt-color-border-focus)', outlineOffset: 2, cursor: 'default' }
         : {};
@@ -59,7 +59,7 @@ function RenderNode({ id, reader, writer }: { id: NodeId; reader: any; writer: a
     const onSelect: React.MouseEventHandler = (e) => {
         e.stopPropagation();
         // 노드 선택은 writer를 통해 수행됩니다.
-        writer.nodes.selectNode(id);
+        writer.setSelectNodeId(id);
     };
 
     const finalProps: any = { ...elProps, style: finalStyle, onClick: chain(elProps.onClick, onSelect), 'data-node-id': id, ref: setNodeRef };
@@ -71,6 +71,7 @@ function RenderNode({ id, reader, writer }: { id: NodeId; reader: any; writer: a
 }
 
 export function Canvas({ dropTarget }: { dropTarget: DndDropTarget | null }) {
+
     const { reader, writer } = useEditorControllerFactory();
     const project = reader.getProject();
     const ui = reader.getUI();
@@ -81,7 +82,7 @@ export function Canvas({ dropTarget }: { dropTarget: DndDropTarget | null }) {
             return project.rootId;
         }
         if (mode === 'Component' && editingFragmentId) {
-            return reader.fragments.getFragmentById(editingFragmentId)?.rootId ?? null;
+            return reader.getFragmentById(editingFragmentId)?.rootId ?? null;
         }
         return null;
     }, [mode, editingFragmentId, project, reader.fragments]);

@@ -1,8 +1,8 @@
 import type { Node, NodeId, CSSDict, Viewport, EditorState } from '../../core/types';
 import { EditorCore } from '../EditorCore';
-import { selectNodes, selectNodeById } from '../../store/slices/nodeSlice';
-import { genId, buildNodeWithDefaults, chooseValidParentId, findParentId, collectSubtreeIds, cloneSubtree } from '../../store/utils';
-import {getDefinition} from "@/figmaV3/core/registry";
+import { getDefinition } from "@/figmaV3/core/registry";
+import { genId, buildNodeWithDefaults, chooseValidParentId, cloneSubtree } from '../../store/utils';
+import {selectNodeById, selectNodes} from "@/figmaV3/store/slices/nodeSlice";
 
 export function nodesDomain() {
     const R = {
@@ -11,104 +11,168 @@ export function nodesDomain() {
             if (!id) return null;
             return selectNodeById(id)(EditorCore.getState()) ?? null;
         },
-        getCurrentNode: (): Node | null => {
-            const state = EditorCore.getState();
-            return state.ui.selectedId ? R.getNode(state.ui.selectedId) : null;
-        },
         getRootNodeId: (): NodeId | null => EditorCore.getState().project.rootId,
+        getCurrentNode: (): Node | null => {
+            const s = EditorCore.getState();
+            const id = s.ui.selectedId;
+            return id ? (s.project.nodes[id] ?? null) : null;
+        },
     };
 
     const W = {
         addNodeByDef(defId: string, parentId?: NodeId, index?: number): NodeId {
+            const S = EditorCore.store.getState();
             const newId = genId(`node_${defId}`);
-            EditorCore.store.getState().update((s: EditorState) => {
-                const newNode = buildNodeWithDefaults(defId, newId);
-                s.project.nodes[newId] = newNode;
-                const desiredParentId = parentId ?? s.ui.selectedId ?? s.project.rootId;
-                const finalParentId = chooseValidParentId(s.project, desiredParentId);
-                const parentNode = s.project.nodes[finalParentId]!;
-                if (!parentNode.children) parentNode.children = [];
-                const finalIndex = Math.max(0, Math.min(index ?? parentNode.children.length, parentNode.children.length));
-                parentNode.children.splice(finalIndex, 0, newId);
-                s.ui.selectedId = newId;
-            }, true);
+            const newNode = buildNodeWithDefaults(defId, newId);
+            S._createNode(newNode);
+
+            const st = EditorCore.store.getState();
+            const desiredParentId = parentId ?? st.ui.selectedId ?? st.project.rootId;
+            const finalParentId = chooseValidParentId(st.project, desiredParentId);
+            const parent = st.project.nodes[finalParentId]!;
+            const finalIndex = Math.max(0, Math.min(index ?? (parent.children?.length ?? 0), parent.children?.length ?? 0));
+            S._moveNode(newId, finalParentId, finalIndex);
+            S._setSelectedId(newId);
             return newId;
         },
+
         moveNode(nodeId: NodeId, newParentId: NodeId, newIndex: number) {
-            const state = EditorCore.store.getState();
-            if (nodeId === state.project.rootId) return;
-
-            const oldParentId = findParentId(state.project.nodes, nodeId);
-
-            state.update((s: EditorState) => {
-                if (oldParentId) {
-                    const oldParent = s.project.nodes[oldParentId]!;
-                    oldParent.children = (oldParent.children ?? []).filter(id => id !== nodeId);
-                }
-
-                const newParent = s.project.nodes[newParentId]!;
-                if (!newParent.children) newParent.children = [];
-                const finalIndex = Math.max(0, Math.min(newIndex, newParent.children.length));
-                newParent.children.splice(finalIndex, 0, nodeId);
-            }, true);
+            EditorCore.store.getState()._moveNode(nodeId, newParentId, newIndex);
         },
+
         removeNodeCascade(nodeId: NodeId) {
-            EditorCore.store.getState().update((s: EditorState) => {
-                if (nodeId === s.project.rootId) return;
-                const parentId = findParentId(s.project.nodes, nodeId);
-                if (parentId) {
-                    const parent = s.project.nodes[parentId]!;
-                    parent.children = (parent.children ?? []).filter(id => id !== nodeId);
-                }
-                const idsToDelete = collectSubtreeIds(s.project.nodes, nodeId);
-                idsToDelete.forEach(id => delete s.project.nodes[id]);
-                if (s.ui.selectedId && idsToDelete.includes(s.ui.selectedId)) {
-                    s.ui.selectedId = parentId ?? s.project.rootId;
-                }
-            }, true);
+            EditorCore.store.getState()._deleteNodeCascade(nodeId);
         },
-        saveNodeAsComponent(nodeId: NodeId, name: string, description: string, isPublic: boolean) {
-            EditorCore.store.getState().update((s: EditorState) => {
-                const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, nodeId);
-                const newFragment = { id: genId('comp'), name, description, rootId: newRootId, isPublic };
-                s.project.nodes = { ...s.project.nodes, ...clonedNodes };
-                s.project.fragments.push(newFragment);
-            }, true);
+
+        updateNodeProps(id: NodeId, props: Record<string, unknown>) {
+            EditorCore.store.getState()._updateNodeProps(id, props);
         },
-        insertComponent(fragmentId: string, parentId?: NodeId) {
-            EditorCore.store.getState().update((s: EditorState) => {
-                const fragment = s.project.fragments.find(f => f.id === fragmentId);
-                if (!fragment) return;
-                const { nodes: clonedNodes, newRootId } = cloneSubtree(s.project.nodes, fragment.rootId);
-                s.project.nodes = { ...s.project.nodes, ...clonedNodes };
-                const desiredParentId = parentId ?? s.ui.selectedId ?? s.project.rootId;
-                const finalParentId = chooseValidParentId(s.project, desiredParentId);
-                const parentNode = s.project.nodes[finalParentId]!;
-                if (!parentNode.children) parentNode.children = [];
-                parentNode.children.push(newRootId);
-                s.ui.selectedId = newRootId;
-            }, true);
+
+        updateNodeStyles(id: NodeId, styles: CSSDict, viewport?: Viewport) {
+            EditorCore.store.getState()._updateNodeStyles(id, styles, viewport);
         },
-        updateNodeProps: (id: NodeId, props: Record<string, unknown>) => EditorCore.store.getState()._updateNodeProps(id, props),
-        updateNodeStyles: (id: NodeId, styles: CSSDict, viewport?: Viewport) => EditorCore.store.getState()._updateNodeStyles(id, styles, viewport),
-        toggleNodeVisibility: (nodeId: NodeId) => EditorCore.store.getState()._patchNode(nodeId, { isVisible: !R.getNode(nodeId)?.isVisible }),
-        toggleNodeLock: (nodeId: NodeId) => EditorCore.store.getState()._patchNode(nodeId, { locked: !R.getNode(nodeId)?.locked }),
+
+        toggleNodeVisibility(nodeId: NodeId) {
+            EditorCore.store.getState()._toggleNodeVisibility(nodeId);
+        },
+
+        toggleNodeLock(nodeId: NodeId) {
+            EditorCore.store.getState()._toggleNodeLock(nodeId);
+        },
+
+        // ui.ts에 유사 함수 존재 (selectNode)
+        setSelectNodeId(nodeId: NodeId){
+            EditorCore.store.getState()._setSelectedId(nodeId);
+        },
+
+        duplicateSelected() {
+            const S = EditorCore.store.getState();
+            const sel = S.ui.selectedId;
+            if (!sel) return;
+
+            // 부모/인덱스 탐색
+            const nodes = S.project.nodes;
+            let parentId: string | null = null;
+            let index = 0;
+            for (const id in nodes) {
+                const n = nodes[id]!;
+                const idx = n.children?.findIndex((cid) => cid === sel) ?? -1;
+                if (idx >= 0) { parentId = id; index = idx + 1; break; }
+            }
+            if (!parentId) return;
+
+            // 서브트리 복제
+            const { nodes: cloned, newRootId } = cloneSubtree(nodes, sel);
+            S.update((st) => { st.project.nodes = { ...st.project.nodes, ...cloned }; }, true);
+            S._moveNode(newRootId, parentId, index);
+            S._setSelectedId(newRootId);
+        },
+
+        groupSelected(groupComponentId = 'box') {
+            const S = EditorCore.store.getState();
+            const sel = S.ui.selectedId;
+            if (!sel) return;
+
+            // 부모/인덱스
+            const st = EditorCore.getState();
+            const nodes = st.project.nodes;
+            let parentId: string | null = null;
+            let index = 0;
+            for (const id in nodes) {
+                const n = nodes[id]!;
+                const idx = n.children?.findIndex((cid) => cid === sel) ?? -1;
+                if (idx >= 0) { parentId = id; index = idx; break; }
+            }
+            if (!parentId) return;
+
+            const gid = genId('group');
+            const groupNode: Node = {
+                id: gid,
+                //name: 'Group',
+                componentId: groupComponentId,
+                children: [],
+                props: {},
+                styles: { element: { base: {} } },
+                isVisible: true,
+                locked: false,
+            };
+
+            S._createNode(groupNode);
+            S._moveNode(gid, parentId, index);
+            S._moveNode(sel, gid, 0);
+            S._setSelectedId(gid);
+        },
+
+        ungroupSelected() {
+            const S = EditorCore.store.getState();
+            const sel = S.ui.selectedId;
+            if (!sel) return;
+
+            const st = EditorCore.getState();
+            const nodes = st.project.nodes;
+            const group = nodes[sel];
+            if (!group || !group.children || group.children.length === 0) return;
+
+            // 부모 찾기
+            let parentId: string | null = null;
+            for (const id in nodes) {
+                const n = nodes[id]!;
+                if (n.children?.includes(sel)) { parentId = id; break; }
+            }
+            if (!parentId) return;
+
+            const startIndex = nodes[parentId]!.children!.findIndex((id) => id === sel);
+            group.children.forEach((cid, i) => {
+                S._moveNode(cid, parentId!, startIndex + i + 1);
+            });
+            S._deleteNodeCascade(sel);
+            S._setSelectedId(parentId);
+        },
+        /*
         hydrateDefaults() {
             EditorCore.store.getState().update(s => {
                 for (const id in s.project.nodes) {
                     const node = s.project.nodes[id]!;
                     const def = getDefinition(node.componentId);
                     if (!def) continue;
+
                     const defProps = def.defaults?.props ?? {};
                     const nextProps = { ...defProps, ...(node.props ?? {}) };
+
                     const element = node.styles?.element ?? {};
                     const defBase = def.defaults?.styles?.element?.base ?? {};
                     const curBase = (element as any).base ?? {};
                     const nextElement = { ...element, base: { ...defBase, ...curBase } };
-                    s.project.nodes[id] = { ...node, props: nextProps, styles: { ...node.styles, element: nextElement } };
+
+                    s.project.nodes[id] = {
+                        ...node,
+                        props: nextProps,
+                        styles: { ...node.styles, element: nextElement },
+                    };
                 }
             }, true);
         },
+         */
     };
 
     return { reader: R, writer: W } as const;

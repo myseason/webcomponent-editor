@@ -34,7 +34,9 @@ export function StylesSection(): JSX.Element {
     const expert = ui.expertMode;
 
     // 현재 선택 노드 (없으면 루트)
-    const nodeId = reader.getCurrentNode().id ?? reader.getRootNodeId();
+    //const nodeId = reader.getCurrentNode().id ?? reader.getRootNodeId();
+    const currentNode = reader.getCurrentNode();
+    const nodeId = currentNode ? currentNode.id : reader.getRootNodeId();
     const node = project.nodes[nodeId];
 
     // 정책/정의 정보 (베이스 유틸 사용)
@@ -63,7 +65,7 @@ export function StylesSection(): JSX.Element {
 
     // 스타일 패치 (뷰포트 모드에 따라 대상 분기)
     const patch = (kv: CSSDict) =>
-        reader.updateNodeStyles(
+        writer.updateNodeStyles(
             nodeId,
             kv,
             mode === 'Independent' ? activeViewport : undefined

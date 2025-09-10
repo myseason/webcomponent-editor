@@ -15,10 +15,10 @@ export const withLog =
         (orig: AnyFn): AnyFn =>
             (...args: any[]) => {
                 // 필요하면 디버그 로깅
-                if (process.env.NODE_ENV !== 'production') {
+                //if (process.env.NODE_ENV !== 'production') {
                     // eslint-disable-next-line no-console
                     console.debug(`[${name}]`, ...args);
-                }
+                //}
                 return orig(...args);
     };
 

@@ -3,8 +3,10 @@
 import * as React from 'react';
 import { useEditorApi, EditorDomain } from '../../engine/EditorApi';
 import { useStoreTick } from '../adapters/useStoreTick';
-import { makeSmartController } from '../makeSmartController';
+import {makeSmartController, writerRerenderAspect} from '../makeSmartController';
 import { withLog } from '../adapters/aspect';
+
+import { useRerenderOnWrite } from '@/figmaV3/controllers/adapters/uiRerender';
 
 export enum LeftDomain {
     Sidebar = 'Sidebar',
@@ -26,7 +28,8 @@ export function useLeftControllerFactory(domain?: LeftDomain): { reader: any; wr
         EditorDomain.Selectors,
         EditorDomain.History,
     ]);
-    useStoreTick();
+    //useStoreTick();
+    useRerenderOnWrite();
 
     return React.useMemo(() => {
         switch (domain) {
@@ -47,6 +50,7 @@ export function useLeftControllerFactory(domain?: LeftDomain): { reader: any; wr
 
 function createPagesController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Pages', RE, WE, {
+        writerAspect: writerRerenderAspect,
         wrap: {
             addPage: withLog('addPage'),
             removePage: withLog('removePage'),
@@ -56,15 +60,17 @@ function createPagesController(RE: any, WE: any) {
     });
 
     return ctl
-        .pickReader('getProject', 'getUI')
-        .pickWriter('addPage', 'removePage', 'duplicatePage', 'selectPage', 'update')
+        //.pickReader('getProject', 'getUI')
+        //.pickWriter('addPage', 'removePage', 'duplicatePage', 'selectPage', 'update')
+        .exposeAll()
         .build();
 }
 
 function createLayersController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Layers', RE, WE, {
+        writerAspect: writerRerenderAspect,
         wrap: {
-            select: withLog('select'),
+            //select: withLog('select'),
             moveNode: withLog('moveNode'),
             toggleNodeVisibility: withLog('toggleNodeVisibility'),
             toggleNodeLock: withLog('toggleNodeLock'),
@@ -73,13 +79,15 @@ function createLayersController(RE: any, WE: any) {
     });
 
     return ctl
-        .pickReader('getProject', 'getUI', 'getNodeById', 'getNode')
-        .pickWriter('select', 'moveNode', 'toggleNodeVisibility', 'toggleNodeLock', 'removeNodeCascade')
+        //.pickReader('getProject', 'getUI', 'getNodeById', 'getNode')
+        //.pickWriter('select', 'moveNode', 'toggleNodeVisibility', 'toggleNodeLock', 'removeNodeCascade')
+        .exposeAll()
         .build();
 }
 
 function createComponentsController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Components', RE, WE, {
+        writerAspect: writerRerenderAspect,
         wrap: {
             addFragment: withLog('addFragment'),
             updateFragment: withLog('updateFragment'),
@@ -92,6 +100,7 @@ function createComponentsController(RE: any, WE: any) {
     });
 
     return ctl
+        /*
         .pickReader('getProject', 'getUI', 'isAdmin')
         .pickWriter(
             'addFragment',
@@ -102,11 +111,14 @@ function createComponentsController(RE: any, WE: any) {
             'insertComponent',
             'setNotification',
         )
+        */
+        .exposeAll()
         .build();
 }
 
 function createAssetsController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Assets', RE, WE, {
+        writerAspect: writerRerenderAspect,
         wrap: {
             addAsset: withLog('addAsset'),
             removeAsset: withLog('removeAsset'),
@@ -116,8 +128,9 @@ function createAssetsController(RE: any, WE: any) {
     });
 
     return ctl
-        .pickReader('getProject', 'getUI')
-        .pickWriter('addAsset', 'removeAsset', 'updateGlobalCss', 'updateGlobalJs')
+        //.pickReader('getProject', 'getUI')
+        //.pickWriter('addAsset', 'removeAsset', 'updateGlobalCss', 'updateGlobalJs')
+        .exposeAll()
         .build();
 }
 
@@ -125,13 +138,15 @@ function createStylesheetsController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Stylesheets', RE, WE, {});
 
     return ctl
-        .pickReader('getProject', 'getUI')
-        .pickWriter('update')
+        //.pickReader('getProject', 'getUI')
+        //.pickWriter('update')
+        .exposeAll()
         .build();
 }
 
 function createPaletteController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Palette', RE, WE, {
+        writerAspect: writerRerenderAspect,
         wrap: {
             addByDef: withLog('addByDef'),
             insertComponent: withLog('insertComponent'),
@@ -140,13 +155,15 @@ function createPaletteController(RE: any, WE: any) {
     });
 
     return ctl
-        .pickReader('getProject', 'getUI', 'isAdmin')
-        .pickWriter('addByDef', 'insertComponent', 'removeFragment')
+        //.pickReader('getProject', 'getUI', 'isAdmin')
+        //.pickWriter('addByDef', 'insertComponent', 'removeFragment')
+        .exposeAll()
         .build();
 }
 
 function createTemplatesController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Templates', RE, WE, {
+        writerAspect: writerRerenderAspect,
         wrap: {
             insertComponent: withLog('insertComponent'),
             removeFragment: withLog('removeFragment'),

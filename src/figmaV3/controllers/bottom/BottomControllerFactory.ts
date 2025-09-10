@@ -3,7 +3,8 @@
 import * as React from 'react';
 import { useEditorApi, EditorDomain } from '../../engine/EditorApi';
 import { useStoreTick } from '../adapters/useStoreTick';
-import { makeSmartController } from '../makeSmartController';
+import { useRerenderOnWrite } from '@/figmaV3/controllers/adapters/uiRerender';
+import {makeSmartController, writerRerenderAspect} from '../makeSmartController';
 import { withLog } from '../adapters/aspect';
 
 export enum BottomDomain {
@@ -23,7 +24,8 @@ export function useBottomControllerFactory(domain?: BottomDomain): { reader: any
         EditorDomain.Selectors,
         EditorDomain.History,
     ]);
-    useStoreTick();
+    //useStoreTick();
+    useRerenderOnWrite();
 
     return React.useMemo(() => {
         switch (domain) {
@@ -41,6 +43,7 @@ export function useBottomControllerFactory(domain?: BottomDomain): { reader: any
 
 function createDockController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Dock', RE, WE, {
+        writerAspect: writerRerenderAspect,
         wrap: { toggleBottomDock: withLog('toggleBottomDock'), update: withLog('update') },
     });
     return ctl
@@ -51,6 +54,7 @@ function createDockController(RE: any, WE: any) {
 
 function createFlowsController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Flows', RE, WE, {
+        writerAspect: writerRerenderAspect,
         wrap: {
             addFlowEdge: withLog('addFlowEdge'),
             updateFlowEdge: withLog('updateFlowEdge'),
@@ -66,6 +70,7 @@ function createFlowsController(RE: any, WE: any) {
 
 function createDataController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Data', RE, WE, {
+        writerAspect: writerRerenderAspect,
         wrap: { update: withLog('update') },
     });
 
@@ -77,6 +82,7 @@ function createDataController(RE: any, WE: any) {
 
 function createActionsController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Actions', RE, WE, {
+        writerAspect: writerRerenderAspect,
         wrap: {
             setActionSteps: withLog('setActionSteps'),
             runActionSteps: withLog('runActionSteps'),
@@ -84,8 +90,9 @@ function createActionsController(RE: any, WE: any) {
     });
 
     return ctl
-        .pickReader('selectedNodeId', 'getActionSteps', 'defaultNavigateTargetId', 'pages')
-        .pickWriter('setActionSteps', 'runActionSteps')
+        //.pickReader('selectedNodeId', 'getActionSteps', 'defaultNavigateTargetId', 'pages')
+        //.pickWriter('setActionSteps', 'runActionSteps')
+        .exposeAll()
         .build();
 }
 

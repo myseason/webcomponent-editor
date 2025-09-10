@@ -55,7 +55,9 @@ export function uiDomain() {
         setCanvasZoom: (zoom: number) => EditorCore.store.getState()._setCanvasZoom(zoom),
         toggleCanvasOrientation: () => {
             const state = EditorCore.store.getState();
+            const { width, height, orientation } = state.ui.canvas;
             const newOrientation = state.ui.canvas.orientation === 'landscape' ? 'portrait' : 'landscape';
+            state._setCanvasSize({ width: height, height: width });
             state._setCanvasOrientation(newOrientation);
         },
         toggleBottomDock: () => EditorCore.store.getState()._toggleBottomDock(),

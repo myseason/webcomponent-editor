@@ -3,9 +3,11 @@
 import * as React from 'react';
 import { useEditorApi, EditorDomain } from '../../engine/EditorApi';
 import { useStoreTick } from '../adapters/useStoreTick';
-import { makeSmartController } from '../makeSmartController';
+import {makeSmartController, writerRerenderAspect} from '../makeSmartController';
 import { withLog } from '../adapters/aspect';
 import { getDefinition } from "@/figmaV3/core/registry";
+import {NodeId} from "@/figmaV3/core/types";
+import { useRerenderOnWrite } from '@/figmaV3/controllers/adapters/uiRerender';
 
 export enum RightDomain {
     Inspector = 'Inspector',
@@ -19,7 +21,8 @@ export function useRightControllerFactory(domain?: RightDomain): { reader: any; 
         EditorDomain.Fragment,
         EditorDomain.Selectors,
     ]);
-    useStoreTick();
+    //useStoreTick();
+    useRerenderOnWrite();
 
     return React.useMemo(() => {
         switch (domain) {
@@ -31,9 +34,13 @@ export function useRightControllerFactory(domain?: RightDomain): { reader: any; 
 }
 
 /* ───────── 내부 구현 숨김 ───────── */
+type InspectorVM = {
+    target: null | { nodeId: NodeId; componentId: string | null };
+};
 
 function createInspectorController(RE: any, WE: any) {
     const ctl = makeSmartController('Right/Inspector', RE, WE, {
+        writerAspect: writerRerenderAspect,
         wrap: {
             updateNodeStyles: withLog('updateNodeStyles'),
             updateNodeProps: withLog('updateNodeProps'),
@@ -42,30 +49,21 @@ function createInspectorController(RE: any, WE: any) {
         },
     });
 
-    const getViewModel = () => {
-        //const selectedId = RE.getCurrentNode().id;
-        const node = RE.getCurrentNode();
-        if (!node)
-            return null;
-
-        const definition = getDefinition(node.componentId);
-        const policy = RE.getGlobalStylePolicy(); // 혹은 컴포넌트별 정책
-        const effectiveStyles = RE.getEffectiveDecl(node.id);
-        const schemaOverrides = RE.getSchemaOverrides()?.[node.componentId];
-
-        return {
-            key: node.id,
-            node,
-            definition,
-            policy,
-            effectiveStyles,
-            schemaOverrides,
-        };
-    };
-
     return ctl
-        .pickReader('getProject', 'getUI', 'getNodeById', 'getEffectiveDecl', 'getInspectorTarget')
-        .pickWriter('updateNodeStyles', 'updateNodeProps', 'setNotification', 'updateComponentPolicy')
+        .attachReader("getInspectorVM", () => {
+            const ui = RE.getUI?.();
+            const project = RE.getProject?.();
+
+            const nodeId: NodeId | null = (ui?.selectedId as NodeId | undefined) ?? null;
+            const componentId: string | null =
+                nodeId ? ((project?.nodes?.[nodeId]?.componentId as string | undefined) ?? null) : null;
+
+            if (!nodeId) return { target: null };
+            return { target: { nodeId, componentId } };
+        })
+        //.pickReader('getProject', 'getUI', 'getNodeById', 'getEffectiveDecl', 'getInspectorVM')
+        //.pickWriter('updateNodeStyles', 'updateNodeProps', 'setNotification', 'updateComponentPolicy')
+        .exposeAll()
         .build();
 }
 
@@ -75,7 +73,8 @@ function createPolicyController(RE: any, WE: any) {
     });
 
     return ctl
-        .pickReader('getProject', 'getUI')
-        .pickWriter('updateComponentPolicy')
+        //.pickReader('getProject', 'getUI')
+        //.pickWriter('updateComponentPolicy')
+        .exposeAll()
         .build();
 }

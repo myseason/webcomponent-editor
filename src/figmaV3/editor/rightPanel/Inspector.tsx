@@ -78,7 +78,7 @@ export function Inspector() {
 
     //------------------------------------------------------------------------------------------------------------------
     // 컨트롤러 기반 VM (타깃 노드 단일화)
-    const vm = reader.getInspectorTarget();
+    const vm = reader.getInspectorVM();
 
     // 컨트롤러가 계산한 nodeId/defId가 있으면 우선 사용
     const effectiveNodeId = (vm?.target?.nodeId ?? targetNodeId) as NodeId | null;

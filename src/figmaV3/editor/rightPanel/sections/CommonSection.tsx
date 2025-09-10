@@ -18,21 +18,20 @@ type AttrMap = Record<string, string>;
 
 export function CommonSection({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     // ✅ 컨트롤러 교체 (호출 패턴 동일)
-    const { reader, writer } = useRightControllerFactory(RightDomain.Policy);
-    const R = reader; const W = writer;
+    const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
 
     // ✅ 기존 state 구성 유지 (reader/writer에서 동일 기능 바인딩)
     const state = {
-        ui: R.getUI(),
-        project: R.getProject(),
-        data: R.data?.(), // 일부 구현에서는 data()가 없을 수 있으므로 optional
-        getEffectiveDecl: R.getEffectiveDecl?.bind(R),
-        updateNodeStyles: W.updateNodeStyles.bind(W),
-        updateNodeProps: W.updateNodeProps.bind(W),
-        setNotification: W.setNotification?.bind(W),
-        saveNodeAsComponent: W.saveNodeAsComponent?.bind(W),
-        updateComponentPolicy: W.updateComponentPolicy?.bind(W),
-        update: W.update?.bind(W),
+        ui: reader.getUI(),
+        project: reader.getProject(),
+        data: reader.data?.(), // 일부 구현에서는 data()가 없을 수 있으므로 optional
+        getEffectiveDecl: reader.getEffectiveDecl?.bind(reader),
+        updateNodeStyles: writer.updateNodeStyles.bind(writer),
+        updateNodeProps: writer.updateNodeProps.bind(writer),
+        setNotification: writer.setNotification?.bind(writer),
+        saveNodeAsComponent: writer.saveNodeAsComponent?.bind(writer),
+        updateComponentPolicy: writer.updateComponentPolicy?.bind(writer),
+        update: writer.update?.bind(writer),
     };
 
     const { ui, project, updateNodeProps } = state;

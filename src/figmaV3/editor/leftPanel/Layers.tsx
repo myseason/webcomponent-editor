@@ -57,7 +57,7 @@ const Row: React.FC<{ id: NodeId; depth: number }> = memo(({ id, depth }) => {
     const selected = ui.selectedId === id;
     const name = getDisplayName(node);
 
-    const onSelect = useCallback(() => writer.select(id), [writer, id]);
+    const onSelect = useCallback(() => writer.setSelectNodeId(id), [writer, id]);
     const onToggleVisible = useCallback(() => writer.toggleNodeVisibility(id), [writer, id]);
     const onToggleLock = useCallback(() => writer.toggleNodeLock(id), [writer, id]);
     const onRemoveCascade = useCallback(() => writer.removeNodeCascade(id), [writer, id]);

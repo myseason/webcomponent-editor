@@ -1,8 +1,9 @@
 'use client';
+
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Viewport, Page, ViewportMode } from '../../core/types';
 import { Monitor, Tablet, Smartphone, RotateCw, Plus, Minus, Undo, Redo, Info } from 'lucide-react';
-import { useTopbarControllerFactory, TopbarDomain } from "@/figmaV3/controllers/topbar/TopbarControllerFactory";
+import {useTopbarControllerFactory} from "@/figmaV3/controllers/topbar/TopbarControllerFactory";
 
 const VIEWPORT_SIZES: Record<Viewport, { w: number; h: number }> = {
     base:   { w: 1280, h: 800 },
@@ -20,8 +21,16 @@ const VP_LIST: Viewport[] = ['base', 'tablet', 'mobile'];
 const ZOOM_MIN = 0.25, ZOOM_MAX = 4.0, ZOOM_STEP = 0.25;
 
 export default function PageBar() {
-    const { reader, writer } = useTopbarControllerFactory(TopbarDomain.Topbar);
-
+    const {reader, writer} = useTopbarControllerFactory();
+    /*
+    const {
+        project, ui, history,
+        setActiveViewport, setCanvasSize, setCanvasZoom,
+        toggleCanvasOrientation, selectPage,
+        setBaseViewport, setViewportMode,
+        undo, redo, setNotification,
+    } = state;
+    */
     const project = reader.getProject();
     const ui = reader.getUI();
 
@@ -31,6 +40,7 @@ export default function PageBar() {
     );
 
     const { activeViewport, baseViewport, vpMode, width: canvasWidth, height: canvasHeight, zoom } = ui.canvas;
+    const notification = ui.notification;
     const editorMode = ui.mode;
 
     const [wStr, setWStr] = useState(String(canvasWidth));
@@ -41,6 +51,7 @@ export default function PageBar() {
     useEffect(() => setHStr(String(canvasHeight)), [canvasHeight]);
     useEffect(() => setZoomStr(String(Math.round(zoom * 100))), [zoom]);
 
+    // ✨ [수정] 전역 notification 상태를 구독하고, 2초 후 자동으로 사라지도록 타이머 설정
     const [visibleNotification, setVisibleNotification] = useState<string | null>(null);
     useEffect(() => {
         if (ui.notification) {
@@ -53,14 +64,16 @@ export default function PageBar() {
     }, [ui.notification]);
 
     const setViewport = (vp: Viewport) => {
-        writer.setActiveViewport(vp);
+        writer.setActiveViewport?.(vp);
         const sz = VIEWPORT_SIZES[vp];
-        writer.setCanvasSize({ width: sz.w, height: sz.h });
+        const isPortrait = reader.getUI().canvas.orientation === 'portrait';
+        writer.setCanvasSize?.({ width: isPortrait ? sz.h : sz.w, height: isPortrait ? sz.w : sz.h });
     };
 
     const applySize = () => {
         const w = parseInt(wStr, 10), h = parseInt(hStr, 10);
-        if (!isNaN(w) && w > 0 && !isNaN(h) && h > 0) writer.setCanvasSize({ width: w, height: h });
+        if (!isNaN(w) && w > 0 && !isNaN(h) && h > 0)
+            writer.setCanvasSize({ width: w, height: h });
         else {
             setWStr(String(canvasWidth));
             setHStr(String(canvasHeight));
@@ -74,8 +87,15 @@ export default function PageBar() {
         else setZoomStr(String(Math.round(zoom * 100)));
     };
 
+    const toggleExpertMode = () => {
+        //state.update(s => { s.ui.expertMode = !s.ui.expertMode; });
+        writer.setExpertMode(!ui.expertMode);
+        writer.setNotification(`Expert Mode: ${!ui.expertMode ? 'ON' : 'OFF'}`); // ✨ [수정] 전역 알림 액션 사용
+    }
+
     return (
         <div className="relative w-full flex items-center justify-between border-b border-gray-200 bg-white px-3 py-2">
+            {/* Left: 페이지 선택 또는 컴포넌트 모드 표시 */}
             <div className="flex items-center gap-2">
                 {editorMode === 'Page' ? (
                     <select
@@ -94,6 +114,7 @@ export default function PageBar() {
                 )}
             </div>
 
+            {/* Center: 뷰포트 및 캔버스 컨트롤 */}
             <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
                 <div className="flex items-center gap-1">
                     <button
@@ -122,12 +143,10 @@ export default function PageBar() {
                             type="radio"
                             name="vp-mode"
                             checked={vpMode[activeViewport] === 'Unified'}
-                            onChange={
-                                () => {
-                                    writer.setViewportMode(activeViewport, 'Unified');
-                                    writer.setNotification(`Mode: Unified (${activeViewport})`);
-                                }
-                            }
+                            onChange={() => {
+                                writer.setViewportMode(activeViewport, 'Unified');
+                                writer.setNotification(`Mode: Unified (${activeViewport})`);
+                            }}
                         />
                         통합
                     </label>
@@ -136,12 +155,10 @@ export default function PageBar() {
                             type="radio"
                             name="vp-mode"
                             checked={vpMode[activeViewport] === 'Independent'}
-                            onChange={
-                                () => {
-                                    writer.setViewportMode(activeViewport, 'Independent');
-                                    writer.setNotification(`Mode: Independent (${activeViewport})`);
-                                }
-                            }
+                            onChange={() => {
+                                writer.setViewportMode(activeViewport, 'Independent');
+                                writer.setNotification(`Mode: Independent (${activeViewport})`);
+                            }}
                         />
                         개별
                     </label>
@@ -164,12 +181,10 @@ export default function PageBar() {
                                 name="vp-base"
                                 className="accent-blue-600"
                                 checked={baseViewport === vp}
-                                onChange={
-                                    () => {
-                                        writer.setBaseViewport(vp);
-                                        writer.setNotification(`Base viewport: ${vp}`);
-                                    }
-                                }
+                                onChange={() => {
+                                    writer.setBaseViewport(vp);
+                                    writer.setNotification(`Base viewport: ${vp}`);
+                                }}
                                 title="Set as Base"
                             />
                         </div>
@@ -234,9 +249,18 @@ export default function PageBar() {
                 </div>
             </div>
 
-            {/* ✨ [제거] Expert 모드 토글 버튼 */}
-            <div className="w-20"></div> {/* Right side alignment placeholder */}
+            {/* Right: 전문가 모드 토글 */}
+            <div className="flex items-center gap-2">
+                <button
+                    className={`p-1.5 rounded border text-xs px-2 ${ui.expertMode ? 'bg-orange-100 text-orange-700' : ''}`}
+                    onClick={toggleExpertMode}
+                    title="Toggle Expert Mode"
+                >
+                    Expert
+                </button>
+            </div>
 
+            {/* ✨ [수정] 전역 상태 기반 알림(Toast) UI */}
             {visibleNotification && (
                 <div className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 animate-in fade-in-0 slide-in-from-top-2 duration-300">
                     <div className="flex items-center gap-2 rounded bg-black/80 text-white text-xs px-3 py-1.5 shadow">
