@@ -66,7 +66,7 @@ export function fragmentsDomain() {
         },
 
         /** 프래그먼트를 공유 라이브러리에 공개 상태로 변경합니다. */
-        publishComponent(fragmentId: string) {
+        publishFragment(fragmentId: string) {
             W.updateFragment(fragmentId, { isPublic: true });
         },
 

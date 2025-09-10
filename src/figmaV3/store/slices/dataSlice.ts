@@ -56,26 +56,24 @@ export const createDataSlice: StateCreator<EditorStoreState, [], [], DataSlice> 
     _removeStylesheet: (id: string) => get().update((s) => {
         s.project.stylesheets = (s.project.stylesheets ?? []).filter((x) => x.id !== id);
     }, true),
+
+    // 단일 edge를 id 기준으로 upsert (Record<string, FlowEdge> 구조에 맞춤)
+    _upsertFlowEdge: (id: string, edge: FlowEdge) =>
+        get().update((s) => {
+            const map = s.flowEdges ?? {};
+            s.flowEdges = { ...map, [id]: edge };
+        }, true),
+
+    // 단일 edge를 id 기준으로 제거
+    _removeFlowEdge: (id: string) =>
+        get().update((s) => {
+            const map = s.flowEdges ?? {};
+            if (!(id in map)) return; // 변화 없으면 no-op
+            const { [id]: _removed, ...rest } = map;
+            s.flowEdges = rest;
+        }, true),
+
 }) as DataSlice & {
-    upsertFlowEdge?: (id: string, edge: FlowEdge) => void;
-    removeFlowEdge?: (id: string) => void;
-};
-
-// 별도 헬퍼를 prototype에 추가해도 되지만, 보통은 store 레벨에서 확장합니다.
-export const attachFlowEdgeHelpers = (store: { getState: () => EditorStoreState }) => {
-    const st = store.getState() as EditorStoreState & {
-        upsertFlowEdge?: (id: string, edge: FlowEdge) => void;
-        removeFlowEdge?: (id: string) => void;
-    };
-
-    st.upsertFlowEdge = (id, edge) => {
-        const edges = selectFlowEdges(st);
-        st._setFlowEdges({ ...edges, [id]: edge });
-    };
-
-    st.removeFlowEdge = (id) => {
-        const edges = selectFlowEdges(st);
-        const { [id]: _, ...next } = edges;
-        st._setFlowEdges(next);
-    };
+    _upsertFlowEdge?: (id: string, edge: FlowEdge) => void;
+    _removeFlowEdge?: (id: string) => void;
 };

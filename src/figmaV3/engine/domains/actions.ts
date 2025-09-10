@@ -26,7 +26,7 @@ export function actionsDomain() {
         },
 
         /** 액션 스텝을 추가합니다. */
-        appendActionStep(nodeId: NodeId, event: SupportedEvent, step: ActionStep) {
+        addActionStep(nodeId: NodeId, event: SupportedEvent, step: ActionStep) {
             const currentSteps = R.getActionSteps(nodeId, event);
             W.setActionSteps(nodeId, event, [...currentSteps, step]);
         },

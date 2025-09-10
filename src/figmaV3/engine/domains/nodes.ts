@@ -148,31 +148,6 @@ export function nodesDomain() {
             S._deleteNodeCascade(sel);
             S._setSelectedId(parentId);
         },
-        /*
-        hydrateDefaults() {
-            EditorCore.store.getState().update(s => {
-                for (const id in s.project.nodes) {
-                    const node = s.project.nodes[id]!;
-                    const def = getDefinition(node.componentId);
-                    if (!def) continue;
-
-                    const defProps = def.defaults?.props ?? {};
-                    const nextProps = { ...defProps, ...(node.props ?? {}) };
-
-                    const element = node.styles?.element ?? {};
-                    const defBase = def.defaults?.styles?.element?.base ?? {};
-                    const curBase = (element as any).base ?? {};
-                    const nextElement = { ...element, base: { ...defBase, ...curBase } };
-
-                    s.project.nodes[id] = {
-                        ...node,
-                        props: nextProps,
-                        styles: { ...node.styles, element: nextElement },
-                    };
-                }
-            }, true);
-        },
-         */
     };
 
     return { reader: R, writer: W } as const;
