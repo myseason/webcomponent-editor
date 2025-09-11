@@ -1,5 +1,86 @@
 import { EditorCore } from '../EditorCore';
-import type { EditorState, CSSDict, NodeId, Page, Fragment } from '../../core/types';
+import type {
+    EditorState,
+    CSSDict,
+    NodeId,
+    Page,
+    Fragment,
+    BottomRightPanelKind,
+    EditorUI,
+    EditorMode, Project
+} from '../../core/types';
+
+// ======================================================
+// 파생 셀렉터에서 재사용할 안전 보정 유틸
+// ======================================================
+type PanelsT = NonNullable<EditorUI['panels']>;
+type BottomT  = NonNullable<PanelsT['bottom']>;
+type AdvancedT = NonNullable<BottomT['advanced']>;
+
+type BottomAdvanced = { open: boolean; kind: BottomRightPanelKind; widthPct: number };
+type BottomDockState = { heightPx: number; isCollapsed: boolean; advanced: BottomAdvanced };
+type BottomRightLayout = { rightOpen: boolean; rightPct: number; leftPct: number };
+
+/* -------------------------------
+ * 내부 정규화 유틸
+ * ----------------------------- */
+function normBottomDock(ui?: EditorUI): BottomDockState {
+    // 가능한 한 "정확한 타입"으로 캐스팅 + Partial로 안전 접근
+    const panels = (ui?.panels as PanelsT | undefined);
+    const bottom = (panels?.bottom as BottomT | undefined);
+
+    const pBottom: Partial<BottomT> | undefined = bottom as any;
+
+    const heightPx =
+        typeof pBottom?.heightPx === 'number' ? pBottom!.heightPx : 240;
+
+    const isCollapsed = !!pBottom?.isCollapsed;
+
+    const advRaw = (pBottom?.advanced as AdvancedT | undefined);
+    const pAdv: Partial<AdvancedT> | undefined = advRaw as any;
+
+    const advanced: BottomAdvanced = {
+        open: !!pAdv?.open,
+        kind: (pAdv?.kind ?? 'None') as BottomRightPanelKind,
+        widthPct: typeof pAdv?.widthPct === 'number' ? pAdv.widthPct! : 36,
+    };
+
+    return { heightPx, isCollapsed, advanced };
+}
+
+function computeRightLayout(ui?: EditorUI): BottomRightLayout {
+    const st = normBottomDock(ui);
+    // 클램프는 여기서만: UI 정책 변경도 한 곳에서 조정 가능
+    const rp = Math.max(0, Math.min(100, st.advanced.widthPct));
+    const rightOpen = !!st.advanced.open && st.advanced.kind === 'SchemaEditor';
+    return { rightOpen, rightPct: rp, leftPct: Math.max(0, 100 - rp) };
+}
+
+function findCurrentRootIdByMode(ui?: EditorUI, project?: Project): NodeId | null {
+    const mode: EditorMode = (ui?.mode ?? 'Page') as EditorMode;
+
+    if (mode === 'Component') {
+        const fragId =
+            // v1.4에서 사용하는 편집 프래그먼트 id 우선순위
+            (ui as any)?.editingFragmentId ??
+            ui?.panels?.left?.lastActiveFragmentId ??
+            null;
+
+        if (fragId && project?.fragments?.length) {
+            const f = project.fragments.find((x) => x.id === fragId) ?? project.fragments[0];
+            return f?.rootId ?? null;
+        }
+        return null;
+    }
+
+    // Page 모드
+    const pageId = ui?.panels?.left?.lastActivePageId ?? null;
+    if (project?.pages?.length) {
+        const p = (pageId ? project.pages.find((x) => x.id === pageId) : null) ?? project.pages[0];
+        return p?.rootId ?? null;
+    }
+    return null;
+}
 
 /**
  * selectorsDomain — 순수 Reader
@@ -82,6 +163,23 @@ export function selectorsDomain() {
         /** 현재 편집 중 프래그먼트 */
         getEditingFragment() {
             return selectEditingFragment(EditorCore.getState());
+        },
+        /** BottomDock 표준 읽기 상태(초깃값 포함) */
+        selectBottomDockState(): BottomDockState {
+            const s = EditorCore.store.getState() as EditorState;
+            return normBottomDock(s.ui);
+        },
+
+        /** 우측 고급 패널 레이아웃 파생값 */
+        selectBottomRightLayout(): BottomRightLayout {
+            const s = EditorCore.store.getState() as EditorState;
+            return computeRightLayout(s.ui);
+        },
+
+        /** 현재 모드(Page/Component)에 따른 현재 루트 NodeId */
+        selectCurrentRootId(): NodeId | null {
+            const s = EditorCore.store.getState() as EditorState;
+            return findCurrentRootIdByMode(s.ui, s.project);
         },
     };
 

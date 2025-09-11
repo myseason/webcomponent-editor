@@ -13,10 +13,9 @@ export function FragmentsPanel() {
     const { reader, writer } = useBottomControllerFactory(BottomDomain.Fragments);
 
     // 호환 접근(getUI/getProject 우선, 구형 시그니처 폴백)
-    const ui = (reader as any).getUI?.() ?? (reader as any).ui?.();
-    const project = (reader as any).getProject?.() ?? (reader as any).project?.();
-    const flowEdges: Record<string, FlowEdge> =
-        (reader as any).flowEdges?.() ?? {};
+    const ui = reader.getUI();
+    const project = reader.getProject();
+    const flowEdges: Record<string, FlowEdge> = reader.getFlowEdges() ?? {};
 
     // refs 카운트(Flows + Actions) — useMemo로 계산 비용 절감
     const refCountById = useMemo<Record<string, number>>(() => {

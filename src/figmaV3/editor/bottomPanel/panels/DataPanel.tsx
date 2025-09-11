@@ -12,14 +12,7 @@ export function DataPanel() {
     const { reader, writer } = useBottomControllerFactory(BottomDomain.Data);
 
     // 호환 접근(getData 우선, 구형 시그니처 폴백)
-    const dataObj = useMemo<Record<string, unknown>>(
-        () => ((reader as any).getData?.() ?? (reader as any).data?.() ?? {}) as Record<string, unknown>,
-        // reader는 프록시일 수 있으므로, data 스냅샷 문자열을 의존성으로 사용해 변경 감지
-        // (getData() / data()가 참조 동일성을 보장하지 않을 경우를 대비)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [(reader as any).getData?.() ?? (reader as any).data?.()]
-    );
-
+    const dataObj = useMemo<Record<string, unknown>>(() => reader.getData() ?? {} as Record<string, unknown>,[reader.getData()]);
     const [text, setText] = useState<string>(JSON.stringify(dataObj, null, 2));
 
     // 외부에서 data가 갱신되면 textarea도 동기화
