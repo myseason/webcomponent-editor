@@ -19,9 +19,6 @@ import { RightDomain, useRightControllerFactory } from '@/figmaV3/controllers/ri
 
 // ──────────────────────────────────────────────────────────────────────────────
 // 스타일 섹션 상단: 정책 메시지 패널(공통 표시 영역)
-// - 페이지 모드: TagPolicy+ComponentPolicy 반영 시 “숨김 안내”
-// - 페이지 모드 강제노출(Inspector 상단 토글): “컴포넌트 정책 무시 안내”
-// - 컴포넌트 모드: “TagPolicy로 제한된 속성은 숨김/ 🔒로 페이지 모드 숨김 설정 가능”
 // ──────────────────────────────────────────────────────────────────────────────
 function InspectorPolicyNotice({
                                    mode,
@@ -36,18 +33,16 @@ function InspectorPolicyNotice({
             ? 'TagPolicy 기준으로 스타일을 모두 표시합니다. (컴포넌트 정책은 무시됩니다)'
             : '정책에 의해 제한되는 속성은 표시되지 않습니다. (컴포넌트 정책 적용)';
     } else {
-        text = '컴포넌트 개발 모드입니다. TagPolicy로 제한되는 속성은 숨겨지며, 🔒을 눌러 페이지 모드에서 숨길 속성을 지정할 수 있습니다.';
+        text =
+            '컴포넌트 개발 모드입니다. TagPolicy로 제한되는 속성은 숨겨지며, 🔒을 눌러 페이지 모드에서 숨길 속성을 지정할 수 있습니다.';
     }
 
-    // Inspector 내부 강조: 테마를 해치지 않되 눈에 띄게
     return (
         <div className="mt-2 mb-2 -mx-2 px-3 py-2 rounded-md border-2 border-amber-400/80 bg-amber-50 text-amber-800 font-semibold text-[13px]">
             {text}
         </div>
     );
 }
-
-// ──────────────────────────────────────────────────────────────────────────────
 
 type OpenState = {
     layout: boolean;
@@ -67,7 +62,6 @@ export function StylesSection(): JSX.Element {
     const expert = ui.expertMode;
 
     // 현재 선택 노드 (없으면 루트)
-    // const nodeId = reader.getCurrentNode().id ?? reader.getRootNodeId();
     const currentNode = reader.getCurrentNode();
     const nodeId = currentNode ? currentNode.id : reader.getRootNodeId();
     const node = project.nodes[nodeId];
@@ -75,38 +69,63 @@ export function StylesSection(): JSX.Element {
     // 허용된 스타일 키 집합(정책 기반)
     const allow = useAllowed(nodeId);
 
-    // 그룹별로 다루는 대표 스타일 키 목록(그룹 내에 하나라도 허용되면 그룹을 노출)
+    // 그룹별 대표 키 (하나라도 허용되면 그룹 노출)
     const GROUP_KEYS: Record<keyof OpenState, string[]> = {
         layout: [
             'display',
-            'flexDirection', 'justifyContent', 'alignItems', 'gap',
-            'gridTemplateColumns', 'gridTemplateRows',
-            'width', 'height', 'overflow',
+            'flexDirection',
+            'justifyContent',
+            'alignItems',
+            'gap',
+            'gridTemplateColumns',
+            'gridTemplateRows',
+            'width',
+            'height',
+            'overflow',
         ],
         typo: [
-            'fontFamily', 'fontSize', 'lineHeight', 'fontWeight',
-            'letterSpacing', 'textAlign', 'color',
+            'fontFamily',
+            'fontSize',
+            'lineHeight',
+            'fontWeight',
+            'letterSpacing',
+            'textAlign',
+            'color',
         ],
-        position: [
-            'position', 'top', 'left', 'right', 'bottom', 'zIndex',
-        ],
+        position: ['position', 'top', 'left', 'right', 'bottom', 'zIndex'],
         spacing: [
-            'margin', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
-            'padding', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-            'gap', // flex/grid 공통
+            'margin',
+            'marginTop',
+            'marginRight',
+            'marginBottom',
+            'marginLeft',
+            'padding',
+            'paddingTop',
+            'paddingRight',
+            'paddingBottom',
+            'paddingLeft',
+            'gap',
         ],
         border: [
-            'border', 'borderWidth', 'borderStyle', 'borderColor',
-            'borderRadius', 'outline', 'outlineColor', 'outlineWidth',
+            'border',
+            'borderWidth',
+            'borderStyle',
+            'borderColor',
+            'borderRadius',
+            'outline',
+            'outlineColor',
+            'outlineWidth',
         ],
         background: [
-            'background', 'backgroundColor', 'backgroundImage', 'backgroundSize',
-            'backgroundRepeat', 'backgroundPosition',
+            'background',
+            'backgroundColor',
+            'backgroundImage',
+            'backgroundSize',
+            'backgroundRepeat',
+            'backgroundPosition',
         ],
-        effects: [
-            'boxShadow', 'filter', 'backdropFilter', 'opacity',
-        ],
-        custom: [], // 커스텀은 별도 기준(현재는 허용 키로 판단하기 어려워 상위에서 제어하지 않음)
+        effects: ['boxShadow', 'filter', 'backdropFilter', 'opacity'],
+        custom: [],
     };
 
     const hasAnyAllowed = (keys: string[]) => keys.some((k) => allow.has(k));
@@ -123,22 +142,17 @@ export function StylesSection(): JSX.Element {
 
     // 뷰포트/스타일 병합 모드
     const activeViewport: Viewport = ui.canvas.activeViewport;
-    //const mode = ui.canvas.viewportMode[activeViewport];
-    const mode =
-        (ui.canvas.viewportMode?.[activeViewport] ??
-            ui.canvas.vpMode?.[activeViewport] ??
-            'Base') as 'Base' | 'Independent';
+    const mode = ui.canvas.viewportMode[activeViewport];
 
     // 템플릿/컴포넌트별 인스펙터 필터
     // forceTagPolicy가 켜진 경우 componentPolicy 무시
-    const tf = ui.mode === 'Page' && !!ui.inspector?.forceTagPolicy
-        ? undefined
-        : project.inspectorFilters?.[node.componentId];
+    const tf =
+        ui.mode === 'Page' && !!ui.inspector?.forceTagPolicy
+            ? undefined
+            : project.inspectorFilters?.[node.componentId];
 
-    // 현재 유효 CSS 선언
-    const el = useMemo(() => {
-        return (reader.getEffectiveDecl(nodeId) ?? {}) as CSSDict;
-    }, [reader, nodeId]);
+    // ✅ 중요한 수정: useMemo 제거 → 리렌더마다 최신 선언을 읽음
+    const el = (reader.getEffectiveDecl(nodeId) ?? {}) as CSSDict;
 
     // 스타일 패치 (뷰포트 모드에 따라 대상 분기)
     const patch = (kv: CSSDict) =>
@@ -159,7 +173,8 @@ export function StylesSection(): JSX.Element {
         effects: false,
         custom: false,
     });
-    const toggle = (k: keyof OpenState) => setOpen((prev) => ({ ...prev, [k]: !prev[k] }));
+    const toggle = (k: keyof OpenState) =>
+        setOpen((prev) => ({ ...prev, [k]: !prev[k] }));
 
     // 각 그룹에 공통 props 전달 (베이스와 동일)
     const groupProps = {
@@ -168,10 +183,10 @@ export function StylesSection(): JSX.Element {
         tag,
         tagPolicy,
         tf,
-        map: project.tagPolicies, // (기존 호환을 위해 유지)
+        map: project.tagPolicies, // (기존 호환)
         expert,
         nodeId,
-        componentId: def.id, // ✅ defId가 아니라 def.id 사용
+        componentId: def.id,
     };
 
     return (
@@ -191,41 +206,73 @@ export function StylesSection(): JSX.Element {
 
             {/* Layout */}
             {hasAnyAllowed(GROUP_KEYS.layout) && (
-              <LayoutGroup {...groupProps} open={open.layout} onToggle={() => toggle('layout')} />
+                <LayoutGroup
+                    {...groupProps}
+                    open={open.layout}
+                    onToggle={() => toggle('layout')}
+                />
             )}
 
             {/* Typography */}
             {hasAnyAllowed(GROUP_KEYS.typo) && (
-              <TypographyGroup {...groupProps} open={open.typo} onToggle={() => toggle('typo')} />
+                <TypographyGroup
+                    {...groupProps}
+                    open={open.typo}
+                    onToggle={() => toggle('typo')}
+                />
             )}
 
             {/* Position */}
             {hasAnyAllowed(GROUP_KEYS.position) && (
-              <PositionGroup {...groupProps} open={open.position} onToggle={() => toggle('position')} />
+                <PositionGroup
+                    {...groupProps}
+                    open={open.position}
+                    onToggle={() => toggle('position')}
+                />
             )}
 
             {/* Spacing */}
             {hasAnyAllowed(GROUP_KEYS.spacing) && (
-              <SpacingGroup {...groupProps} open={open.spacing} onToggle={() => toggle('spacing')} />
+                <SpacingGroup
+                    {...groupProps}
+                    open={open.spacing}
+                    onToggle={() => toggle('spacing')}
+                />
             )}
 
             {/* Border */}
             {hasAnyAllowed(GROUP_KEYS.border) && (
-              <BorderGroup {...groupProps} open={open.border} onToggle={() => toggle('border')} />
+                <BorderGroup
+                    {...groupProps}
+                    open={open.border}
+                    onToggle={() => toggle('border')}
+                />
             )}
 
             {/* Background */}
             {hasAnyAllowed(GROUP_KEYS.background) && (
-              <BackgroundGroup {...groupProps} open={open.background} onToggle={() => toggle('background')} />
+                <BackgroundGroup
+                    {...groupProps}
+                    open={open.background}
+                    onToggle={() => toggle('background')}
+                />
             )}
 
             {/* Effects */}
             {hasAnyAllowed(GROUP_KEYS.effects) && (
-              <EffectsGroup {...groupProps} open={open.effects} onToggle={() => toggle('effects')} />
+                <EffectsGroup
+                    {...groupProps}
+                    open={open.effects}
+                    onToggle={() => toggle('effects')}
+                />
             )}
 
-            {/* Custom (현재는 조건 판단 불명확 → 유지. 필요시 정책 기반으로 확장) */}
-            <CustomGroup {...groupProps} open={open.custom} onToggle={() => toggle('custom')} />
+            {/* Custom */}
+            <CustomGroup
+                {...groupProps}
+                open={open.custom}
+                onToggle={() => toggle('custom')}
+            />
         </>
     );
 }
