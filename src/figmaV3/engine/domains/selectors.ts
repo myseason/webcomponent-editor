@@ -23,7 +23,7 @@ export function selectorsDomain() {
         const el = node.styles?.element ?? {};
         const baseVp = state.ui.canvas.baseViewport;
         const activeVp = state.ui.canvas.activeViewport;
-        const mode = state.ui.canvas.vpMode[activeVp];
+        const mode = state.ui.canvas.viewportMode[activeVp];
 
         const baseDecl = (el as any)[baseVp] ?? {};
         if (mode === 'Independent' && activeVp !== baseVp) {

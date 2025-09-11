@@ -310,7 +310,7 @@ export interface EditorUI {
         activeViewport: Viewport;
         baseViewport: Viewport;
         // @deprecated
-        vpMode: Record<Viewport, ViewportMode>;
+        //vpMode: Record<Viewport, ViewportMode>;
         viewportMode: Record<Viewport, ViewportMode>;
     };
 

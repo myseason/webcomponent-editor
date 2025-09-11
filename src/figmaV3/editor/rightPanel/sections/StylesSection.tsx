@@ -53,16 +53,18 @@ export function StylesSection(): JSX.Element {
 
     // 뷰포트/스타일 병합 모드
     const activeViewport: Viewport = ui.canvas.activeViewport;
-    const mode = ui.canvas.vpMode[activeViewport];
+    const mode = ui.canvas.viewportMode[activeViewport];
 
     // 템플릿/컴포넌트별 인스펙터 필터 (베이스 구조 유지)
     const tf = project.inspectorFilters?.[node.componentId];
 
     // 현재 유효 CSS 선언 (베이스의 getEffectiveDecl 사용)
+    /*
     const el = useMemo(() => {
         return (reader.getEffectiveDecl(nodeId) ?? {}) as CSSDict;
     }, [reader, nodeId]);
-
+    */
+    const el = (reader.getEffectiveDecl(nodeId) ?? {}) as CSSDict;
     // 스타일 패치 (뷰포트 모드에 따라 대상 분기)
     const patch = (kv: CSSDict) =>
         writer.updateNodeStyles(

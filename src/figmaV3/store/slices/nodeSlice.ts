@@ -58,7 +58,7 @@ export const createNodeSlice: StateCreator<EditorStoreState, [], [], NodeSlice> 
         const base = s.ui.canvas.baseViewport;
         const vp =
             viewport ??
-            (s.ui.canvas.vpMode[s.ui.canvas.activeViewport] === 'Independent'
+            (s.ui.canvas.viewportMode[s.ui.canvas.activeViewport] === 'Independent'
                 ? s.ui.canvas.activeViewport
                 : base);
 
