@@ -47,8 +47,9 @@ function createDockController(RE: any, WE: any) {
         wrap: { toggleBottomDock: withLog('toggleBottomDock'), update: withLog('update') },
     });
     return ctl
-        .pickReader('getUI', 'getProject', 'data', 'history', 'getEffectiveDecl', 'flowEdges')
-        .pickWriter('toggleBottomDock', 'update')
+        .exposeAll()
+        //.pickReader('getUI', 'getProject', 'data', 'history', 'getEffectiveDecl', 'flowEdges')
+        //.pickWriter('toggleBottomDock', 'update')
         .build();
 }
 
@@ -63,8 +64,9 @@ function createFlowsController(RE: any, WE: any) {
     });
 
     return ctl
-        .pickReader('getUI', 'getProject', 'getNodeById', 'flowEdges')
-        .pickWriter('addFlowEdge', 'updateFlowEdge', 'removeFlowEdge')
+        .exposeAll()
+        //.pickReader('getUI', 'getProject', 'getNodeById', 'flowEdges')
+        //.pickWriter('addFlowEdge', 'updateFlowEdge', 'removeFlowEdge')
         .build();
 }
 
@@ -75,8 +77,9 @@ function createDataController(RE: any, WE: any) {
     });
 
     return ctl
-        .pickReader('data')
-        .pickWriter('update')
+        .exposeAll()
+        //.pickReader('data')
+        //.pickWriter('update')
         .build();
 }
 
@@ -107,7 +110,8 @@ function createFragmentsController(RE: any, WE: any) {
     });
 
     return ctl
-        .pickReader('getUI', 'getProject', 'flowEdges', 'getNodeById', 'data')
-        .pickWriter('addFragment', 'removeFragment', 'openFragment', 'closeFragment', 'update')
+        .exposeAll()
+        //.pickReader('getUI', 'getProject', 'flowEdges', 'getNodeById', 'data')
+        //.pickWriter('addFragment', 'removeFragment', 'openFragment', 'closeFragment', 'update')
         .build();
 }

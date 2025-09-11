@@ -30,30 +30,43 @@ export function fragmentsDomain() {
 
             // fragmentSlice와 nodeSlice의 setter를 조합하여 하나의 유스케이스를 완성합니다.
             state._setFragments([...state.project.fragments, newFragment]);
-            state._patchNode(rootId, rootNode); // 새 노드를 추가합니다.
+            //state._patchNode(rootId, rootNode); // 새 노드를 추가합니다.
+            state._createNode(rootNode);
 
             return newId;
         },
 
         /** 프래그먼트와 관련된 모든 노드를 재귀적으로 삭제합니다. */
-        removeFragment(fragmentId: string) {
+        removeFragment(fragmentId: string): boolean {
             const state = EditorCore.store.getState();
-            const frag = R.getFragmentById(fragmentId);
-            if (!frag) return;
 
-            // 여러 상태를 하나의 트랜잭션으로 처리하기 위해 update 함수를 사용합니다.
-            state.update(s => {
-                const idsToDelete = collectSubtreeIds(s.project.nodes, frag.rootId);
-                idsToDelete.forEach(id => delete s.project.nodes[id]);
-                s.project.fragments = s.project.fragments.filter(f => f.id !== fragmentId);
+            // 존재 확인
+            const frags = state.project.fragments ?? [];
+            const frag = frags.find(f => f.id === fragmentId);
+            if (!frag)
+                return false;
 
-                // 현재 편집 중인 프래그먼트가 삭제되었다면, 다른 프래그먼트로 전환합니다.
-                if (s.ui.editingFragmentId === fragmentId) {
-                    const nextFragment = s.project.fragments[0];
-                    s.ui.editingFragmentId = nextFragment?.id ?? null;
-                    s.ui.selectedId = nextFragment?.rootId ?? null;
-                }
-            }, true);
+            // 최소 1개 보장: 마지막 1개면 삭제 금지
+            if (frags.length <= 1) {
+                state._setNotification?.('At least one component is required in Component Dev Mode.');
+                return false;
+            }
+
+            // 트리 삭제는 원자 연산으로
+            if (frag.rootId) {
+                state._deleteNodeCascade?.(frag.rootId);   // store/slices/nodeSlice.ts 원자 연산 사용
+            }
+
+            //  fragment 목록 갱신 (원자 setter 사용)
+            const nextFrags = frags.filter(f => f.id !== fragmentId);
+            state._setFragments?.(nextFrags);
+
+            //  편집/선택 상태 보정: 남은 첫 컴포넌트로 전환
+            const next = nextFrags[0];
+            state._setEditingFragmentId?.(next?.id ?? null);
+            state._setSelectedId?.(next?.rootId ?? null);
+
+            return true;
         },
 
         /** 프래그먼트의 메타데이터(이름, 설명, 공개 여부 등)를 업데이트합니다. */

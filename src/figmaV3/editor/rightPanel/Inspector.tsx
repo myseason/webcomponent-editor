@@ -7,7 +7,7 @@ import type {Fragment, NodeId} from '../../core/types';
 import {CommonSection} from './sections/CommonSection';
 import {PropsAutoSection} from './sections/PropsAutoSection';
 import {StylesSection} from './sections/StylesSection';
-import {SchemaEditor} from './sections/SchemaEditor';
+//import {SchemaEditor} from './sections/SchemaEditor';
 import {SaveAsComponentDialog} from './sections/SaveAsComponentDialog';
 
 import {RightDomain, useRightControllerFactory} from '../../controllers/right/RightControllerFactory';
@@ -31,10 +31,11 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
                 <StylesSection />
             </div>
 
-            {/* Schema — 베이스 시그니처는 { nodeId } */}
+            {/* Schema — 베이스 시그니처는 { nodeId }
             <div className="mt-4">
                 <SchemaEditor nodeId={nodeId} />
             </div>
+             */}
         </>
     );
 }
@@ -50,10 +51,11 @@ function ComponentInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }
             <div className="mt-4">
                 <StylesSection />
             </div>
-
+            {/*
             <div className="mt-4">
                 <SchemaEditor nodeId={nodeId} />
             </div>
+            */}
         </>
     );
 }

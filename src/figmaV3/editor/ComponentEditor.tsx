@@ -68,7 +68,7 @@ export function ComponentEditor() {
             const newIndex = target.position === 'before' ? 0 : target.position === 'after' ? childrenCount : childrenCount;
 
             if (payload.kind === 'palette-component') {
-                writer.addByDefAt(payload.defId, target.nodeId, newIndex);
+                writer.WE.addNodeByDef(payload.defId, target.nodeId, newIndex);
             } else if (payload.kind === 'layers-node' || payload.kind === 'canvas-node') {
                 writer.moveNode(payload.nodeId, target.nodeId, newIndex);
             }
@@ -97,7 +97,7 @@ export function ComponentEditor() {
                             <Canvas dropTarget={dropTarget} />
                             <OverlayHost />
                         </div>
-                        <div className="w-[320px] shrink-0 bg-white border-l border-gray-200">
+                        <div className="w-[400px] shrink-0 bg-white border-l border-gray-200">
                             <Inspector />
                         </div>
                     </div>

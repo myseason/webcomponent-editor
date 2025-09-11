@@ -16,6 +16,9 @@ function ComponentEditorCard({ frag }: { frag: Fragment }) {
     const [description, setDescription] = useState(frag.description ?? '');
     const isEditing = ui.editingFragmentId === frag.id;
 
+    const fragments = reader.getProject().fragments ?? [];
+    const canDelete = fragments.length > 1; // ✅ 최소 2개부터 삭제 허용
+
     useEffect(() => {
         setName(frag.name);
         setDescription(frag.description ?? '');
@@ -64,6 +67,8 @@ function ComponentEditorCard({ frag }: { frag: Fragment }) {
                 <div className="text-[10px] text-gray-400 font-mono bg-gray-100 px-2 py-0.5 rounded-full">
                     ID: {frag.id}
                 </div>
+                {/* ✅ 삭제 버튼: 최소 2개일 때만 노출(또는 disabled) */}
+                {canDelete ? (
                 <button
                     onClick={handleDelete}
                     className="p-1.5 rounded text-gray-400 hover:bg-red-100 hover:text-red-600"
@@ -71,6 +76,7 @@ function ComponentEditorCard({ frag }: { frag: Fragment }) {
                 >
                     <Trash2 size={14} />
                 </button>
+                ) : null}
             </div>
 
             <div className="space-y-1.5">

@@ -188,6 +188,17 @@ function createSidebarController(RE: any, WE: any) {
     });
 
     return ctl
+        .attachReader('getLeftSidebarVM', () => {
+            const ui = RE.getUI();
+            const left = ui?.panels?.left ?? {};
+            const bottom = ui?.panels?.bottom ?? {};
+            const isSplit =
+                left.isSplit === true ||
+                typeof left.splitPercentage === 'number';
+            const bottomActive = bottom.activeTab;
+            const showLayersInLeft = !(isSplit && bottomActive === 'Layers');
+            return { isSplit, bottomActive, showLayersInLeft, activeLeftTab: left.activeTab };
+        })
         .pickReader('getUI')
         .pickWriter(
             'setActiveHubTab',

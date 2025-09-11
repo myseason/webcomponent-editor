@@ -20,18 +20,18 @@ function RenderNode({ id, reader, writer }: { id: NodeId; reader: any; writer: a
     const { setNodeRef } = useDroppable({ id, data: { current: { kind: 'canvas-node', nodeId: id, position: 'inside' } } });
 
     // 스타일 계산은 이제 reader를 통해 수행됩니다.
-    const instanceStyle = useMemo(() => {
+    const instanceStyle = () => {
         // getEffectiveDecl은 이제 selectors 도메인에 있습니다.
         const decl = reader.getEffectiveDecl(id) ?? {};
         return toReactStyle(decl as CSSDict);
-    }, [reader, id]);
+    };
 
     if (!node || node.isVisible === false) return null;
 
     const def = getDefinition(node.componentId);
     const defaultStyle = toReactStyle(def?.defaults?.styles?.element?.base as CSSDict | undefined);
 
-    const selected = reader.getCurrentNode() === reader.getNode(id);
+    const selected = reader.getUI().selectedId === id;
     const selectionStyle: React.CSSProperties = selected
         ? { outline: '2px solid var(--mdt-color-border-focus)', outlineOffset: 2, cursor: 'default' }
         : {};
@@ -79,13 +79,13 @@ export function Canvas({ dropTarget }: { dropTarget: DndDropTarget | null }) {
 
     const rootId = useMemo(() => {
         if (mode === 'Page') {
-            return project.rootId;
+            return reader.getRootNodeId();
         }
         if (mode === 'Component' && editingFragmentId) {
             return reader.getFragmentById(editingFragmentId)?.rootId ?? null;
         }
         return null;
-    }, [mode, editingFragmentId, project, reader.fragments]);
+    }, [mode, editingFragmentId, project.rootId, project.fragments]);
 
     const { width, height, zoom } = ui.canvas;
     const scaledW = Math.round(width * zoom);

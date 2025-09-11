@@ -52,7 +52,9 @@ export function BottomDock() {
 
     // 높이 조절 드래그
     const onHDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
+
         e.preventDefault();
+
         const startY = e.clientY;
         const startH = heightPx;
 
@@ -61,12 +63,7 @@ export function BottomDock() {
             const vh = window.innerHeight;
             const max = Math.max(MIN_HEIGHT, Math.floor(vh * MAX_VH));
             const next = Math.max(MIN_HEIGHT, Math.min(max, startH + dy));
-            (writer as any).update((s: EditorState) => {
-                s.ui = s.ui ?? ({} as any);
-                s.ui.panels = s.ui.panels ?? ({} as any);
-                s.ui.panels.bottom = s.ui.panels.bottom ?? ({} as any);
-                s.ui.panels.bottom.heightPx = next;
-            });
+            writer.setBottomDockHeightPx?.(next);
         };
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
@@ -78,8 +75,10 @@ export function BottomDock() {
 
     // 좌/우 리사이저(고급 패널 폭)
     const onVDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!rightOpen) return;
+        if (!rightOpen)
+            return;
         e.preventDefault();
+
         const root = e.currentTarget.parentElement;
         if (!root) return;
 
@@ -87,13 +86,7 @@ export function BottomDock() {
             const rect = root.getBoundingClientRect();
             const x = ev.clientX - rect.left;
             const pctRight = Math.max(20, Math.min(60, Math.round(((rect.width - x) / rect.width) * 100)));
-            (writer as any).update((s: EditorState) => {
-                s.ui = s.ui ?? ({} as any);
-                s.ui.panels = s.ui.panels ?? ({} as any);
-                s.ui.panels.bottom = s.ui.panels.bottom ?? ({} as any);
-                const cur = s.ui.panels.bottom.advanced ?? { open: false, kind: 'None' as BottomRightPanelKind, widthPct: 36 };
-                s.ui.panels.bottom.advanced = { ...cur, widthPct: pctRight };
-            });
+            writer.setBottomRightWidthPct?.(pctRight);
         };
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
@@ -105,29 +98,12 @@ export function BottomDock() {
 
     // 접기/펴기 토글 (writer.toggleBottomDock 있으면 사용, 없으면 update 폴백)
     const toggleCollapsed = () => {
-        const w: any = writer as any;
-        if (typeof w.toggleBottomDock === 'function') {
-            w.toggleBottomDock();
-        } else {
-            w.update((s: EditorState) => {
-                s.ui = s.ui ?? ({} as any);
-                s.ui.panels = s.ui.panels ?? ({} as any);
-                s.ui.panels.bottom = s.ui.panels.bottom ?? ({} as any);
-                s.ui.panels.bottom.isCollapsed = !Boolean(s.ui.panels.bottom.isCollapsed);
-            });
-        }
+        writer.toggleBottomDock();
     };
 
     // SchemaEditor 닫기
     const closeAdvancedRight = () => {
-        (writer as any).update((s: EditorState) => {
-            s.ui = s.ui ?? ({} as any);
-            s.ui.panels = s.ui.panels ?? ({} as any);
-            s.ui.panels.bottom = s.ui.panels.bottom ?? ({} as any);
-            if (s.ui.panels.bottom.advanced) {
-                s.ui.panels.bottom.advanced.open = false;
-            }
-        });
+        writer.setCloseAdvancedRight();
     };
 
     // nodeId: 선택 노드 없으면 project.rootId

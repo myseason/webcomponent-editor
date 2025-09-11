@@ -145,7 +145,6 @@ function SinglePanel({ tab }: { tab: HubTab }) {
 }
 
 export function LeftSidebar() {
-    // ✅ 도메인 인자 삭제
     const { reader, writer } = useLeftControllerFactory(LeftDomain.Sidebar);
 
     // ── 모드 UI(기존 유지) ────────────────────────────────────────────────
@@ -175,7 +174,7 @@ export function LeftSidebar() {
     const splitPct =
         typeof leftUI.splitPercentage === 'number' ? leftUI.splitPercentage : 50;
 
-    // 모드에 따른 탭 필터
+    // 모드에 따른 탭 1차 필터
     const availableTabs = React.useMemo(() => {
         if (mode === 'Component') {
             return HUB_TABS.filter((t) => COMPONENT_MODE_TABS.has(t.id));
@@ -183,7 +182,22 @@ export function LeftSidebar() {
         return HUB_TABS;
     }, [mode]);
 
-    // 컴포넌트 모드에서 금지 탭이 활성화돼 있으면 Components로 보정
+    // ✅ 분할 모드에서는 좌측 Layers 탭을 숨김 (하단에 Layers 고정 표시)
+    const showLayersInLeft = !isSplit;
+    const visibleTabs = React.useMemo(() => {
+        return showLayersInLeft
+            ? availableTabs
+            : availableTabs.filter((t) => t.id !== 'Layers');
+    }, [availableTabs, showLayersInLeft]);
+
+    // 좌측에서 숨김 처리로 인해 활성 탭이 Layers면 안전하게 Components로 보정
+    React.useEffect(() => {
+        if (!showLayersInLeft && activeHubTab === 'Layers') {
+            writer.setActiveHubTab?.('Components');
+        }
+    }, [showLayersInLeft, activeHubTab, writer.setActiveHubTab]);
+
+    // (기존) 컴포넌트 모드에서 금지 탭이 활성화돼 있으면 Components로 보정
     React.useEffect(() => {
         if (mode === 'Component' && !COMPONENT_MODE_TABS.has(activeHubTab)) {
             writer.setActiveHubTab?.('Components');
@@ -207,7 +221,7 @@ export function LeftSidebar() {
         <div className="h-full flex bg-white">
             {/* 1. 수직 아이콘 탭 바 */}
             <div className="w-12 px-1 py-1 box-border flex flex-col gap-2 border-r border-gray-200 shrink-0">
-                {availableTabs.map(({ id, icon }) => (
+                {visibleTabs.map(({ id, icon }) => (
                     <TabButton
                         key={id}
                         icon={icon}
@@ -268,6 +282,7 @@ export function LeftSidebar() {
                             <SplitResizer currentPct={splitPct} onChangePct={handleResizePct} />
 
                             <div className="flex-1 min-h-[120px] overflow-auto border-t border-gray-200">
+                                {/* 분할 하단은 Layers 고정 */}
                                 <LayersPanel />
                             </div>
                         </div>
