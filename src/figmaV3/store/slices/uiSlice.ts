@@ -28,8 +28,6 @@ export const createUiSlice: StateCreator<EditorStoreState, [], [], UiSlice> = (s
     _setBaseViewport: (viewport) => get().update((s) => { s.ui.canvas.baseViewport = viewport; }, true),
 
     _setViewportMode: (viewport, mode) => get().update((s) => {
-        // legacy bridge + 신규 필드 모두 유지
-        s.ui.canvas.vpMode = { ...s.ui.canvas.vpMode, [viewport]: mode };
         s.ui.canvas.viewportMode = { ...s.ui.canvas.viewportMode, [viewport]: mode };
     }, true),
 

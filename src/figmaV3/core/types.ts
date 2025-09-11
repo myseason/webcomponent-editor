@@ -315,8 +315,6 @@ export interface EditorUI {
         orientation: 'portrait' | 'landscape';
         activeViewport: Viewport;
         baseViewport: Viewport;
-        // @deprecated
-        vpMode: Record<Viewport, ViewportMode>;
         viewportMode: Record<Viewport, ViewportMode>;
     };
 

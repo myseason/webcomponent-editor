@@ -52,8 +52,6 @@ const initialState: EditorState = {
             orientation: 'landscape',
             activeViewport: 'base',
             baseViewport: 'base',
-            // @deprecated
-            vpMode: { base: 'Unified', tablet: 'Unified', mobile: 'Unified' },
             viewportMode: { base: 'Unified', tablet: 'Unified', mobile: 'Unified' },
         },
         panels: {
