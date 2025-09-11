@@ -1,0 +1,127 @@
+1) 목적과 정의(Why / What)
+
+TagPolicy
+	•	목적: 태그별(W3C 기반)로 허용되는 속성/이벤트/스타일 키를 표준화.
+	•	효과:
+	•	Inspector(PropsAutoSection/Styles)에서 태그가 허용하지 않는 항목을 노출/적용하지 않음.
+	•	렌더/Export에서도 안전한 필터링.
+
+StylePolicy
+	•	목적: CSS 속성의 **정보(타입/제약/토큰/값 소스)**와 프리셋(그림자/필터/옵션) 제공.
+	•	효과:
+	•	Inspector에서 값 입력 시 검증/클램프, 프리셋 바로 적용.
+	•	런타임/Export에서도 일관된 검증 경로 재사용.
+
+ComponentPolicy
+	•	목적: 컴포넌트 제작자가 사용자가 만질 수 있는 속성/스타일 키를 제한(허용/숨김/읽기전용/금지).
+	•	효과:
+	•	페이지 모드에서 허용된 항목만 Inspector 노출.
+	•	컴포넌트 모드에선 TagPolicy 전체 노출을 기본으로 하고, 제작자가 락/숨김을 지정해 정책화.
+
+적용 순서
+
+TagPolicy → StylePolicy → ComponentPolicy
+(보편 제약 → 속성 제약 → 컴포넌트별 제약)
+
+⸻
+
+2) 적용 방안(How)
+
+2.1 도메인(reader/writer) 정리
+	•	policyDomain(reader) 확장
+	•	getEffectiveTagPolicy(tag) : 전역 + 프로젝트 오버라이드 병합
+	•	getEffectiveStylePolicy() : Default + Global + ProjectOverride 병합
+	•	getEffectiveComponentPolicy(defId) : definition + project.components[defId]
+	•	getEffectivePolicies() : inspector 초기화용 스냅샷(선택)
+	•	policyDomain(writer)
+	•	updateComponentPolicy(defId, patch) : 제작자 락/숨김/허용/기본값 저장(존재)
+
+2.2 셀렉터(read-only)로 Inspector에 “무엇을 보여줄지” 계산
+	•	selectorsDomain(reader) 추가·확장
+	•	selectInspectorStyleKeys(nodeId) → { visible: string[], readonly: Set, hidden: Set }
+	•	selectInspectorPropKeys(nodeId) → { visible: string[], readonly: Set, hidden: Set }
+	•	내부 로직:
+	1.	TagPolicy 허용 키 산출(deny 제외)
+	2.	페이지 모드에서 “모든 스타일” 버튼 ON이면 → TagPolicy만 사용
+	3.	기본은 TagPolicy ∩ ComponentPolicy(allow/deny/readonly/hidden 반영)
+	4.	값 검증은 StylePolicy(제약/토큰/소스)로 패널 내부에서 수행
+
+2.3 UI 상태(페이지 모드 특수 버튼)
+	•	**uiDomain(writer)**에 임시 플래그 추가
+	•	setInspectorForceTagPolicy(on: boolean)
+	•	페이지 모드에서만 의미, 켜면 컴포넌트 제약을 무시하고 TagPolicy 전체를 노출
+	•	Right/InspectorController에 위 writer 노출 + 셀렉터 리더 노출
+
+2.4 Inspector 렌더 규칙
+	•	Style/Props 패널 공통
+	•	visible만 렌더
+	•	readonly → 컨트롤 disabled + 🔒아이콘(툴팁: “컴포넌트 정책으로 잠김”)
+	•	hidden → 항목 자체를 표시하지 않음(eye-off 효과)
+	•	카테고리 축소: visible이 소수면 그룹 헤더를 숨기고 플랫 리스트로 표시
+	•	컴포넌트 모드(제작자 뷰)
+	•	각 행에 eye/lock 토글을 노출
+	•	토글 시 updateComponentPolicy(defId, patch) 저장
+	•	허용/읽기전용/숨김(또는 deny) 세트로 정책 구성
+
+2.5 값 검증 유틸(StylePolicy 기반)
+	•	Inspector·런타임·Export에서 재사용할 함수:
+	•	validateStyleDecl(decl, stylePolicy) -> { okDecl, warnings }
+	•	constraints(min/max/step)/tokens/valueSources/allow/deny 반영
+	•	TagPolicy는 “키 필터”, StylePolicy는 “값 검증”에 사용
+
+2.6 Render/Export 경로
+	•	실제 DOM props/style 생성 전에
+	•	키 필터: getEffectiveTagPolicy(tag)
+	•	값 검증: validateStyleDecl
+	•	컴포넌트 정책 적용(페이지 모드): 허용 키만 통과
+
+2.7 Save As Component 흐름
+	•	페이지 모드에서 “모든 스타일”로 구성한 결과를 새 컴포넌트로 저장
+	•	저장 시 선택적으로:
+	•	현 상태를 defaults.styles/props에 스냅샷
+	•	제작자가 락/숨김을 바로 세팅할 수 있는 다이얼로그 제공
+	•	이후 페이지에서 이 컴포넌트를 사용할 때는 정책에 따라 제한된 Inspector가 노출
+
+⸻
+
+3) 개발 단계(우선순위)
+
+단계 A. 인프라(도메인/셀렉터)
+	1.	policyDomain(reader) 확장
+	•	getEffectiveTagPolicy, getEffectiveStylePolicy, getEffectiveComponentPolicy
+	2.	selectorsDomain에 selectInspectorStyleKeys/PropKeys 구현
+	3.	uiDomain에 setInspectorForceTagPolicy 추가
+	4.	컨트롤러 노출(Right/InspectorController): 위 reader/writer 연결
+
+단계 B. Inspector UI 적용
+	5.	Inspector 상단 버튼(페이지 모드 한정)
+	•	토글 상태 노출 + 안내 배너
+	6.	Style/Props 패널 렌더 규칙 적용
+	•	visible/readonly/hidden 반영
+	•	카테고리 축소 로직 반영(가시성 개선)
+
+단계 C. 제작자 워크플로(컴포넌트 모드)
+	7.	각 행에 eye/lock 토글 제공(컴포넌트 모드)
+	•	updateComponentPolicy로 저장
+	8.	Save As Component와 연계
+	•	현재 defaults 저장 + 정책 초기 템플릿 생성(선택)
+
+단계 D. 값 검증/Export 통일
+	9.	validateStyleDecl 유틸 구현 → Inspector/Render/Export 경로에 공통 적용
+	10.	Render/Export 경로의 키 필터/검증 호출 삽입
+
+단계 E. 정책 데이터 보강
+	11.	TagPolicy W3C 보강(우선 div/img/button/input/span/a 등 top 10)
+	12.	StylePolicy constraints/tokens/valueSources 튜닝(실 사용 위주)
+
+⸻
+
+4) 테스트 전략
+	•	단위 테스트
+	•	selectorsDomain: 다양한 모드/플래그/정책 조합에서 visible/readonly/hidden 정확성
+	•	validateStyleDecl: min/max/step/token/deny 조합 케이스
+	•	통합 테스트
+	•	Inspector 토글 → 렌더 변화, 페이지↔컴포넌트 모드 전환
+	•	Save As Component 후, 페이지 모드에서 제한된 Inspector 노출 검증
+	•	시각/UX 테스트
+	•	카테고리 축소 시 레이아웃 일관성, 툴팁/아이콘 가시성
