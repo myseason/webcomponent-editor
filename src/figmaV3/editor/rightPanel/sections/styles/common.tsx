@@ -3,7 +3,7 @@
 import React from 'react';
 import type {ComponentPolicy, EditorUI, NodeId, Project,} from '../../../../core/types';
 import {getAllowedStyleKeysForNode, getEffectivePoliciesForNode} from '../../../../runtime/capabilities';
-import {Lock, Unlock} from 'lucide-react';
+import {Lock, ShieldAlert, Unlock} from 'lucide-react';
 import styles from '../../../ui/theme.module.css';
 import {RightDomain, useRightControllerFactory} from '@/figmaV3/controllers/right/RightControllerFactory';
 
@@ -216,6 +216,18 @@ export const ColorField: React.FC<{
         </div>
     );
 };
+
+/** [ADD] 강제 공개 표식 */
+export const PolicyBadge: React.FC<{ show?: boolean; title?: string }> = ({ show, title }) => {
+    if (!show) return null;
+    return (
+        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200" title={title ?? 'Policy override'}>
+      <ShieldAlert size={10} />
+      override
+    </span>
+    );
+};
+
 
 /* ────────────────────────────────────────────────────
  * 허용/제한 판단 유틸 (변경 없음)

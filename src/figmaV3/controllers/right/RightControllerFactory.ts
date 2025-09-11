@@ -41,7 +41,7 @@ type InspectorVM = {
 
 function createInspectorController(RE: any, WE: any) {
     const ctl = makeSmartController('Right/Inspector', RE, WE, {
-        writerAspect: writerRerenderAspect,
+        //writerAspect: writerRerenderAspect,
         wrap: {
             updateNodeStyles: withLog('updateNodeStyles'),
             updateNodeProps: withLog('updateNodeProps'),
