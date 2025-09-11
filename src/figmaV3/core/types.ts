@@ -300,7 +300,12 @@ export interface EditorUI {
     overlays: string[];
     editingFragmentId: string | null;
     notification: { message: string; timestamp: number } | null;
-
+    // --- Inspector (옵션) ---
+    // Page 모드에서 "TagPolicy 전부 허용 보기" 같은 임시 토글 저장용
+    inspector?: {
+        /** Page 모드에서 TagPolicy가 허용하는 모든 스타일/속성 노출 */
+        forceTagPolicy?: boolean;
+    };
     // --- Center Panel (Canvas) ---
     canvas: {
         width: number;

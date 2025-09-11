@@ -76,7 +76,9 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
     /** 정책 기반 필터 + Tag 기반 보정 */
     const baseEntries = useMemo(() => {
         const entries = schema.filter((e) => !RESERVED_PROP_KEYS.has(e.key));
-        if (ui.mode === 'Page' && !ui.expertMode) {
+        //if (ui.mode === 'Page' && !ui.expertMode) {
+        const forceAll = !!ui.inspector?.forceTagPolicy;
+        if (ui.mode === 'Page' && !ui.expertMode && !forceAll) {
             const componentPolicy = project.policies?.components?.[def?.title ?? ''];
             if (componentPolicy) {
                 return entries.filter((entry: any) => {
@@ -86,7 +88,8 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
             }
         }
         return entries;
-    }, [schema, ui.mode, ui.expertMode, project.policies, def?.title]);
+        //}, [schema, ui.mode, ui.expertMode, project.policies, def?.title]);
+    }, [schema, ui.mode, ui.expertMode, ui.inspector?.forceTagPolicy, project.policies, def?.title]);
 
     const visibleEntries = useMemo(
         () => filterByTagAndDef(def?.title ?? '', selTag, baseEntries),

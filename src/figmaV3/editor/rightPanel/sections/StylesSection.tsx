@@ -56,7 +56,10 @@ export function StylesSection(): JSX.Element {
     const mode = ui.canvas.vpMode[activeViewport];
 
     // 템플릿/컴포넌트별 인스펙터 필터 (베이스 구조 유지)
-    const tf = project.inspectorFilters?.[node.componentId];
+    // const tf = project.inspectorFilters?.[node.componentId];
+    const tf = (ui.mode === 'Page' && !!ui.inspector?.forceTagPolicy)
+        ? undefined
+        : project.inspectorFilters?.[node.componentId];
 
     // 현재 유효 CSS 선언 (베이스의 getEffectiveDecl 사용)
     const el = useMemo(() => {

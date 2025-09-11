@@ -7,6 +7,7 @@ import {makeSmartController, writerRerenderAspect} from '../makeSmartController'
 import { withLog } from '../adapters/aspect';
 import { getDefinition } from "@/figmaV3/core/registry";
 import {NodeId} from "@/figmaV3/core/types";
+
 import { useRerenderOnWrite } from '@/figmaV3/controllers/adapters/uiRerender';
 
 export enum RightDomain {

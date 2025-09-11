@@ -186,6 +186,13 @@ export function uiDomain() {
                 }
             });
         },
+
+        // [ADD] 페이지 모드에서 Inspector를 TagPolicy 전체 허용으로 전환하는 임시 플래그
+        /** Page 모드에서 TagPolicy 강제 공개 토글 */
+        setInspectorForceTagPolicy: (force: boolean) => {
+            const state = EditorCore.store.getState();
+            state._setInspectorForceTagPolicy?.(!!force);
+        },
     };
 
     return { reader: R, writer: W } as const;

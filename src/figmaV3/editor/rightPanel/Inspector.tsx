@@ -63,7 +63,7 @@ function ComponentInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }
 export function Inspector() {
 
     const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
-    const { mode, selectedId, editingFragmentId, expertMode } = reader.getUI();
+    const { mode, selectedId, editingFragmentId, expertMode, inspector } = reader.getUI();
     const { rootId, fragments, nodes } = reader.getProject();
 
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
@@ -104,6 +104,16 @@ export function Inspector() {
         writer.setNotification(`고급 모드: ${nextExpertMode ? 'ON' : 'OFF'}`);
     };
 
+    // TagPolicy 강제 노출 토글(Page 모드에서만)
+    const forceAll = !!inspector?.forceTagPolicy;
+    const toggleForceTagPolicy = () => {
+        if (mode !== 'Page')
+            return;
+        writer.setInspectorForceTagPolicy?.(!forceAll);
+        writer.setNotification?.(
+            `TagPolicy: ${!forceAll ? 'ALL (component 제한 무시)' : 'Limited (component 제한 적용)'}`
+        );
+    };
     // SaveAsComponentDialog에 전달할 nodeId
     const dialogNodeId: NodeId | null = node?.id ?? null;
 
@@ -122,9 +132,29 @@ export function Inspector() {
                     <div className="ml-2 text-[11px] text-gray-500">
                         {mode === 'Page' ? '( Page Build Mode)' : '(️ Component Dev Mode)'}
                     </div>
+                    {/* Page 모드 한정: TagPolicy 강제 토글 */}
+                    {mode === 'Page' && (
+                        <button
+                            onClick={toggleForceTagPolicy}
+                            className={[
+                                'ml-auto px-2 py-0.5 text-xs rounded-md border',
+                                forceAll
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100',
+                                ].join(' ')}
+                                title={
+                                forceAll
+                                    ? '현재: TagPolicy 허용 전부 노출 (클릭하면 컴포넌트 제한 적용)'
+                                    : '현재: 컴포넌트 제한 적용 (클릭하면 TagPolicy 허용 전부 노출)'
+                                }
+                        >
+                        {forceAll ? 'TagPolicy: ALL' : 'TagPolicy: Limited'}
+                        </button>
+                    )}
 
                     <div className="ml-auto flex items-center gap-2">
                         {/* Save as Component: Page 모드 + 고급 모드일 때만 노출 (베이스 UX 유지) */}
+                        {/*
                         {mode === 'Page' && expertMode && (
                             <button
                                 className="rounded border border-gray-300 px-2 py-1 text-xs"
@@ -133,6 +163,7 @@ export function Inspector() {
                                 Save as Component
                             </button>
                         )}
+                        */}
 
                         {/* 기본/고급 토글: Page 모드에서만 노출 (베이스 UX 유지) */}
                         {mode === 'Page' && (
