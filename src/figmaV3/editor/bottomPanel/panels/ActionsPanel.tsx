@@ -191,7 +191,9 @@ export function ActionsPanel() {
 
     const writeSteps = React.useCallback(
         (next: ActionStep[]) => {
-            if (!node) return;
+            if (!node)
+                return;
+            /*
             writer.update((s: EditorState) => {
                 const n = s.project.nodes[node.id] as Node;
                 const props = (n.props ?? {}) as Record<string, unknown>;
@@ -201,6 +203,8 @@ export function ActionsPanel() {
                 const newBag: ActionsBag = { ...bag, [evt]: { steps: next } };
                 (n.props as any) = { ...props, __actions: newBag };
             });
+            */
+            writer.setActionSteps(node.id, evt, next);
         },
         [node, evt, writer],
     );

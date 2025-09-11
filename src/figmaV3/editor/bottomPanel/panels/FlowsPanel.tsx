@@ -15,13 +15,13 @@ export function FlowsPanel() {
     const { reader, writer } = useBottomControllerFactory(BottomDomain.Flows);
 
     // 2) reader를 사용하여 필요한 모든 상태를 조회합니다.
-    const ui = reader.ui.getUI();
-    const project = reader.project.getProject();
-    const flowEdgesMap: Record<string, FlowEdge> = reader.flow.getFlowEdges();
+    const ui = reader.getUI();
+    const project = reader.getProject();
+    const flowEdgesMap: Record<string, FlowEdge> = reader.getFlowEdges();
 
     // 3) SelectPage와 SelectFragment에 전달할 목록을 준비합니다.
-    const pages = reader.pages.getPages();
-    const fragments = reader.fragments.getFragments();
+    const pages = reader.getPages();
+    const fragments = reader.getFragments();
 
     // 4) 로컬 상태 관리 (기존 로직 유지)
     const defaultFrom = ui?.selectedId ?? project?.rootId;

@@ -23,6 +23,7 @@ export function useBottomControllerFactory(domain?: BottomDomain): { reader: any
         EditorDomain.Actions,
         EditorDomain.Selectors,
         EditorDomain.History,
+        EditorDomain.Fragment
     ]);
     //useStoreTick();
     useRerenderOnWrite();
@@ -43,7 +44,7 @@ export function useBottomControllerFactory(domain?: BottomDomain): { reader: any
 
 function createDockController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Dock', RE, WE, {
-        writerAspect: writerRerenderAspect,
+        //writerAspect: writerRerenderAspect,
         wrap: { toggleBottomDock: withLog('toggleBottomDock'), update: withLog('update') },
     });
     return ctl
@@ -55,7 +56,7 @@ function createDockController(RE: any, WE: any) {
 
 function createFlowsController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Flows', RE, WE, {
-        writerAspect: writerRerenderAspect,
+        //writerAspect: writerRerenderAspect,
         wrap: {
             addFlowEdge: withLog('addFlowEdge'),
             updateFlowEdge: withLog('updateFlowEdge'),
@@ -72,7 +73,7 @@ function createFlowsController(RE: any, WE: any) {
 
 function createDataController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Data', RE, WE, {
-        writerAspect: writerRerenderAspect,
+        //writerAspect: writerRerenderAspect,
         wrap: { update: withLog('update') },
     });
 
@@ -85,7 +86,7 @@ function createDataController(RE: any, WE: any) {
 
 function createActionsController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Actions', RE, WE, {
-        writerAspect: writerRerenderAspect,
+        //writerAspect: writerRerenderAspect,
         wrap: {
             setActionSteps: withLog('setActionSteps'),
             runActionSteps: withLog('runActionSteps'),

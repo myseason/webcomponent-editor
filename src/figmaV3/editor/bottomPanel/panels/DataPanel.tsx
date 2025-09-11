@@ -30,9 +30,12 @@ export function DataPanel() {
     const onApply = () => {
         try {
             const obj = JSON.parse(text) as Record<string, unknown>;
+            /*
             (writer as any).update?.((s: EditorState) => {
                 s.data = obj; // 얕은 복사 update 규약에 맞춰 저장
             });
+            */
+            writer.setData(obj);
         } catch {
             alert('JSON 파싱 오류');
         }
