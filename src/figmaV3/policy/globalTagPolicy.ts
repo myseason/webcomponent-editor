@@ -3,6 +3,25 @@
 // groups 항목은 Inspector의 그룹 패널 묶음에 사용됩니다.
 import type { TagPolicy } from '../core/types';
 
+// 정책 레이어: 태그 분류/헬퍼
+export const CONTAINER_TAGS = [
+    'div', 'section', 'article', 'main', 'nav', 'aside', 'header', 'footer'
+] as const;
+
+export const INLINE_OR_SIMPLE_TAGS = [
+    'span', 'label', 'button', 'img', 'p'
+] as const;
+
+export type HtmlTag = typeof CONTAINER_TAGS[number] | typeof INLINE_OR_SIMPLE_TAGS[number] | string;
+
+export function isContainerTag(tag: string): boolean {
+    return (CONTAINER_TAGS as readonly string[]).includes(tag);
+}
+
+export function isInlineOrSimple(tag: string): boolean {
+    return (INLINE_OR_SIMPLE_TAGS as readonly string[]).includes(tag);
+}
+
 export const GLOBAL_TAG_POLICIES: Record<string, TagPolicy> = {
     // ✅ [수정] div 태그가 grid 관련 속성을 포함한 모든 레이아웃 스타일을 사용할 수 있도록 확장했습니다.
     div: {

@@ -9,14 +9,12 @@ import {
     type EditorMode,
     type Project,
     type InspectorFilter,
-    type Node,
+    type Node, ComponentCapabilities,
 } from '../../core/types';
 import { getDefinition } from '../../core/registry';
-import { GLOBAL_TAG_POLICIES } from '../../policy/globalTagPolicy';
+import { GLOBAL_TAG_POLICIES, CONTAINER_TAGS, INLINE_OR_SIMPLE_TAGS, isContainerTag } from '../../policy/globalTagPolicy';
 
-/* ======================================================
- * 안전 보정 타입
- * ====================================================== */
+/* ===================== BottomDock / 공통 파생 util (기존 유지) ===================== */
 type PanelsT = NonNullable<EditorUI['panels']>;
 type BottomT = NonNullable<PanelsT['bottom']>;
 type AdvancedT = NonNullable<NonNullable<BottomT['advanced']>>;
@@ -25,9 +23,6 @@ type BottomAdvanced = { open: boolean; kind: BottomRightPanelKind; widthPct: num
 type BottomDockState = { heightPx: number; isCollapsed: boolean; advanced: BottomAdvanced };
 type BottomRightLayout = { rightOpen: boolean; rightPct: number; leftPct: number };
 
-/* -------------------------------
- * 내부 정규화 유틸 (BottomDock)
- * ----------------------------- */
 function normBottomDock(ui?: EditorUI): BottomDockState {
     const panels = ui?.panels as PanelsT | undefined;
     const bottom = panels?.bottom as BottomT | undefined;
@@ -62,7 +57,6 @@ function findCurrentRootIdByMode(ui?: EditorUI, project?: Project): NodeId | nul
         return null;
     }
 
-    // Page 모드
     const pageId = ui?.panels?.left?.lastActivePageId ?? null;
     if (project?.pages?.length) {
         const p = (pageId ? project.pages.find((x) => x.id === pageId) : null) ?? project.pages[0];
@@ -71,11 +65,7 @@ function findCurrentRootIdByMode(ui?: EditorUI, project?: Project): NodeId | nul
     return null;
 }
 
-/* ======================================================
- * Tag 계산 유틸 (Node → HTML Tag)
- *  - Node에는 tag 필드 없음
- *  - 우선순위: node.props.__tag → def.capabilities.defaultTag → 'div'
- * ====================================================== */
+/* ===================== Tag 계산 / Policy & Inspector ===================== */
 function getNodeTag(state: EditorState, node: Node<any, any> | undefined): string {
     if (!node) return 'div';
     const tagOverride = (node.props as any)?.__tag as string | undefined;
@@ -86,11 +76,6 @@ function getNodeTag(state: EditorState, node: Node<any, any> | undefined): strin
     return defTag ?? 'div';
 }
 
-/* ======================================================
- * TagPolicy 허용 스타일 키 계산
- *  - GLOBAL_TAG_POLICIES[tag].styles.allow/deny, groups를 활용
- *  - allow에 '*'가 있으면 groups의 모든 키 합집합 사용(deny로 제거)
- * ====================================================== */
 function computeTagAllowedStyleKeys(tag: string): Set<string> {
     const tp = (GLOBAL_TAG_POLICIES as any)[tag] as
         | {
@@ -109,25 +94,16 @@ function computeTagAllowedStyleKeys(tag: string): Set<string> {
     const deny = new Set<string>(tp.styles.deny ?? []);
     const groups = tp.styles.groups ?? {};
 
-    // allow='*' 처리 → 그룹에 정의된 모든 키를 풀셋으로 사용
     if (allow.has('*')) {
         allow.clear();
         for (const arr of Object.values(groups)) {
             for (const k of arr) allow.add(k);
         }
     }
-
-    // deny 제거
     for (const d of deny) allow.delete(d);
-
     return allow;
 }
 
-/* ======================================================
- * InspectorFilter 기반 제한 적용
- *  - project.inspectorFilters[defId]?.styles/props allow/deny
- *  - 존재할 때만 교차/제외 적용
- * ====================================================== */
 function applyInspectorFilter(
     keys: Set<string>,
     filter: InspectorFilter | undefined,
@@ -139,7 +115,6 @@ function applyInspectorFilter(
     const denyList = filter[kind]?.deny ?? undefined;
 
     let vis = new Set<string>(keys);
-
     if (Array.isArray(allowList) && allowList.length > 0) {
         vis = new Set<string>([...vis].filter((k) => allowList.includes(k)));
     }
@@ -149,121 +124,135 @@ function applyInspectorFilter(
     return { visible: [...vis] };
 }
 
-/* ======================================================
- * selectorsDomain — 순수 Reader
- *  - 상태 변경 없음 (writer 비움)
- *  - 기존 v1.4 파일에 있던 Reader 유지 + Inspector 가시성 계산 추가
- * ====================================================== */
+const selectEffectiveDecl = (state: EditorState, nodeId: string): CSSDict | null => {
+    const node = state.project.nodes[nodeId];
+    if (!node) return null;
+
+    const el = node.styles?.element ?? {};
+    const baseVp = state.ui.canvas.baseViewport;
+    const activeVp = state.ui.canvas.activeViewport;
+    const mode = state.ui.canvas.viewportMode?.[activeVp] ?? state.ui.canvas.vpMode?.[activeVp];
+
+    const baseDecl = (el as any)[baseVp] ?? {};
+    if (mode === 'Independent' && activeVp !== baseVp) {
+        const overrideDecl = (el as any)[activeVp] ?? {};
+        return { ...baseDecl, ...overrideDecl };
+    }
+    return { ...baseDecl };
+};
+
+/* ===================== 새로 추가: Tag 선택 옵션 ===================== */
+
+export type TagOption = {
+    value: string;
+    label: string;
+    /** 현재 컴포넌트가 비컨테이너일 때 컨테이너 태그는 선택 금지 → disabled */
+    disabled?: boolean;
+    /** disabled이면서 컨테이너 태그인 경우: 선택 시 컨테이너로 승격 필요 */
+    upgradeToContainer?: boolean;
+};
+
+function getAllowedTagsByComponent(defId: string): string[] {
+    const def = getDefinition(defId);
+    const caps = def?.capabilities ?? {} as ComponentCapabilities;
+    // 컴포넌트에서 명시한 allowedTags만 노출 (요청사항: "기본 태그 외 모두 뜨는 문제" 방지)
+    const allowed = Array.isArray(caps.allowedTags) && caps.allowedTags.length > 0
+        ? caps.allowedTags
+        : [(caps.defaultTag ?? 'div')];
+
+    // (옵션) 글로벌 정책에서 완전히 제외된 태그를 걸러내고 싶다면 여기서 필터 가능
+    return allowed;
+}
+
 export function selectorsDomain() {
-    /* ---------- 기존 v1.4 Reader 예시 (필요 시 유지/보강) ---------- */
-
-    const selectEffectiveDecl = (state: EditorState, nodeId: string): CSSDict | null => {
-        const node = state.project.nodes[nodeId];
-        if (!node) return null;
-
-        const el = node.styles?.element ?? {};
-        const baseVp = state.ui.canvas.baseViewport;
-        const activeVp = state.ui.canvas.activeViewport;
-        const mode = state.ui.canvas.viewportMode?.[activeVp] ?? state.ui.canvas.vpMode?.[activeVp];
-
-        const baseDecl = (el as any)[baseVp] ?? {};
-        if (mode === 'Independent' && activeVp !== baseVp) {
-            const overrideDecl = (el as any)[activeVp] ?? {};
-            return { ...baseDecl, ...overrideDecl };
-        }
-        return { ...baseDecl };
-    };
-
-    /* ---------- Inspector 가시성 계산 (추가) ---------- */
-
-    /** 스타일 키: TagPolicy → (옵션) project.inspectorFilters 교차 적용
-     *  + Page 모드에서 ui.inspector.forceTagPolicy === true면 TagPolicy 허용 전부 노출
-     */
-    const selectInspectorStyleKeys = (state: EditorState, nodeId: NodeId): { visible: string[] } => {
-        const node = state.project.nodes?.[nodeId];
-        const tag = getNodeTag(state, node);
-        const tagAllowed = computeTagAllowedStyleKeys(tag);
-
-        // Page 모드 + 강제 표시는 TagPolicy 허용 전부
-        const mode = (state.ui?.mode ?? 'Page') as EditorMode;
-        const forceAll = !!state.ui?.inspector?.forceTagPolicy;
-        if (mode === 'Page' && forceAll) {
-            return { visible: [...tagAllowed] };
-        }
-
-        // 프로젝트 단위 InspectorFilter(컴포넌트별)
-        const defId = node?.componentId ?? '';
-        const filter = (state.project.inspectorFilters?.[defId] as InspectorFilter | undefined);
-
-        return applyInspectorFilter(tagAllowed, filter, 'styles');
-    };
-
-    /** 속성 키: TagPolicy(attributes.allow/deny) → (옵션) project.inspectorFilters 교차 적용
-     *  + Page 모드 + forceTagPolicy === true면 TagPolicy 허용 전부
-     */
-    const selectInspectorPropKeys = (state: EditorState, nodeId: NodeId): { visible: string[] } => {
-        const node = state.project.nodes?.[nodeId];
-        const tag = getNodeTag(state, node);
-
-        const tp = (GLOBAL_TAG_POLICIES as any)[tag] as
-            | { attributes?: { allow?: string[]; deny?: string[] } }
-            | undefined;
-
-        const allow = new Set<string>(tp?.attributes?.allow ?? []);
-        const deny = new Set<string>(tp?.attributes?.deny ?? []);
-        for (const d of deny) allow.delete(d);
-
-        const mode = (state.ui?.mode ?? 'Page') as EditorMode;
-        const forceAll = !!state.ui?.inspector?.forceTagPolicy;
-        if (mode === 'Page' && forceAll) {
-            return { visible: [...allow] };
-        }
-
-        const defId = node?.componentId ?? '';
-        const filter = (state.project.inspectorFilters?.[defId] as InspectorFilter | undefined);
-
-        return applyInspectorFilter(allow, filter, 'props');
-    };
-
-    /* ---------- BottomDock/레이아웃 파생 ---------- */
-
     const R = {
-        /** Inspector용 최종 스타일 선언 */
         getEffectiveDecl(nodeId: string) {
             return selectEffectiveDecl(EditorCore.getState(), nodeId);
         },
-
-        /** BottomDock 표준 읽기 상태(초깃값 포함) */
         selectBottomDockState(): BottomDockState {
             const s = EditorCore.store.getState() as EditorState;
             return normBottomDock(s.ui);
         },
-
-        /** 우측 고급 패널 레이아웃 파생값 */
         selectBottomRightLayout(): BottomRightLayout {
             const s = EditorCore.store.getState() as EditorState;
             return computeRightLayout(s.ui);
         },
-
-        /** 현재 모드(Page/Component)에 따른 현재 루트 NodeId */
         selectCurrentRootId(): NodeId | null {
             const s = EditorCore.store.getState() as EditorState;
             return findCurrentRootIdByMode(s.ui, s.project);
         },
-
-        /** ✅ Inspector 표시 키 계산(스타일) */
         selectInspectorStyleKeys(nodeId: NodeId): { visible: string[] } {
-            return selectInspectorStyleKeys(EditorCore.getState(), nodeId);
+            const s = EditorCore.getState();
+            const node = s.project.nodes?.[nodeId];
+            const tag = getNodeTag(s, node);
+            const tagAllowed = computeTagAllowedStyleKeys(tag);
+
+            const mode = (s.ui?.mode ?? 'Page') as EditorMode;
+            const forceAll = !!s.ui?.inspector?.forceTagPolicy;
+            if (mode === 'Page' && forceAll) {
+                return { visible: [...tagAllowed] };
+            }
+
+            const defId = node?.componentId ?? '';
+            const filter = (s.project.inspectorFilters?.[defId] as InspectorFilter | undefined);
+            return applyInspectorFilter(tagAllowed, filter, 'styles');
+        },
+        selectInspectorPropKeys(nodeId: NodeId): { visible: string[] } {
+            const s = EditorCore.getState();
+            const node = s.project.nodes?.[nodeId];
+            const tag = getNodeTag(s, node);
+
+            const tp = (GLOBAL_TAG_POLICIES as any)[tag] as
+                | { attributes?: { allow?: string[]; deny?: string[] } }
+                | undefined;
+
+            const allow = new Set<string>(tp?.attributes?.allow ?? []);
+            const deny = new Set<string>(tp?.attributes?.deny ?? []);
+            for (const d of deny) allow.delete(d);
+
+            const mode = (s.ui?.mode ?? 'Page') as EditorMode;
+            const forceAll = !!s.ui?.inspector?.forceTagPolicy;
+            if (mode === 'Page' && forceAll) {
+                return { visible: [...allow] };
+            }
+
+            const defId = node?.componentId ?? '';
+            const filter = (s.project.inspectorFilters?.[defId] as InspectorFilter | undefined);
+            return applyInspectorFilter(allow, filter, 'props');
         },
 
-        /** ✅ Inspector 표시 키 계산(속성/Props) */
-        selectInspectorPropKeys(nodeId: NodeId): { visible: string[] } {
-            return selectInspectorPropKeys(EditorCore.getState(), nodeId);
+        /** ✅ Tag 선택 옵션 계산
+         * - 컴포넌트가 비컨테이너(canHaveChildren=false) → 컨테이너 태그는 disabled+upgradeToContainer
+         * - 컴포넌트가 컨테이너 → allowedTags 그대로 사용
+         */
+        selectAllowedTagOptions(nodeId: NodeId): TagOption[] {
+            const s = EditorCore.getState();
+            const node = s.project.nodes[nodeId];
+            if (!node) return [];
+
+            const def = getDefinition(node.componentId);
+            const canHaveChildren = !!def?.capabilities?.canHaveChildren;
+
+            const allowed = getAllowedTagsByComponent(node.componentId); // 컴포넌트가 허용한 태그만
+            // 현재 태그가 allowed에 없으면(과거 데이터 등), 맨 앞에 붙여 표시
+            const curTag = getNodeTag(s, node);
+            const list = allowed.includes(curTag) ? allowed : [curTag, ...allowed];
+
+            return list.map<TagOption>((tag) => {
+                const isContainer = isContainerTag(tag);
+                if (!canHaveChildren && isContainer) {
+                    return {
+                        value: tag,
+                        label: tag,
+                        disabled: true,
+                        upgradeToContainer: true,
+                    };
+                }
+                return { value: tag, label: tag };
+            });
         },
     };
 
-    // selectors 도메인은 상태를 변경하지 않으므로 writer는 비어있습니다.
     const W = {};
-
     return { reader: R, writer: W } as const;
 }

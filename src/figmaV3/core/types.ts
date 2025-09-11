@@ -25,6 +25,7 @@ export interface Node<
     S extends StyleBase = StyleBase
 > {
     id: NodeId;
+    parentId?: NodeId;
     componentId: string;
     props: P;
     styles: S;

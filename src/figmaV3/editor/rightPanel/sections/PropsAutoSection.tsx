@@ -17,7 +17,13 @@ import {
     IconBtnV1,
 } from './styles/layoutV1';
 
-import {RightDomain, useRightControllerFactory} from '../../../controllers/right/RightControllerFactory';
+import { RightDomain, useRightControllerFactory } from '../../../controllers/right/RightControllerFactory';
+
+// ✅ 컨테이너 태그 목록(선택 차단용)
+//   - 단일 컴포넌트(컨테이너 아님)에서는 이 태그들이 셀렉트에 절대 나타나지 않도록 필터링합니다.
+const CONTAINER_TAGS = new Set([
+    'div', 'section', 'article', 'main', 'nav', 'aside', 'header', 'footer'
+]);
 
 const RESERVED_PROP_KEYS = new Set([
     'as',
@@ -33,7 +39,7 @@ const RESERVED_PROP_KEYS = new Set([
 type AttrMap = Record<string, string>;
 
 /** 태그/컴포넌트별로 숨겨야 할 prop을 최소 규칙으로 처리 */
-function filterByTagAndDef(defTitle: string, selTag: string, entries: any[]) {
+function filterByTagAndDef(defTitle: string | undefined, selTag: string, entries: any[]) {
     if (defTitle === 'Image' && selTag !== 'img') {
         // img가 아닐 때는 src/alt 숨김
         return entries.filter((e) => e.key !== 'src' && e.key !== 'alt');
@@ -50,9 +56,8 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
     const ui = reader.getUI();
 
     // ✅ 쓰기 액션
-    const { updateNodeProps, setNotification } = writer as {
+    const { updateNodeProps } = writer as {
         updateNodeProps: (nodeId: NodeId, patch: Record<string, unknown>) => void;
-        setNotification: (msg: string) => void;
     };
 
     const node = project.nodes[nodeId];
@@ -62,22 +67,59 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
     // ⬇️ 스키마가 비어 있어도(= Box 등) As(Tag)와 Tag Attrs를 보여야 하므로 조기 return 하지 않음
     const schema = (def?.propsSchema ?? []) as any[];
 
-    /** As(Tag) — 항상 표시 */
-    const allowedTags = (def as any)?.capabilities?.allowedTags ?? ['div'];
-    const defaultTag = (def as any)?.capabilities?.defaultTag ?? allowedTags[0] ?? 'div';
+    /** As(Tag) — 항상 표시 (기준: ComponentDefinition.capabilities.allowedTags) */
+    const allowedTagsFromDef = (def as any)?.capabilities?.allowedTags as string[] | undefined;
+    const defaultTagFromDef = (def as any)?.capabilities?.defaultTag as string | undefined;
 
-    const currentTag = String(((node.props ?? {}) as any).__tag ?? defaultTag);
-    const [selTag, setSelTag] = useState(currentTag);
+    // 현재 노드 tag
+    const currentTag = String(((node.props ?? {}) as any).__tag ?? (defaultTagFromDef ?? (allowedTagsFromDef?.[0] ?? 'div')));
+
+    // ✅ 단일/컨테이너 여부
+    const isContainerDef = !!(def as any)?.capabilities?.canHaveChildren;
+
+    // ✅ 최종 Tag 선택지:
+    //  - 기본적으로 Definition이 허용하는 태그 목록을 기반으로 하되,
+    //  - “단일 컴포넌트(컨테이너 아님)”이면 CONTAINER_TAGS 를 **아예 제거**하여 노출 차단.
+    //  - TagPolicy가 컨테이너 태그를 허용하더라도 여기서는 원천 차단합니다.
+    const selectableTags: string[] = useMemo(() => {
+        const base = allowedTagsFromDef && allowedTagsFromDef.length > 0
+            ? allowedTagsFromDef
+            : [defaultTagFromDef ?? 'div'];
+
+        if (!isContainerDef) {
+            // 단일 컴포넌트 → 컨테이너 태그 제거
+            const filtered = base.filter((t: string) => !CONTAINER_TAGS.has(t));
+            // 만약 필터 결과가 비어서 셀렉트가 비정상 동작할 여지가 있으면, 현재 tag만 단독으로 유지
+            return filtered.length > 0 ? filtered : [currentTag];
+        }
+        return base;
+    }, [allowedTagsFromDef, defaultTagFromDef, isContainerDef, currentTag]);
+
+    // 현재 선택 UI 상태
+    const [selTag, setSelTag] = useState<string>(currentTag);
     React.useEffect(() => setSelTag(currentTag), [currentTag, nodeId, defId]);
 
-    const canChangeTag = allowedTags.length > 1;
-    const applyTag = () => updateNodeProps(nodeId, { __tag: selTag || undefined });
+    // 변경 가능 판단(옵션이 2개 이상이거나, 1개지만 현재와 다른 경우)
+    const canChangeTag = useMemo(() => {
+        const unique = Array.from(new Set(selectableTags));
+        if (unique.length <= 1) return false;
+        // 여러 개면 변경 가능
+        return true;
+    }, [selectableTags]);
+
+    // Tag 적용(여기서는 컨테이너로의 승격/경고 로직을 **원천 제거**합니다)
+    const applyTag = () => {
+        // 방어: selectableTags에 없는 값을 억지로 적용하려는 경우 무시
+        if (!selectableTags.includes(selTag)) return;
+        updateNodeProps(nodeId, { __tag: selTag || undefined });
+    };
 
     /** 정책 기반 필터 + Tag 기반 보정 */
     const baseEntries = useMemo(() => {
         const entries = schema.filter((e) => !RESERVED_PROP_KEYS.has(e.key));
-        //if (ui.mode === 'Page' && !ui.expertMode) {
         const forceAll = !!ui.inspector?.forceTagPolicy;
+
+        // 페이지 모드 & 전문가모드 아님 & 강제표시 아님 → 컴포넌트 정책 적용
         if (ui.mode === 'Page' && !ui.expertMode && !forceAll) {
             const componentPolicy = project.policies?.components?.[def?.title ?? ''];
             if (componentPolicy) {
@@ -88,11 +130,10 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
             }
         }
         return entries;
-        //}, [schema, ui.mode, ui.expertMode, project.policies, def?.title]);
     }, [schema, ui.mode, ui.expertMode, ui.inspector?.forceTagPolicy, project.policies, def?.title]);
 
     const visibleEntries = useMemo(
-        () => filterByTagAndDef(def?.title ?? '', selTag, baseEntries),
+        () => filterByTagAndDef(def?.title, selTag, baseEntries),
         [def?.title, defId, selTag, baseEntries]
     );
 
@@ -144,7 +185,7 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
                                     )}
                                     <MiniSelectV1
                                         value={selTag}
-                                        options={[...allowedTags] as unknown as string[]}
+                                        options={[...selectableTags]}
                                         onChange={(v) => setSelTag(String(v || ''))}
                                         title="html tag"
                                         fullWidth
@@ -252,7 +293,7 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
                         <div className="col-span-3 min-w-0">
                             <button
                                 className="h-[28px] w-full rounded border border-gray-300 text-[12px]"
-                                onClick={addAttr}
+                                onClick={() => addAttr()}
                                 title="add attribute"
                             >
                                 + add attribute
@@ -288,7 +329,7 @@ export function PropsAutoSection({ nodeId, defId }: { nodeId: NodeId; defId: str
                         <div className="col-span-1 min-w-0">
                             <button
                                 className="h-[28px] w-full rounded border border-gray-300 text-[12px]"
-                                onClick={addAttr}
+                                onClick={() => addAttr()}
                                 title="add"
                             >
                                 add

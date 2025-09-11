@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import type {
     CSSDict,
     InspectorFilter,
@@ -10,13 +10,7 @@ import type {
     ComponentDefinition,
 } from '../../../../core/types';
 
-import {
-    useAllowed,
-    DisabledHint,
-    type DisallowReason,
-    PermissionLock,
-    reasonForKey,
-} from './common';
+import { useAllowed, PermissionLock } from './common';
 import { getDefinition } from '../../../../core/registry';
 
 import {
@@ -30,6 +24,7 @@ import {
 } from 'lucide-react';
 
 import { coerceLen } from '../../../../runtime/styleUtils';
+
 // 레이아웃 프리미티브
 import {
     SectionShellV1,
@@ -42,7 +37,7 @@ import {
     IconBtnV1,
 } from './layoutV1';
 
-import {RightDomain, useRightControllerFactory} from '@/figmaV3/controllers/right/RightControllerFactory';
+import { RightDomain, useRightControllerFactory } from '@/figmaV3/controllers/right/RightControllerFactory';
 
 type IconCmp = React.ComponentType<{ size?: number; className?: string }>;
 
@@ -63,27 +58,41 @@ export function LayoutGroup(props: {
     nodeId: NodeId;
     componentId: string;
 }) {
-    // ✅ 컨트롤러 도입 (reader만 사용)
+    // ✅ 컨트롤러 (reader)
     const { reader } = useRightControllerFactory(RightDomain.Inspector);
-    const R = reader;
+    const { el, patch, open, onToggle, nodeId, componentId } = props;
 
-    const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
-    const ui = R.getUI();
-    const project = R.getProject();
+    const ui = reader.getUI();
     const def = getDefinition(componentId);
     const allow = useAllowed(nodeId);
-    const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
     const display = (el as any).display ?? 'block';
     const isInline = display === 'inline';
-    const container = isContainer(def);
 
     const dir = (el as any).flexDirection ?? 'row';
     const isCol = dir === 'column' || dir === 'column-reverse';
 
+    // ① 컨텍스트 판별: 부모가 flex인지, 현재 노드가 컨테이너인지
+    const parentIsFlex = reader.isFlexParent?.(nodeId) ?? false;
+    const isContainerNode =
+        reader.isContainerNode?.(nodeId) ?? isContainer(def);
+
+    // ② 표시 규칙: 노드가 컨테이너가 아닌 경우 flex/grid 옵션 자체를 노출하지 않음
+    const rawDisplayOptions = isContainerNode
+        ? (['block', 'inline', 'flex', 'grid'] as const)
+        : (['block', 'inline'] as const);
+
+    // display 키 자체가 정책상 막혀 있으면 버튼을 안 보이게 함
+    const displayOptions = allow.has('display') ? rawDisplayOptions : ([] as string[]);
+
     const renderLock = (controlKey: string) => {
         if (ui.mode === 'Component') {
-            return <PermissionLock controlKey={`styles:${controlKey}`} componentId={componentId} />;
+            return (
+                <PermissionLock
+                    controlKey={`styles:${controlKey}`}
+                    componentId={componentId}
+                />
+            );
         }
         return null;
     };
@@ -163,22 +172,16 @@ export function LayoutGroup(props: {
     const manualRowsVal = rows === null ? '' : String(rows);
 
     return (
-        // 최상위: 요청대로 mt-4
         <div className="mt-4">
-            <SectionShellV1
-                title="Layout"
-                open={open}
-                onToggle={onToggle}
-            >
+            <SectionShellV1 title="Layout" open={open} onToggle={onToggle}>
                 {/* display */}
-                <RowV1>
-                    <RowLeftV1 title="display" />
-                    <RowRightGridV1>
-                        <div className="col-span-6 min-w-0 flex items-center gap-[2px] flex-nowrap">
-                            {renderLock('display')}
-                            {!allow.has('display') && <DisabledHint reason={dis('display') ?? 'template'} />}
-                            {allow.has('display') ? (
-                                (['block', 'inline', 'flex', 'grid'] as const).map((v) => (
+                {displayOptions.length > 0 && (
+                    <RowV1>
+                        <RowLeftV1 title="display" />
+                        <RowRightGridV1>
+                            <div className="col-span-6 min-w-0 flex items-center gap-[2px] flex-nowrap">
+                                {renderLock('display')}
+                                {displayOptions.map((v) => (
                                     <ChipBtnV1
                                         key={v}
                                         title={v}
@@ -187,302 +190,291 @@ export function LayoutGroup(props: {
                                     >
                                         {v}
                                     </ChipBtnV1>
-                                ))
-                            ) : (
-                                <span className="text-[11px] text-gray-500">제한됨</span>
-                            )}
-                        </div>
-                    </RowRightGridV1>
-                </RowV1>
-
-                {/* flex 상세 옵션 (display 바로 하단) */}
-                {container && display === 'flex' && (
-                    <>
-                        <RowV1>
-                            <RowLeftV1 title="direction" />
-                            <RowRightGridV1>
-                                <div className="col-span-6 min-w-0 flex items-center gap-[2px] flex-nowrap">
-                                    {renderLock('flexDirection')}
-                                    {!allow.has('flexDirection') && <DisabledHint reason={dis('flexDirection') ?? 'template'} />}
-                                    {[
-                                        { v: 'row', I: GalleryHorizontal, title: 'row' },
-                                        { v: 'row-reverse', I: ArrowLeftRight, title: 'row-reverse' },
-                                        { v: 'column', I: GalleryVertical, title: 'column' },
-                                        { v: 'column-reverse', I: ArrowUpDown, title: 'column-reverse' },
-                                    ].map(({ v, I, title }) => (
-                                        <IconBtnV1
-                                            key={v}
-                                            title={title}
-                                            onClick={() => patch({ flexDirection: v })}
-                                            active={dir === v}
-                                            square24
-                                        >
-                                            <I size={16} />
-                                        </IconBtnV1>
-                                    ))}
-                                </div>
-                            </RowRightGridV1>
-                        </RowV1>
-
-                        <RowV1>
-                            <RowLeftV1 title="justify" />
-                            <RowRightGridV1>
-                                <div className="col-span-6 min-w-0 flex items-center gap-[2px] flex-nowrap">
-                                    {renderLock('justifyContent')}
-                                    {!allow.has('justifyContent') && <DisabledHint reason={dis('justifyContent') ?? 'template'} />}
-                                    {justifyIcons.map(({ v, I, title }) => (
-                                        <IconBtnV1
-                                            key={v}
-                                            title={title}
-                                            onClick={() => patch({ justifyContent: v })}
-                                            active={(el as any).justifyContent === v}
-                                            disabled={!allow.has('justifyContent')}
-                                            square24
-                                        >
-                                            <I size={16} />
-                                        </IconBtnV1>
-                                    ))}
-                                </div>
-                            </RowRightGridV1>
-                        </RowV1>
-
-                        <RowV1>
-                            <RowLeftV1 title="align" />
-                            <RowRightGridV1>
-                                <div className="col-span-6 min-w-0 flex items-center gap-[2px] flex-nowrap">
-                                    {renderLock('alignItems')}
-                                    {!allow.has('alignItems') && <DisabledHint reason={dis('alignItems') ?? 'template'} />}
-                                    {alignIcons.map(({ v, I, title }) => (
-                                        <IconBtnV1
-                                            key={v}
-                                            title={title}
-                                            onClick={() => patch({ alignItems: v })}
-                                            active={(el as any).alignItems === v}
-                                            disabled={!allow.has('alignItems')}
-                                            square24
-                                        >
-                                            <I size={16} />
-                                        </IconBtnV1>
-                                    ))}
-                                </div>
-                            </RowRightGridV1>
-                        </RowV1>
-
-                        <RowV1>
-                            <RowLeftV1 title="gap" />
-                            <RowRightGridV1>
-                                <div className="col-span-3 min-w-0">
-                                    {renderLock('gap')}
-                                    {!allow.has('gap') && <DisabledHint reason={dis('gap') ?? 'template'} />}
-                                    {allow.has('gap') ? (
-                                        <MiniInputV1
-                                            value={(el as any).gap ?? ''}
-                                            onChange={(v) => patch({ gap: coerceLen(v) })}
-                                            placeholder="8px"
-                                            size="auto"
-                                            // fullWidth 기본 true라 셀(3칸)을 꽉 채움
-                                        />
-                                    ) : (
-                                        <span className="text-[11px] text-gray-500">제한됨</span>
-                                    )}
-                                </div>
-                                <div className="col-span-3" />
-                            </RowRightGridV1>
-                        </RowV1>
-                    </>
-                )}
-
-                {/* grid 상세 옵션 (display 바로 하단) */}
-                {container && display === 'grid' && (
-                    <>
-                        {/* columns: A,1,2,3,4 + 맨 우측 수동입력(셀 폭 전부 사용) */}
-                        <RowV1>
-                            <RowLeftV1 title="columns" />
-                            <RowRightGridV1>
-                                <div className="col-span-6 min-w-0 flex items-center gap-[2px]">
-                                    {renderLock('gridTemplateColumns')}
-                                    {!allow.has('gridTemplateColumns') && (
-                                        <DisabledHint reason={dis('gridTemplateColumns') ?? 'template'} />
-                                    )}
-
-                                    <div className="flex items-center gap-[2px] flex-none">
-                                        <IconBtnV1
-                                            title="Auto"
-                                            onClick={() => setCols('auto')}
-                                            active={cols === null}
-                                            disabled={!allow.has('gridTemplateColumns')}
-                                            square24
-                                        >
-                                            <span className="text-[11px] leading-none">A</span>
-                                        </IconBtnV1>
-                                        {[1, 2, 3, 4].map((n) => (
-                                            <IconBtnV1
-                                                key={n}
-                                                title={`${n}`}
-                                                onClick={() => setCols(n)}
-                                                active={cols === n}
-                                                disabled={!allow.has('gridTemplateColumns')}
-                                                square24
-                                            >
-                                                <span className="text-[11px] leading-none">{n}</span>
-                                            </IconBtnV1>
-                                        ))}
-                                    </div>
-
-                                    {/* 수동 입력: 남는 셀 폭 모두 사용 */}
-                                    <div className="flex-1 min-w-0 ml-[4px]">
-                                        <MiniInputV1
-                                            value={manualColsVal}
-                                            onChange={handleManualCols}
-                                            placeholder="n"
-                                            numeric
-                                            size="auto"
-                                            title="columns count"
-                                            // fullWidth 기본 true → w-full
-                                        />
-                                    </div>
-                                </div>
-                            </RowRightGridV1>
-                        </RowV1>
-
-                        {/* rows: A,1,2,3,4 + 맨 우측 수동입력(셀 폭 전부 사용) */}
-                        <RowV1>
-                            <RowLeftV1 title="rows" />
-                            <RowRightGridV1>
-                                <div className="col-span-6 min-w-0 flex items-center gap-[2px]">
-                                    {renderLock('gridTemplateRows')}
-                                    {!allow.has('gridTemplateRows') && (
-                                        <DisabledHint reason={dis('gridTemplateRows') ?? 'template'} />
-                                    )}
-
-                                    <div className="flex items-center gap-[2px] flex-none">
-                                        <IconBtnV1
-                                            title="Auto"
-                                            onClick={() => setRows('auto')}
-                                            active={rows === null}
-                                            disabled={!allow.has('gridTemplateRows')}
-                                            square24
-                                        >
-                                            <span className="text-[11px] leading-none">A</span>
-                                        </IconBtnV1>
-                                        {[1, 2, 3, 4].map((n) => (
-                                            <IconBtnV1
-                                                key={n}
-                                                title={`${n}`}
-                                                onClick={() => setRows(n)}
-                                                active={rows === n}
-                                                disabled={!allow.has('gridTemplateRows')}
-                                                square24
-                                            >
-                                                <span className="text-[11px] leading-none">{n}</span>
-                                            </IconBtnV1>
-                                        ))}
-                                    </div>
-
-                                    {/* 수동 입력: 남는 셀 폭 모두 사용 */}
-                                    <div className="flex-1 min-w-0 ml-[4px]">
-                                        <MiniInputV1
-                                            value={manualRowsVal}
-                                            onChange={handleManualRows}
-                                            placeholder="n"
-                                            numeric
-                                            size="auto"
-                                            title="rows count"
-                                        />
-                                    </div>
-                                </div>
-                            </RowRightGridV1>
-                        </RowV1>
-
-                        {/* gap */}
-                        <RowV1>
-                            <RowLeftV1 title="gap" />
-                            <RowRightGridV1>
-                                <div className="col-span-3 min-w-0">
-                                    {renderLock('gap')}
-                                    {!allow.has('gap') && <DisabledHint reason={dis('gap') ?? 'template'} />}
-                                    {allow.has('gap') ? (
-                                        <MiniInputV1
-                                            value={(el as any).gap ?? ''}
-                                            onChange={(v) => patch({ gap: coerceLen(v) })}
-                                            placeholder="8px"
-                                            size="auto"
-                                        />
-                                    ) : (
-                                        <span className="text-[11px] text-gray-500">제한됨</span>
-                                    )}
-                                </div>
-                                <div className="col-span-3" />
-                            </RowRightGridV1>
-                        </RowV1>
-                    </>
-                )}
-
-                {/* W/H (W 1 | input 2 | H 1 | input 2) */}
-                <RowV1>
-                    <RowLeftV1 title="W/H" />
-                    <RowRightGridV1>
-                        {isInline ? (
-                            <div className="col-span-6 text-[11px] text-gray-500">
-                                display:inline 상태에서는 width/height가 적용되지 않습니다.
+                                ))}
                             </div>
-                        ) : (
-                            <>
-                                <div className="col-span-1 flex items-center text-[11px] text-gray-600 pl-[2px]">W</div>
-                                <div className="col-span-2 min-w-0">
-                                    {renderLock('width')}
-                                    {!allow.has('width') && <DisabledHint reason={dis('width') ?? 'template'} />}
-                                    {allow.has('width') ? (
-                                        <MiniInputV1
-                                            value={(el as any).width ?? ''}
-                                            onChange={(v) => patch({ width: coerceLen(v) })}
-                                            placeholder="auto"
-                                            size="auto"
-                                        />
-                                    ) : (
-                                        <span className="text-[11px] text-gray-500">제한됨</span>
-                                    )}
-                                </div>
-                                <div className="col-span-1 flex items-center text-[11px] text-gray-600 pl-[2px]">H</div>
-                                <div className="col-span-2 min-w-0">
-                                    {renderLock('height')}
-                                    {!allow.has('height') && <DisabledHint reason={dis('height') ?? 'template'} />}
-                                    {allow.has('height') ? (
-                                        <MiniInputV1
-                                            value={(el as any).height ?? ''}
-                                            onChange={(v) => patch({ height: coerceLen(v) })}
-                                            placeholder="auto"
-                                            size="auto"
-                                        />
-                                    ) : (
-                                        <span className="text-[11px] text-gray-500">제한됨</span>
-                                    )}
-                                </div>
-                            </>
+                        </RowRightGridV1>
+                    </RowV1>
+                )}
+
+                {/* flex 상세 옵션: 컨테이너 + display === 'flex' 일 때만 노출 */}
+                {isContainerNode && display === 'flex' && (
+                    <>
+                        {/* direction */}
+                        {allow.has('flexDirection') && (
+                            <RowV1>
+                                <RowLeftV1 title="direction" />
+                                <RowRightGridV1>
+                                    <div className="col-span-6 min-w-0 flex items-center gap-[2px] flex-nowrap">
+                                        {renderLock('flexDirection')}
+                                        {[
+                                            { v: 'row', I: GalleryHorizontal, title: 'row' },
+                                            { v: 'row-reverse', I: ArrowLeftRight, title: 'row-reverse' },
+                                            { v: 'column', I: GalleryVertical, title: 'column' },
+                                            { v: 'column-reverse', I: ArrowUpDown, title: 'column-reverse' },
+                                        ].map(({ v, I, title }) => (
+                                            <IconBtnV1
+                                                key={v}
+                                                title={title}
+                                                onClick={() => patch({ flexDirection: v })}
+                                                active={dir === v}
+                                                square24
+                                            >
+                                                <I size={16} />
+                                            </IconBtnV1>
+                                        ))}
+                                    </div>
+                                </RowRightGridV1>
+                            </RowV1>
                         )}
-                    </RowRightGridV1>
-                </RowV1>
+
+                        {/* justify */}
+                        {allow.has('justifyContent') && (
+                            <RowV1>
+                                <RowLeftV1 title="justify" />
+                                <RowRightGridV1>
+                                    <div className="col-span-6 min-w-0 flex items-center gap-[2px] flex-nowrap">
+                                        {renderLock('justifyContent')}
+                                        {justifyIcons.map(({ v, I, title }) => (
+                                            <IconBtnV1
+                                                key={v}
+                                                title={title}
+                                                onClick={() => patch({ justifyContent: v })}
+                                                active={(el as any).justifyContent === v}
+                                                square24
+                                            >
+                                                <I size={16} />
+                                            </IconBtnV1>
+                                        ))}
+                                    </div>
+                                </RowRightGridV1>
+                            </RowV1>
+                        )}
+
+                        {/* align */}
+                        {allow.has('alignItems') && (
+                            <RowV1>
+                                <RowLeftV1 title="align" />
+                                <RowRightGridV1>
+                                    <div className="col-span-6 min-w-0 flex items-center gap-[2px] flex-nowrap">
+                                        {renderLock('alignItems')}
+                                        {alignIcons.map(({ v, I, title }) => (
+                                            <IconBtnV1
+                                                key={v}
+                                                title={title}
+                                                onClick={() => patch({ alignItems: v })}
+                                                active={(el as any).alignItems === v}
+                                                square24
+                                            >
+                                                <I size={16} />
+                                            </IconBtnV1>
+                                        ))}
+                                    </div>
+                                </RowRightGridV1>
+                            </RowV1>
+                        )}
+
+                        {/* gap (flex) */}
+                        {allow.has('gap') && (
+                            <RowV1>
+                                <RowLeftV1 title="gap" />
+                                <RowRightGridV1>
+                                    <div className="col-span-3 min-w-0">
+                                        {renderLock('gap')}
+                                        <MiniInputV1
+                                            value={(el as any).gap ?? ''}
+                                            onChange={(v) => patch({ gap: coerceLen(v) })}
+                                            placeholder="8px"
+                                            size="auto"
+                                        />
+                                    </div>
+                                    <div className="col-span-3" />
+                                </RowRightGridV1>
+                            </RowV1>
+                        )}
+                    </>
+                )}
+
+                {/* grid 상세 옵션: 컨테이너 + display === 'grid' 일 때만 노출 */}
+                {isContainerNode && display === 'grid' && (
+                    <>
+                        {/* columns */}
+                        {allow.has('gridTemplateColumns') && (
+                            <RowV1>
+                                <RowLeftV1 title="columns" />
+                                <RowRightGridV1>
+                                    <div className="col-span-6 min-w-0 flex items-center gap-[2px]">
+                                        {renderLock('gridTemplateColumns')}
+
+                                        <div className="flex items-center gap-[2px] flex-none">
+                                            <IconBtnV1
+                                                title="Auto"
+                                                onClick={() => setCols('auto')}
+                                                active={cols === null}
+                                                square24
+                                            >
+                                                <span className="text-[11px] leading-none">A</span>
+                                            </IconBtnV1>
+                                            {[1, 2, 3, 4].map((n) => (
+                                                <IconBtnV1
+                                                    key={n}
+                                                    title={`${n}`}
+                                                    onClick={() => setCols(n)}
+                                                    active={cols === n}
+                                                    square24
+                                                >
+                                                    <span className="text-[11px] leading-none">{n}</span>
+                                                </IconBtnV1>
+                                            ))}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0 ml-[4px]">
+                                            <MiniInputV1
+                                                value={manualColsVal}
+                                                onChange={handleManualCols}
+                                                placeholder="n"
+                                                numeric
+                                                size="auto"
+                                                title="columns count"
+                                            />
+                                        </div>
+                                    </div>
+                                </RowRightGridV1>
+                            </RowV1>
+                        )}
+
+                        {/* rows */}
+                        {allow.has('gridTemplateRows') && (
+                            <RowV1>
+                                <RowLeftV1 title="rows" />
+                                <RowRightGridV1>
+                                    <div className="col-span-6 min-w-0 flex items-center gap-[2px]">
+                                        {renderLock('gridTemplateRows')}
+
+                                        <div className="flex items-center gap-[2px] flex-none">
+                                            <IconBtnV1
+                                                title="Auto"
+                                                onClick={() => setRows('auto')}
+                                                active={rows === null}
+                                                square24
+                                            >
+                                                <span className="text-[11px] leading-none">A</span>
+                                            </IconBtnV1>
+                                            {[1, 2, 3, 4].map((n) => (
+                                                <IconBtnV1
+                                                    key={n}
+                                                    title={`${n}`}
+                                                    onClick={() => setRows(n)}
+                                                    active={rows === n}
+                                                    square24
+                                                >
+                                                    <span className="text-[11px] leading-none">{n}</span>
+                                                </IconBtnV1>
+                                            ))}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0 ml-[4px]">
+                                            <MiniInputV1
+                                                value={manualRowsVal}
+                                                onChange={handleManualRows}
+                                                placeholder="n"
+                                                numeric
+                                                size="auto"
+                                                title="rows count"
+                                            />
+                                        </div>
+                                    </div>
+                                </RowRightGridV1>
+                            </RowV1>
+                        )}
+
+                        {/* gap (grid) */}
+                        {allow.has('gap') && (
+                            <RowV1>
+                                <RowLeftV1 title="gap" />
+                                <RowRightGridV1>
+                                    <div className="col-span-3 min-w-0">
+                                        {renderLock('gap')}
+                                        <MiniInputV1
+                                            value={(el as any).gap ?? ''}
+                                            onChange={(v) => patch({ gap: coerceLen(v) })}
+                                            placeholder="8px"
+                                            size="auto"
+                                        />
+                                    </div>
+                                    <div className="col-span-3" />
+                                </RowRightGridV1>
+                            </RowV1>
+                        )}
+                    </>
+                )}
+
+                {/* 부모가 flex일 때 노출하는 '아이템 속성' 섹션은
+            (현재 그룹에 없다면) 별도 그룹으로 유지.
+            필요 시 여기로 편입 가능. */}
+                {parentIsFlex && null}
+
+                {/* W/H */}
+                {(allow.has('width') || allow.has('height')) && (
+                    <RowV1>
+                        <RowLeftV1 title="W/H" />
+                        <RowRightGridV1>
+                            {isInline ? (
+                                <div className="col-span-6 text-[11px] text-gray-500">
+                                    display:inline 상태에서는 width/height가 적용되지 않습니다.
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="col-span-1 flex items-center text-[11px] text-gray-600 pl-[2px]">W</div>
+                                    <div className="col-span-2 min-w-0">
+                                        {allow.has('width') && (
+                                            <>
+                                                {renderLock('width')}
+                                                <MiniInputV1
+                                                    value={(el as any).width ?? ''}
+                                                    onChange={(v) => patch({ width: coerceLen(v) })}
+                                                    placeholder="auto"
+                                                    size="auto"
+                                                />
+                                            </>
+                                        )}
+                                    </div>
+                                    <div className="col-span-1 flex items-center text-[11px] text-gray-600 pl-[2px]">H</div>
+                                    <div className="col-span-2 min-w-0">
+                                        {allow.has('height') && (
+                                            <>
+                                                {renderLock('height')}
+                                                <MiniInputV1
+                                                    value={(el as any).height ?? ''}
+                                                    onChange={(v) => patch({ height: coerceLen(v) })}
+                                                    placeholder="auto"
+                                                    size="auto"
+                                                />
+                                            </>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </RowRightGridV1>
+                    </RowV1>
+                )}
 
                 {/* overflow */}
-                <RowV1>
-                    <RowLeftV1 title="overflow" />
-                    <RowRightGridV1>
-                        <div className="col-span-6 min-w-0">
-                            {renderLock('overflow')}
-                            {!allow.has('overflow') && <DisabledHint reason={dis('overflow') ?? 'template'} />}
-                            {allow.has('overflow') ? (
+                {allow.has('overflow') && (
+                    <RowV1>
+                        <RowLeftV1 title="overflow" />
+                        <RowRightGridV1>
+                            <div className="col-span-6 min-w-0">
+                                {renderLock('overflow')}
                                 <MiniSelectV1
                                     value={(el as any).overflow ?? ''}
                                     options={['', 'visible', 'hidden', 'auto', 'scroll']}
                                     onChange={(v) => patch({ overflow: v || undefined })}
                                     title="overflow"
                                 />
-                            ) : (
-                                <span className="text-[11px] text-gray-500">제한됨</span>
-                            )}
-                        </div>
-                    </RowRightGridV1>
-                </RowV1>
+                            </div>
+                        </RowRightGridV1>
+                    </RowV1>
+                )}
             </SectionShellV1>
         </div>
     );

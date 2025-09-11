@@ -62,6 +62,19 @@ function createInspectorController(RE: any, WE: any) {
             if (!nodeId) return { target: null };
             return { target: { nodeId, componentId } };
         })
+        .attachReader('isFlexParent', (orig) => () => {
+            const ui = RE.getUI?.();
+            const nodeId = ui?.selectedId;
+            if (!nodeId)
+                return false;
+            return RE.isFlexParent(nodeId);
+        })
+        .attachReader('isContainer', (orig) => () => {
+            const ui = RE.getUI?.();
+            const nodeId = ui?.selectedId;
+            if (!nodeId)
+                return false;
+            return RE.isContainerNode(nodeId)})
         //.pickReader('getProject', 'getUI', 'getNodeById', 'getEffectiveDecl', 'getInspectorVM')
         //.pickWriter('updateNodeStyles', 'updateNodeProps', 'setNotification', 'updateComponentPolicy')
         .exposeAll()
