@@ -36,7 +36,7 @@ export type DomainPack = {
     writer: Record<string, any>;
 };
 
-const BaseEngineDomains = [EditorDomain.Project, EditorDomain.UI, EditorDomain.Pages, EditorDomain.Nodes];
+const BaseEngineDomains = [EditorDomain.Project, EditorDomain.UI, EditorDomain.Pages, EditorDomain.Nodes, EditorDomain.Selectors];
 
 function mergeWithGuard(base: Record<string, any>, ext: Record<string, any>, label: string, side: 'reader'|'writer') {
     for (const k of Object.keys(ext)) {

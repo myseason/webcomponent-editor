@@ -52,7 +52,7 @@ function RenderNode({ id, reader, writer }: { id: NodeId; reader: any; writer: a
     const finalStyle: React.CSSProperties = {
         ...defaultStyle,
         ...(elProps.style ?? {}),
-        ...instanceStyle,
+        ...instanceStyle(),
         ...selectionStyle
     };
 

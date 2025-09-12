@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { EditorStoreState, NodeSlice } from '../types';
 import { Node, NodeId, CSSDict, Viewport } from '../../core/types';
 import { findParentId, collectSubtreeIds } from '../utils';
+import {normalizeStylePatch} from "@/figmaV3/runtime/styleUtils";
 
 // --- SELECTORS ---
 export const selectNodes = (s: EditorStoreState) => s.project.nodes;
@@ -63,7 +64,8 @@ export const createNodeSlice: StateCreator<EditorStoreState, [], [], NodeSlice> 
                 : base);
 
         const prev = (node.styles.element as any)[vp] ?? {};
-        (node.styles.element as any)[vp] = { ...prev, ...styles };
+        const nextPatch = normalizeStylePatch(styles as CSSDict);
+        (node.styles.element as any)[vp] = { ...prev, ...nextPatch };
     }, true),
 
     _setNodeChildren: (id, children) => get().update((s) => {

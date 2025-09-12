@@ -69,7 +69,18 @@ export function nodesDomain() {
         },
 
         updateNodeStyles(id: NodeId, styles: CSSDict, viewport?: Viewport) {
-            EditorCore.store.getState()._updateNodeStyles(id, styles, viewport);
+            const s = EditorCore.getState();
+            const active = s.ui.canvas.activeViewport;
+            const mode = s.ui.canvas.viewportMode?.[active];
+
+            const vpToUse =
+                viewport !== undefined
+                    ? viewport
+                    : mode === 'Independent'
+                        ? active
+                        : undefined; // base
+
+            EditorCore.store.getState()._updateNodeStyles(id, styles, vpToUse);
         },
 
         // ui.ts에 유사 함수 존재 (selectNode)

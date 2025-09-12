@@ -19,8 +19,7 @@ export enum RightDomain {
 export function useRightControllerFactory(domain?: RightDomain): { reader: any; writer: any } {
     const { reader: RE, writer: WE } = useEditorApi([
         EditorDomain.Policy,
-        EditorDomain.Fragment,
-        EditorDomain.Selectors,
+        EditorDomain.Fragment
     ]);
     //useStoreTick();
     useRerenderOnWrite();
