@@ -1,153 +1,90 @@
 'use client';
 
-import {useCallback, useMemo} from 'react';
-import {getDefinition} from '../../../core/registry';
-import type {NodeId} from '../../../core/types';
-import type {ComponentInspectorPolicyV2, InspectorModePolicy} from '../../../policy/types.local';
-import {RightDomain, useRightControllerFactory} from '../../../controllers/right/RightControllerFactory';
+import { getDefinition } from '@/figmaV3/core/registry';
+import type { EditorMode, Node, StylePolicy, ComponentPolicy } from '@/figmaV3/core/types';
+import { deepMerge } from '@/figmaV3/runtime/deepMerge';
+import { GLOBAL_STYLE_POLICY } from '@/figmaV3/policy/globalStylePolicy';
+import { GLOBAL_TAG_POLICIES } from '@/figmaV3/policy/globalTagPolicy';
 
-type AllowSpec = {
-    allowAllProps: boolean;
-    allowProps: Set<string>;
-    denyProps: Set<string>;
-    allowAllStyles: boolean;
-    allowStyles: Set<string | '*'>;
-    denyStyles: Set<string>;
+// StylePolicy의 각 그룹이 가질 수 있는 최소한의 형태를 정의합니다.
+type PolicyGroup = {
+    visible?: boolean;
+    controls?: Record<string, { visible?: boolean }>;
 };
 
-export const RESERVED_PROP_KEYS = new Set([
-    'as',
-    'href',
-    'tag',
-    '__tag',
-    '__tagAttrs',
-    'id',
-    'name',
-    'slotId',
-]);
+/**
+ * 여러 정책을 병합하여 특정 노드에 대한 최종 "유효 정책" 객체를 계산합니다.
+ * @param node - 대상 노드
+ * @param mode - 현재 에디터 모드 ('Page' 또는 'Component')
+ * @param expertMode - 고급 모드 활성화 여부
+ * @param componentPolicy - 프로젝트에 저장된 컴포넌트 정책
+ * @returns 최종적으로 계산된 StylePolicy 객체
+ */
+export function getEffectivePolicy(
+    node: Node,
+    mode: EditorMode,
+    expertMode: boolean,
+    componentPolicy?: ComponentPolicy
+): StylePolicy {
+    const def = getDefinition(node.componentId);
 
-/** 프로젝트에서 컴포넌트 정책(v2)을 읽기 */
-function getComponentPolicyV2(project: any, defTitle?: string): ComponentInspectorPolicyV2 | undefined {
-    if (!defTitle) return undefined;
-    return project?.policies?.components?.[defTitle] as ComponentInspectorPolicyV2 | undefined;
+    const tag = def?.capabilities?.defaultTag ?? 'div';
+    const tagPolicy = GLOBAL_TAG_POLICIES[tag] ?? {};
+
+    // 기본 정책 = 전역 스타일 정책 + 태그 정책
+    const basePolicy = deepMerge(GLOBAL_STYLE_POLICY, tagPolicy);
+
+    // 고급 모드에서는 ComponentPolicy를 무시하고 기본 정책만 사용합니다.
+    if (expertMode) {
+        return basePolicy;
+    }
+
+    // 페이지 모드에서는 ComponentPolicy를 추가로 병합하여 필터링합니다.
+    if (mode === 'Page' && componentPolicy) {
+        return deepMerge(basePolicy, componentPolicy.inspector ?? {});
+    }
+
+    // 컴포넌트 모드에서는 기본 정책만 사용합니다. (잠금 UI를 표시하기 위함)
+    return basePolicy;
 }
 
-/** 기존 동작 보존을 위한 안전 기본값(정책이 없으면 모두 허용) */
-function defaultsForMode(expertMode: boolean): InspectorModePolicy {
-    return expertMode ? { allowAllInExpert: true } : { allowAllInExpert: true };
-}
+/**
+ * 계산된 유효 정책을 바탕으로 특정 그룹의 표시 여부를 결정합니다.
+ * @param effectivePolicy - getEffectivePolicy로 계산된 최종 정책
+ * @param groupName - 검사할 그룹 이름 (예: 'layout')
+ * @returns 그룹이 표시되어야 하는지 여부
+ */
+export function getGroupVisibility(effectivePolicy: StylePolicy, groupName: keyof StylePolicy): boolean {
+    const groupPolicy = effectivePolicy[groupName] as PolicyGroup | undefined;
 
-/** 모드별 허용 스펙 구성 */
-function buildAllowSpec(policy: ComponentInspectorPolicyV2 | undefined, expertMode: boolean): AllowSpec {
-    const modes = policy?.modes ?? {};
-    const basic = modes.basic ?? defaultsForMode(false);
-    const expert = modes.expert ?? defaultsForMode(true);
+    if (!groupPolicy || groupPolicy.visible === false) {
+        return false;
+    }
 
-    const modePol = expertMode ? expert : basic;
-
-    const allowAll =
-        expertMode
-            ? modePol.allowAllInExpert !== false
-            : modePol.allowProps === undefined && modePol.allowStyles === undefined;
-
-    return {
-        allowAllProps: allowAll,
-        allowProps: new Set(modePol.allowProps ?? []),
-        denyProps: new Set(modePol.denyProps ?? []),
-        allowAllStyles: allowAll,
-        allowStyles: new Set((modePol.allowStyles ?? []) as (string | '*')[]),
-        denyStyles: new Set(modePol.denyStyles ?? []),
-    };
-}
-
-/** 태그 기반 무효 속성 필터 (현 시나리오 유지) */
-export function useTagBasedPropFilter(defTitle: string | undefined, selTag: string) {
-    return useCallback(
-        (key: string) => {
-            if (defTitle === 'Image' && selTag !== 'img') {
-                if (key === 'src' || key === 'alt') return false;
-            }
+    // 그룹 내 컨트롤 중 하나라도 보이면 그룹을 표시합니다.
+    if (!groupPolicy.controls) return false; // 컨트롤이 없는 그룹은 숨김
+    for (const key in groupPolicy.controls) {
+        if (getControlVisibility(effectivePolicy, `${groupName}.${key}`)) {
             return true;
-        },
-        [defTitle, selTag]
-    );
+        }
+    }
+
+    return false;
 }
 
-/** Prop 표시 여부 훅 */
-export function usePropVisibility(nodeId: NodeId, defId: string) {
-    const { reader, writer } = useRightControllerFactory(RightDomain.Policy);
-    const R = reader; const W = writer;
+/**
+ * 계산된 유효 정책을 바탕으로 특정 컨트롤의 표시 여부를 결정합니다.
+ * @param effectivePolicy - getEffectivePolicy로 계산된 최종 정책
+ * @param controlPath - 검사할 컨트롤의 경로 (예: 'layout.display')
+ * @returns 컨트롤이 표시되어야 하는지 여부
+ */
+export function getControlVisibility(effectivePolicy: StylePolicy, controlPath: string): boolean {
+    const [groupName, controlName] = controlPath.split('.') as [keyof StylePolicy, string];
+    if (!groupName || !controlName) return false;
 
-    const project = R.getProject();
-    const ui = R.getUI();
-    const def = getDefinition(defId);
-    const node = project.nodes[nodeId];
+    const groupPolicy = effectivePolicy[groupName] as PolicyGroup | undefined;
+    if (!groupPolicy || groupPolicy.visible === false) return false;
 
-    // 선택 태그: 명시된 __tag 또는 기본 태그
-    const selectedTag: string =
-        (node?.props?.__tag as string) ||
-        (def as any)?.capabilities?.defaultTag ||
-        'div';
-
-    const compPol = getComponentPolicyV2(project, def?.title);
-    const allowSpec = useMemo(() => buildAllowSpec(compPol, !!ui.expertMode), [compPol, ui.expertMode]);
-
-    const tagOk = useTagBasedPropFilter(def?.title, selectedTag);
-
-    const isVisibleProp = useCallback(
-        (key: string) => {
-            if (RESERVED_PROP_KEYS.has(key)) return false;
-            if (!tagOk(key)) return false;
-
-            if (allowSpec.allowAllProps) {
-                if (allowSpec.denyProps.has(key)) return false;
-                return true;
-            }
-
-            if (allowSpec.allowProps.size > 0) {
-                return allowSpec.allowProps.has(key);
-            }
-
-            return true;
-        },
-        [allowSpec, tagOk]
-    );
-
-    return { isVisibleProp, selectedTag };
-}
-
-/** Style 표시 여부 훅 */
-export function useStyleVisibility(nodeId: NodeId, defId: string) {
-    const { reader, writer } = useRightControllerFactory(RightDomain.Policy);
-    const R = reader; const W = writer;
-
-    const project = R.getProject();
-    const ui = R.getUI();
-    const def = getDefinition(defId);
-
-    const compPol = getComponentPolicyV2(project, def?.title);
-    const allowSpec = useMemo(() => buildAllowSpec(compPol, !!ui.expertMode), [compPol, ui.expertMode]);
-
-    const matchesAllow = useCallback(
-        (key: string) => {
-            if (allowSpec.allowAllStyles) {
-                if (allowSpec.denyStyles.has(key)) return false;
-                return true;
-            }
-            if (allowSpec.allowStyles.has('*')) {
-                if (allowSpec.denyStyles.has(key)) return false;
-                return true;
-            }
-            if (allowSpec.allowStyles.size > 0) {
-                if (allowSpec.denyStyles.has(key)) return false;
-                return allowSpec.allowStyles.has(key);
-            }
-            return true;
-        },
-        [allowSpec]
-    );
-
-    const isVisibleStyleKey = useCallback((key: string) => matchesAllow(key), [matchesAllow]);
-
-    return { isVisibleStyleKey };
+    const controlPolicy = groupPolicy.controls?.[controlName];
+    return controlPolicy?.visible !== false;
 }

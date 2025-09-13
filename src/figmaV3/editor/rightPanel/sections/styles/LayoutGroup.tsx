@@ -1,3 +1,5 @@
+// src/figmaV3/editor/rightPanel/sections/styles/LayoutGroup.tsx (변경 없음)
+
 'use client';
 
 import React from 'react';

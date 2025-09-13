@@ -3,7 +3,7 @@
 import React from 'react';
 import type {ComponentPolicy, EditorUI, NodeId, Project,} from '../../../../core/types';
 import {getAllowedStyleKeysForNode, getEffectivePoliciesForNode} from '../../../../runtime/capabilities';
-import {Lock, ShieldAlert, Unlock} from 'lucide-react';
+import {Lock, Unlock, ShieldAlert, LockIcon} from 'lucide-react';
 import styles from '../../../ui/theme.module.css';
 import {RightDomain, useRightControllerFactory} from '@/figmaV3/controllers/right/RightControllerFactory';
 
@@ -44,7 +44,7 @@ export const DisabledHint: React.FC<{ reason: 'template' | 'tag' | 'component' }
         {reason === 'tag' ? 'TAG' : reason === 'component' ? 'COMP' : 'TPL'}
     </span>
 );
-
+/*
 export const PermissionLock: React.FC<{
     componentId: string;
     controlKey: string;
@@ -76,6 +76,22 @@ export const PermissionLock: React.FC<{
         </button>
     );
 };
+*/
+// ✅ PermissionLock 컴포넌트 수정
+export function PermissionLock(props: { controlKey: string; componentId: string }) {
+    const { writer } = useRightControllerFactory(RightDomain.Inspector);
+
+    const onClick = () => {
+        // ✅ 새로 만든 writer 함수를 호출합니다.
+        writer.lockStyleControl(props.componentId, props.controlKey);
+    };
+
+    return (
+        <button onClick={onClick} className="p-1 text-gray-400 hover:text-gray-700" title="Lock this property for page mode">
+            <LockIcon size={12} />
+        </button>
+    );
+}
 
 /* ────────────────────────────────────────────────────
  * 폼 위젯 (Webflow Style)
@@ -290,3 +306,4 @@ export function reasonForKey(
 export function modeBorderClass(mode?: string) {
     return mode === 'Page' ? 'border-t-blue-500' : 'border-t-purple-500';
 }
+
