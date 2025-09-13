@@ -66,7 +66,7 @@ function createInspectorController(RE: any, WE: any) {
             const componentPolicy = project.policies?.components?.[componentId];
 
             // ✅ 확장된 policyVis.ts를 사용하여 최종 유효 정책을 계산합니다.
-            const effectivePolicy = getEffectivePolicy(node, ui.mode, ui.expertMode, componentPolicy);
+            const effectivePolicy = getEffectivePolicy(node, ui.mode, ui.expertMode);
 
             return {
                 target: { nodeId, componentId },

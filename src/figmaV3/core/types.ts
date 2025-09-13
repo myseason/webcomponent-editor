@@ -140,9 +140,12 @@ export interface StylePolicy {
 
 // ===== (추가) 컴포넌트 오버레이 타입 =====
 // 기존 코드가 기대하는 "flat controls" + "그룹 오버레이"를 모두 허용합니다.
+// flat controls 맵: 기존 코드가 직접 사용하는 구조
+export type ComponentInspectorControls = Record<string, PolicyControlVis>;
+
+// 그룹 오버레이(선택) + flat controls(선택)를 모두 허용
 export type InspectorOverlay = Partial<StylePolicy> & {
-    /** flat controls 맵 (기존 코드 호환) */
-    controls?: Record<string, PolicyControlVis>;
+    controls?: ComponentInspectorControls;
 };
 
 export interface ComponentPolicy {
