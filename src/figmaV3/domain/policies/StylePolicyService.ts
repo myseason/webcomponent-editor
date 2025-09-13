@@ -1,20 +1,122 @@
 import type { EditorStoreState } from '../../store/types';
+import type { Node, StylePolicy, ComponentPolicy } from '../../core/types';
+import { getDefinition } from '../../core/registry';
 import { GLOBAL_STYLE_POLICY } from '../../policy/globalStylePolicy';
+import { GLOBAL_TAG_POLICIES } from '../../policy/globalTagPolicy';
+import { deepMerge } from '../../runtime/deepMerge';
 
-// 기준 소스에 타입 export가 없으므로, 실제 상수에서 타입을 추론합니다.
-type StylePolicy = typeof GLOBAL_STYLE_POLICY;
+/**
+ * 정책 병합/가시성 계산을 담당하는 서비스 (레이아웃 비침투)
+ * - 레이아웃/렌더러는 건드리지 않고, "보여줄지 말지"만 결정합니다.
+ */
+type PolicyGroup = {
+    visible?: boolean;
+    controls?: Record<string, { visible?: boolean }>;
+};
+
+function pickTag(s: EditorStoreState, n: Node): string {
+    // 우선순위: 노드의 __tag → 컴포넌트 정의의 defaultTag → 'div'
+    const tagFromNode =
+        (n.props as any)?.__tag ??
+        getDefinition(n.componentId)?.capabilities?.defaultTag ??
+        'div';
+    return String(tagFromNode || 'div');
+}
+
+function getComponentPolicy(
+    s: EditorStoreState,
+    componentId: string | undefined
+): ComponentPolicy | undefined {
+    if (!componentId) return undefined;
+    // 프로젝트 설정 내 오버라이드에서 컴포넌트별 정책을 찾습니다.
+    // core/types.ts 상에서 project.policies?.components가 Partial<Record<string, ComponentPolicy>>로 정의되어 있음
+    const p = s.project?.policies as any;
+    const map = p?.components as Record<string, ComponentPolicy> | undefined;
+    return map?.[componentId];
+}
+
+function normalizeControlPath(path: string): string {
+    // 현 레포에는 콜론/점 표기가 혼재. 저장/조회 모두 호환하기 위해 점 표기로 통일 조회 + 콜론도 fallback
+    // ex) "styles.layout.display" | "styles:layout.display" | "styles:layout:display"
+    return path.replace(/:/g, '.');
+}
 
 export const StylePolicyService = {
-    /** 전체 정책(읽기 전용) */
+    /**
+     * 전역 StylePolicy (정적)
+     */
     getStylePolicy(_s: EditorStoreState): StylePolicy {
-        // 현 구조상 정책은 정적 상수로 제공됨 (스토어 의존 없음)
         return GLOBAL_STYLE_POLICY;
     },
+
+    /**
+     * 노드 기준 최종(Effective) 정책 계산
+     * - ExpertMode: ComponentPolicy 무시 (Style + Tag만)
+     * - Page 모드: Style + Tag + Component(inspector) 병합
+     * - Component 모드: Style + Tag만
+     */
+    computeEffectivePolicy(s: EditorStoreState, node: Node): StylePolicy {
+        const ui = s.ui;
+        const tag = pickTag(s, node);
+        const tagPolicy = (GLOBAL_TAG_POLICIES as any)?.[tag] ?? {};
+
+        // 기본: 전역 + 태그 정책
+        const basePolicy = deepMerge(GLOBAL_STYLE_POLICY, tagPolicy);
+
+        // 고급 모드면 ComponentPolicy 무시
+        if (ui.expertMode) return basePolicy;
+
+        if (ui.mode === 'Page') {
+            const cp = getComponentPolicy(s, node.componentId);
+            if (cp?.inspector) {
+                // inspector 스코프만 병합 (가시성 제어 목적)
+                return deepMerge(basePolicy, cp.inspector);
+            }
+        }
+        // Component 모드: base만
+        return basePolicy;
+    },
+
+    /**
+     * 그룹 가시성 판단
+     */
+    getGroupVisibility(effective: StylePolicy, groupName: keyof StylePolicy): boolean {
+        const group = (effective as any)[groupName] as PolicyGroup | undefined;
+        if (!group || group.visible === false) return false;
+
+        // 컨트롤이 없으면 숨김 처리
+        if (!group.controls) return false;
+
+        // 하위 컨트롤 중 1개라도 보이면 그룹 보임
+        for (const key in group.controls) {
+            if (this.getControlVisibility(effective, `${String(groupName)}.${key}`)) {
+                return true;
+            }
+        }
+        return false;
+    },
+
+    /**
+     * 컨트롤별 가시성 판단
+     * @param controlPath ex) "layout.display" / "typography.fontSize"
+     */
+    getControlVisibility(effective: StylePolicy, controlPath: string): boolean {
+        const normalized = normalizeControlPath(controlPath);
+        const [groupName, controlName] = normalized.split('.') as [keyof StylePolicy, string];
+        if (!groupName || !controlName) return false;
+
+        const group = (effective as any)[groupName] as PolicyGroup | undefined;
+        if (!group || group.visible === false) return false;
+
+        const control = group.controls?.[controlName];
+        return control?.visible !== false;
+    },
+
+    // ===== 아래는 기존 유틸(색/폰트/프리셋 등) 유지 =====
 
     /** 색상 팔레트 */
     getColorPalette(s: EditorStoreState) {
         const p = this.getStylePolicy(s) as any;
-        // colors.palette가 없을 수도 있으니 안전하게 폴백
         return p?.colors?.palette ?? [];
     },
 
@@ -27,7 +129,6 @@ export const StylePolicyService = {
     /** 그림자 프리셋 */
     getShadowPresets(s: EditorStoreState) {
         const p = this.getStylePolicy(s) as any;
-        // 예: p.shadows?.presets: {label,value}[] 형태 가정, 없으면 []
         return p?.shadows?.presets ?? [];
     },
 
@@ -40,7 +141,6 @@ export const StylePolicyService = {
     /** 그라디언트 정책 (예: maxStops 등) */
     getGradientPolicy(s: EditorStoreState) {
         const p = this.getStylePolicy(s) as any;
-        // 정책이 없을 수도 있으므로 안전 폴백
         return p?.gradients ?? {};
     },
 };

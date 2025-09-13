@@ -12,7 +12,7 @@ import type {
     ComponentDefinition,
 } from '../../../../core/types';
 
-import { useAllowed, PermissionLock } from './common';
+import {useAllowed, PermissionLock, DisallowReason, reasonForKey, renderStyleLock} from './common';
 import { getDefinition } from '../../../../core/registry';
 
 import {
@@ -60,13 +60,20 @@ export function LayoutGroup(props: {
     nodeId: NodeId;
     componentId: string;
 }) {
+
     // ✅ 컨트롤러 (reader)
     const { reader } = useRightControllerFactory(RightDomain.Inspector);
-    const { el, patch, open, onToggle, nodeId, componentId } = props;
+    const {el, patch, expert, open, onToggle, nodeId, componentId} = props;
 
     const ui = reader.getUI();
+    const project = reader.getProject();
     const def = getDefinition(componentId);
     const allow = useAllowed(nodeId);
+    const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
+
+    const showLock = ui.mode === 'Component';
+    const lockDisabled = ui.expertMode || !!ui?.inspector?.forceTagPolicy;
+
 
     const display = (el as any).display ?? 'block';
     const isInline = display === 'inline';
@@ -87,6 +94,7 @@ export function LayoutGroup(props: {
     // display 키 자체가 정책상 막혀 있으면 버튼을 안 보이게 함
     const displayOptions = allow.has('display') ? rawDisplayOptions : ([] as string[]);
 
+    /*
     const renderLock = (controlKey: string) => {
         if (ui.mode === 'Component') {
             return (
@@ -98,6 +106,8 @@ export function LayoutGroup(props: {
         }
         return null;
     };
+    */
+    const renderLock = (controlKey: string) => renderStyleLock(ui, componentId, controlKey);
 
     const justifyIcons: { v: string; title: string; I: IconCmp }[] = isCol
         ? [
@@ -179,7 +189,18 @@ export function LayoutGroup(props: {
                 {/* display */}
                 {displayOptions.length > 0 && (
                     <RowV1>
-                        <RowLeftV1 title="display" />
+                        <RowLeftV1
+                            title={
+                                <>
+                                    display
+                                    {showLock && (
+                                        <span className="ml-1 inline-flex">
+                                            <PermissionLock controlKey="display" componentId={componentId} disabled={lockDisabled}/>
+                                        </span>
+                                    )}
+                                </>
+                            }
+                        />
                         <RowRightGridV1>
                             <div className="col-span-6 min-w-0 flex items-center gap-[2px] flex-nowrap">
                                 {renderLock('display')}
@@ -235,7 +256,6 @@ export function LayoutGroup(props: {
                                 <RowLeftV1 title="justify" />
                                 <RowRightGridV1>
                                     <div className="col-span-6 min-w-0 flex items-center gap-[2px] flex-nowrap">
-                                        {renderLock('justifyContent')}
                                         {justifyIcons.map(({ v, I, title }) => (
                                             <IconBtnV1
                                                 key={v}
@@ -258,7 +278,6 @@ export function LayoutGroup(props: {
                                 <RowLeftV1 title="align" />
                                 <RowRightGridV1>
                                     <div className="col-span-6 min-w-0 flex items-center gap-[2px] flex-nowrap">
-                                        {renderLock('alignItems')}
                                         {alignIcons.map(({ v, I, title }) => (
                                             <IconBtnV1
                                                 key={v}
@@ -278,10 +297,18 @@ export function LayoutGroup(props: {
                         {/* gap (flex) */}
                         {allow.has('gap') && (
                             <RowV1>
-                                <RowLeftV1 title="gap" />
+                                <RowLeftV1 title={
+                                    <>
+                                    gap
+                                        {showLock && (
+                                            <span className="ml-1 inline-flex">
+                                                <PermissionLock controlKey="gap" componentId={componentId} disabled={lockDisabled}/>
+                                            </span>
+                                        )}
+                                    </>
+                                }/>
                                 <RowRightGridV1>
                                     <div className="col-span-3 min-w-0">
-                                        {renderLock('gap')}
                                         <MiniInputV1
                                             value={(el as any).gap ?? ''}
                                             onChange={(v) => patch({ gap: coerceLen(v) })}
@@ -392,10 +419,18 @@ export function LayoutGroup(props: {
                         {/* gap (grid) */}
                         {allow.has('gap') && (
                             <RowV1>
-                                <RowLeftV1 title="gap" />
+                                <RowLeftV1 title={
+                                    <>
+                                        gap
+                                        {showLock && (
+                                            <span className="ml-1 inline-flex">
+                                            <PermissionLock controlKey="gap" componentId={componentId} disabled={lockDisabled}/>
+                                            </span>
+                                        )}
+                                    </>
+                                }/>
                                 <RowRightGridV1>
                                     <div className="col-span-3 min-w-0">
-                                        {renderLock('gap')}
                                         <MiniInputV1
                                             value={(el as any).gap ?? ''}
                                             onChange={(v) => patch({ gap: coerceLen(v) })}
@@ -418,7 +453,16 @@ export function LayoutGroup(props: {
                 {/* W/H */}
                 {(allow.has('width') || allow.has('height')) && (
                     <RowV1>
-                        <RowLeftV1 title="W/H" />
+                        <RowLeftV1 title={
+                            <>
+                            W/H
+                                {showLock && (
+                                    <span className="ml-1 inline-flex">
+                                        <PermissionLock controlKey="width_height" componentId={componentId} disabled={lockDisabled}/>
+                                    </span>
+                                )}
+                            </>
+                        }/>
                         <RowRightGridV1>
                             {isInline ? (
                                 <div className="col-span-6 text-[11px] text-gray-500">
@@ -428,9 +472,8 @@ export function LayoutGroup(props: {
                                 <>
                                     <div className="col-span-1 flex items-center text-[11px] text-gray-600 pl-[2px]">W</div>
                                     <div className="col-span-2 min-w-0">
-                                        {allow.has('width') && (
+                                        {allow.has('width_height') && (
                                             <>
-                                                {renderLock('width')}
                                                 <MiniInputV1
                                                     value={(el as any).width ?? ''}
                                                     onChange={(v) => patch({ width: coerceLen(v) })}
@@ -442,9 +485,8 @@ export function LayoutGroup(props: {
                                     </div>
                                     <div className="col-span-1 flex items-center text-[11px] text-gray-600 pl-[2px]">H</div>
                                     <div className="col-span-2 min-w-0">
-                                        {allow.has('height') && (
+                                        {allow.has('width_height') && (
                                             <>
-                                                {renderLock('height')}
                                                 <MiniInputV1
                                                     value={(el as any).height ?? ''}
                                                     onChange={(v) => patch({ height: coerceLen(v) })}
@@ -463,10 +505,19 @@ export function LayoutGroup(props: {
                 {/* overflow */}
                 {allow.has('overflow') && (
                     <RowV1>
-                        <RowLeftV1 title="overflow" />
+                        <RowLeftV1 title={
+                            <>
+                                overflow
+                                {showLock && (
+                                    <span className="ml-1 inline-flex">
+                                        <PermissionLock controlKey="overflow" componentId={componentId} disabled={lockDisabled}/>
+                                    </span>
+                                )}
+                            </>
+
+                        }/>
                         <RowRightGridV1>
                             <div className="col-span-6 min-w-0">
-                                {renderLock('overflow')}
                                 <MiniSelectV1
                                     value={(el as any).overflow ?? ''}
                                     options={['', 'visible', 'hidden', 'auto', 'scroll']}

@@ -40,7 +40,7 @@ export type ColorPolicy = {
     palette?: string[];               // (옵션) ColorField 등에서 사용 가능
 };
 
-export type StylePolicy = {
+export type StylePresets = {
     gradient: {
         maxStops: number;           // gradient stop 개수 제한
         anglePresets: string[];     // linear-gradient 각도 프리셋
@@ -58,7 +58,7 @@ export type StylePolicy = {
 };
 
 // ===== 기본값 =====
-export const DEFAULT_STYLE_POLICY: StylePolicy = {
+export const DEFAULT_STYLE_PRESETS: StylePresets = {
     gradient: {
         maxStops: 5,
         anglePresets: ['0deg', '45deg', '90deg', '180deg', '270deg'],

@@ -14,7 +14,7 @@ import {
     DisabledHint,
     type DisallowReason,
     PermissionLock,
-    reasonForKey,
+    reasonForKey, renderStyleLock,
 } from './common';
 
 import {
@@ -110,12 +110,16 @@ export function CustomGroup(props: {
         setItems(existingCustom);
     }, [existingCustom]);
 
+    /*
     const renderLock = (controlKey: string) => {
         if (ui.mode === 'Component') {
             return <PermissionLock controlKey={`styles:${controlKey}`} componentId={componentId} />;
         }
         return null;
     };
+    */
+
+    const renderLock = (controlKey: string) => renderStyleLock(ui, componentId, controlKey);
 
     const canWrite = (key: string) => {
         // 비어있는 키일 땐 patch를 미루고, 키가 생기면 권한 검사

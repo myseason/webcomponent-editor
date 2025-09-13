@@ -109,6 +109,9 @@ export interface TagPolicy {
     };
 }
 
+export type PolicyControlVis = { visible?: boolean };
+export type PolicyGroupVis = { visible?: boolean; controls?: Record<string, PolicyControlVis> };
+
 export interface StylePolicy {
     version: PolicyVersion;
     tokens?: Record<string, Record<string, string | number>>;
@@ -117,16 +120,37 @@ export interface StylePolicy {
     deny?: string[];
     constraints?: Record<string, { min?: number; max?: number; step?: number }>;
     valueSources?: Record<string, ('token' | 'raw' | 'css-var')[]>;
+
+    // (선택) Inspector 오버레이 허용
+    layout?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
+    spacing?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
+    typography?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
+    background?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
+    border?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
+    effects?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
+    position?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
+    custom?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
+
+    // (선택) 프리셋/팔레트 등 선택지 (이미 사용하는 코드가 있으면 충돌 방지용으로 optional)
+    shadows?: { presets: Array<{ id?: string; name?: string; value: string } | string> };
+    filters?: { presets: Array<{ id?: string; name?: string; value: string } | string> };
+    gradients?: Record<string, unknown>;
+    colors?: { palette: Array<{ name?: string; value: string } | string> };
 }
+
+// ===== (추가) 컴포넌트 오버레이 타입 =====
+// 기존 코드가 기대하는 "flat controls" + "그룹 오버레이"를 모두 허용합니다.
+export type InspectorOverlay = Partial<StylePolicy> & {
+    /** flat controls 맵 (기존 코드 호환) */
+    controls?: Record<string, PolicyControlVis>;
+};
 
 export interface ComponentPolicy {
     version: PolicyVersion;
     component: string;
     tag: string;
-    inspector?: {
-        groups?: Record<string, { visible?: boolean; expanded?: boolean }>;
-        controls?: Record<string, { visible?: boolean; preset?: (string | number)[] }>;
-    };
+    // 실제 사용 방식에 맞춤: 최상위에 그룹 오버레이가 온다
+    inspector?: InspectorOverlay;
     defaults?: { props?: Record<string, unknown>; styles?: Record<string, string | number> };
     runtime?: { strict?: boolean };
     savePolicy?: { allowPrivate?: boolean; allowPublic?: boolean };

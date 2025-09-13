@@ -1,102 +1,148 @@
 'use client';
 
 import React from 'react';
-import type {ComponentPolicy, EditorUI, NodeId, Project,} from '../../../../core/types';
-import {getAllowedStyleKeysForNode, getEffectivePoliciesForNode} from '../../../../runtime/capabilities';
-import {Lock, Unlock, ShieldAlert, LockIcon} from 'lucide-react';
+import type { ComponentPolicy, EditorUI, NodeId, Project } from '../../../../core/types';
+
+// Phase 2: 단일 진입점 사용
+import {
+    getAllowedStyleKeysForNode,
+    getEffectivePoliciesForNode,
+} from '../../../../policy/EffectivePolicyService';
+
+import { GLOBAL_STYLE_POLICY } from '../../../../policy/globalStylePolicy';
+import { Lock } from 'lucide-react';
 import styles from '../../../ui/theme.module.css';
-import {RightDomain, useRightControllerFactory} from '@/figmaV3/controllers/right/RightControllerFactory';
+import { RightDomain, useRightControllerFactory } from '@/figmaV3/controllers/right/RightControllerFactory';
+
+/**
+ * 모든 스타일 패널에서 잠금 버튼을 동일 규칙으로 렌더링하기 위한 공통 함수.
+ * - 컴포넌트 개발 모드에서만 노출
+ * - controlKey는 "styles:" prefix를 보장
+ * - componentId가 없거나 expertMode면 버튼 비활성/비표시 처리
+ */
+export function renderStyleLock(
+    ui: { mode: string; expertMode: boolean },   // 최소 속성만 요구
+    componentId: string | undefined,
+    controlKey: string,
+): React.ReactNode {
+    if (!ui || ui.mode !== 'Component') return null; // 컴포넌트 개발 모드에서만
+    if (!componentId) return null;                   // 대상 없으면 노출 X
+    const ck = controlKey.startsWith('styles:') ? controlKey : `styles:${controlKey}`;
+    return (
+        <PermissionLock
+            controlKey={ck}
+            componentId={componentId}
+            disabled={ui.expertMode} // 전문가 모드에서는 버튼 비활성
+        />
+    );
+}
 
 /* ────────────────────────────────────────────────────
  * 공통 레이아웃 컴포넌트
  * ──────────────────────────────────────────────────── */
-
 export const Section: React.FC<{
     title: string;
     open: boolean;
     onToggle: () => void;
     children: React.ReactNode;
 }> = ({ title, open, onToggle, children }) => (
-    <section className="mt-3">
+    <div className="mb-2 border rounded-lg border-[var(--mdt-color-border)]">
         <div
-            className="flex items-center justify-between text-sm font-semibold text-[var(--mdt-color-text-primary)] cursor-pointer select-none py-1"
+            className="px-2 py-1 text-xs bg-[var(--mdt-color-panel-header)] cursor-pointer select-none"
             onClick={onToggle}
         >
-            <span>{open ? '▾' : '▸'} {title}</span>
+            {open ? '▾' : '▸'} {title}
         </div>
-        {open && <div className="mt-1 space-y-3">{children}</div>}
-    </section>
+        {open && <div className="p-2">{children}</div>}
+    </div>
 );
 
 export const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <span className={`${styles.mdt_v1_label} w-24 select-none shrink-0`}>{children}</span>
+    <div className="text-xs text-[var(--mdt-color-foreground)]">{children}</div>
 );
 
-export const DisabledHint: React.FC<{ reason: 'template' | 'tag' | 'component' }> = ({ reason }) => (
-    <span
-        className="text-[10px] px-1.5 py-0.5 rounded-full border border-[var(--mdt-color-border)] text-[var(--mdt-color-text-secondary)]"
-        title={
-            reason === 'tag' ? 'TagPolicy에 의해 제한됨' :
-                reason === 'component' ? 'ComponentPolicy에 의해 제한됨' :
-                    'Template 필터에 의해 제한됨'
-        }
-    >
-        {reason === 'tag' ? 'TAG' : reason === 'component' ? 'COMP' : 'TPL'}
-    </span>
+/**
+ * 라벨 + suffix 슬롯(오른쪽 고정) 컨테이너
+ * - suffix는 absolute로 배치되어 컬럼/그리드를 소비하지 않음
+ */
+export const LabelRow: React.FC<{
+    label: React.ReactNode;
+    suffix?: React.ReactNode;
+    className?: string;
+}> = ({ label, suffix, className }) => (
+    <div className={`relative ${className ?? ''}`}>
+        <div className="pr-6 text-xs text-[var(--mdt-color-foreground)]">{label}</div>
+        {suffix ? (
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 inline-flex items-center">
+                {suffix}
+            </div>
+        ) : null}
+    </div>
 );
-/*
-export const PermissionLock: React.FC<{
-    componentId: string;
+
+export const DisabledHint: React.FC<{ reason: 'template' | 'tag' | 'component' }> = ({
+                                                                                         reason,
+                                                                                     }) => (
+    <span className="ml-1 px-1 py-0.5 text-[10px] border rounded border-[var(--mdt-color-border)] text-[var(--mdt-color-muted)]">
+    {reason === 'tag' ? 'TAG' : reason === 'component' ? 'COMP' : 'TPL'}
+  </span>
+);
+
+/** 🔒 PermissionLock: 컴포넌트 개발 모드에서만 활성 */
+export function PermissionLock(props: {
     controlKey: string;
-}> = ({ componentId, controlKey }) => {
-    const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
-    const R = reader; const W = writer;
-
-    const project = R.getProject();
-    const updateComponentPolicy = W.updateComponentPolicy;
-    const isVisible =
-        project.policies?.components?.[componentId]?.inspector?.controls?.[controlKey]?.visible !== false;
-
-    const toggleVisibility = () => {
-        const patch: Partial<ComponentPolicy> = {
-            inspector: {
-                controls: { [controlKey]: { visible: !isVisible } },
-            },
-        };
-        updateComponentPolicy(componentId, patch);
-    };
-
-    return (
-        <button
-            onClick={toggleVisibility}
-            className="p-1 rounded text-[var(--mdt-color-text-secondary)] hover:bg-[var(--mdt-color-panel-secondary)] hover:text-[var(--mdt-color-text-primary)]"
-            title={isVisible ? '페이지 빌더에게 이 컨트롤 숨기기' : '페이지 빌더에게 이 컨트롤 보이기'}
-        >
-            {isVisible ? <Unlock size={12} /> : <Lock size={12} />}
-        </button>
-    );
-};
-*/
-// ✅ PermissionLock 컴포넌트 수정
-export function PermissionLock(props: { controlKey: string; componentId: string }) {
+    componentId: string;
+    disabled?: boolean;
+}) {
     const { writer } = useRightControllerFactory(RightDomain.Inspector);
-
     const onClick = () => {
-        // ✅ 새로 만든 writer 함수를 호출합니다.
+        if (props.disabled) return;
         writer.lockStyleControl(props.componentId, props.controlKey);
     };
-
     return (
-        <button onClick={onClick} className="p-1 text-gray-400 hover:text-gray-700" title="Lock this property for page mode">
-            <LockIcon size={12} />
+        <button
+            className={`inline-flex items-center justify-center w-5 h-5 ml-1 rounded
+        ${props.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-[var(--mdt-color-hover)]'}`}
+            title={
+                props.disabled
+                    ? '고급/강제 공개 모드에서는 편집할 수 없습니다.'
+                    : '이 컨트롤을 페이지 모드에서 숨기기/해제'
+            }
+            onClick={onClick}
+            disabled={props.disabled}
+            aria-disabled={props.disabled}
+            type="button"
+        >
+            <Lock size={12} />
         </button>
     );
 }
 
 /* ────────────────────────────────────────────────────
- * 폼 위젯 (Webflow Style)
+ * constraints 헬퍼
  * ──────────────────────────────────────────────────── */
+type Constraint = { min?: number; max?: number; step?: number };
+type ConstraintsTable = Record<string, Constraint>;
 
+const CONSTRAINTS: ConstraintsTable = (GLOBAL_STYLE_POLICY as any)?.constraints ?? {};
+
+/** 단일 키 constraint */
+export function useConstraint(key: string): Constraint {
+    return React.useMemo(() => CONSTRAINTS[key] ?? {}, [key]);
+}
+
+/** 여러 키를 한 번에 가져오기 */
+export function useConstraints(keys: string[]): ConstraintsTable {
+    return React.useMemo(() => {
+        const out: ConstraintsTable = {};
+        keys.forEach((k) => (out[k] = CONSTRAINTS[k] ?? {}));
+        return out;
+    }, [keys.join('|')]);
+}
+
+/* ────────────────────────────────────────────────────
+ * 폼 위젯
+ * ──────────────────────────────────────────────────── */
 export const MiniInput: React.FC<{
     value: string | number | undefined;
     onChange: (v: string) => void;
@@ -106,33 +152,37 @@ export const MiniInput: React.FC<{
     className?: string;
 }> = ({ value, onChange, placeholder, disabled, title, className }) => (
     <input
-        type="text"
-        value={value === undefined ? '' : String(value)}
+        value={value as any}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
         title={title}
-        className={`${styles.mdt_v1_input} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className ?? ''}`}
+        className={`${styles.mdt_v1_input} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${
+            className ?? ''
+        }`}
     />
 );
 
 export const NumberInput: React.FC<{
     value: number | undefined;
     onChange: (v: number) => void;
+    /** constraints가 있다면 자동 주입됨 */
     step?: number;
     min?: number;
     max?: number;
     className?: string;
     disabled?: boolean;
     title?: string;
-}> = ({ value, onChange, step = 1, min, max, className, disabled, title }) => (
+}> = ({ value, onChange, step, min, max, className, disabled, title }) => (
     <input
         type="number"
-        step={step}
-        value={Number.isFinite(value ?? NaN) ? (value as number) : ''}
+        value={typeof value === 'number' ? value : ('' as any)}
+        step={step as any}
+        min={min as any}
+        max={max as any}
         onChange={(e) => {
             const n = parseFloat(e.target.value);
-            if (Number.isNaN(n)) return onChange(NaN);
+            if (Number.isNaN(n)) return onChange(NaN as any);
             let v = n;
             if (typeof min === 'number') v = Math.max(min, v);
             if (typeof max === 'number') v = Math.min(max, v);
@@ -140,7 +190,9 @@ export const NumberInput: React.FC<{
         }}
         disabled={disabled}
         title={title}
-        className={`${styles.mdt_v1_input} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className ?? ''}`}
+        className={`${styles.mdt_v1_input} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${
+            className ?? ''
+        }`}
     />
 );
 
@@ -157,11 +209,15 @@ export const MiniSelect: React.FC<{
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         title={title}
-        className={`${styles.mdt_v1_select} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className ?? ''}`}
+        className={`${styles.mdt_v1_select} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${
+            className ?? ''
+        }`}
     >
         {value === undefined && <option value="">{'(unset)'}</option>}
         {options.map((op) => (
-            <option key={op} value={op}>{op}</option>
+            <option key={op} value={op}>
+                {op}
+            </option>
         ))}
     </select>
 );
@@ -174,11 +230,13 @@ export const ChipBtn: React.FC<{
     children: React.ReactNode;
 }> = ({ active, disabled, title, onClick, children }) => (
     <button
-        type="button"
+        className={`px-2 py-1 text-[10px] rounded border ${
+            active ? 'bg-[var(--mdt-color-accent)] text-white' : 'bg-transparent'
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
         title={title}
         onClick={onClick}
         disabled={disabled}
-        className={`${styles.mdt_v1_button} ${active ? styles.mdt_v1_button_accent : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        type="button"
     >
         {children}
     </button>
@@ -192,11 +250,13 @@ export const IconBtn: React.FC<{
     disabled?: boolean;
 }> = ({ active, title, onClick, children, disabled }) => (
     <button
-        type="button"
+        className={`w-6 h-6 inline-flex items-center justify-center rounded border ${
+            active ? 'bg-[var(--mdt-color-accent)] text-white' : 'bg-transparent'
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
         title={title}
         onClick={onClick}
         disabled={disabled}
-        className={`${styles.mdt_v1_button} h-8 w-8 p-1.5 ${active ? styles.mdt_v1_button_accent : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        type="button"
     >
         {children}
     </button>
@@ -211,25 +271,15 @@ export const ColorField: React.FC<{
     const isHex = typeof value === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
     const safeHex = isHex ? value : '#000000';
     return (
-        <div className="flex items-center gap-2">
-            <input
-                type="color"
-                value={safeHex}
-                onChange={(e) => onChange(e.target.value)}
-                disabled={disabled}
-                title={title}
-                className="w-6 h-6 border rounded-md border-[var(--mdt-color-border)] cursor-pointer"
-                style={{ backgroundColor: 'transparent' }}
-            />
-            <MiniInput
-                value={value ?? ''}
-                onChange={onChange}
-                placeholder="#000000 or var(--name)"
-                disabled={disabled}
-                title={title}
-                className="w-20"
-            />
-        </div>
+        <input
+            type="color"
+            value={safeHex}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={disabled}
+            title={title}
+            className="w-6 h-6 border rounded-md border-[var(--mdt-color-border)] cursor-pointer"
+            style={{ backgroundColor: 'transparent' }}
+        />
     );
 };
 
@@ -237,45 +287,34 @@ export const ColorField: React.FC<{
 export const PolicyBadge: React.FC<{ show?: boolean; title?: string }> = ({ show, title }) => {
     if (!show) return null;
     return (
-        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200" title={title ?? 'Policy override'}>
-      <ShieldAlert size={10} />
+        <span
+            className="ml-2 text-[10px] px-1 py-0.5 rounded border border-[var(--mdt-color-border)] text-[var(--mdt-color-muted)]"
+            title={title ?? 'ComponentPolicy 무시(강제 공개)'}
+        >
       override
     </span>
     );
 };
 
-
 /* ────────────────────────────────────────────────────
- * 허용/제한 판단 유틸 (변경 없음)
+ * 허용/제한 판단 유틸 (Phase 2 치환)
  * ──────────────────────────────────────────────────── */
+
 export type DisallowReason = 'template' | 'tag' | 'component' | null;
 
+/** ✅ 허용 키 집합: EffectivePolicyService를 통해 계산 */
 export function useAllowed(nodeId: NodeId): Set<string> {
     const { reader } = useRightControllerFactory(RightDomain.Policy);
     const R = reader;
-
     const project = R.getProject();
     const ui = R.getUI();
     const { mode, expertMode } = ui;
 
     return React.useMemo(() => {
-        const policyInfo = getEffectivePoliciesForNode(project, nodeId);
-        if (!policyInfo) return new Set();
-
-        const baseAllowed = getAllowedStyleKeysForNode(project, nodeId, expertMode);
-
-        if (mode === 'Page' && !expertMode) {
-            const { componentPolicy } = policyInfo;
-            if (componentPolicy?.inspector?.controls) {
-                Object.entries(componentPolicy.inspector.controls).forEach(([key, control]) => {
-                    if (control.visible === false) {
-                        baseAllowed.delete(key);
-                    }
-                });
-            }
-        }
-        return baseAllowed;
-    }, [project, nodeId, mode, expertMode]);
+        if (!nodeId) return new Set<string>();
+        const force = !!ui?.inspector?.forceTagPolicy;
+        return getAllowedStyleKeysForNode(project, nodeId, { expertMode, force });
+    }, [project, nodeId, mode, expertMode, ui?.inspector?.forceTagPolicy]);
 }
 
 export function reasonForKey(
@@ -290,20 +329,25 @@ export function reasonForKey(
 
     const { tagPolicy, componentPolicy } = policyInfo;
 
-    if (ui.mode === 'Page' && !expert && componentPolicy?.inspector?.controls?.[`styles:${key}`]?.visible === false) {
+    // ComponentPolicy에 의해 숨김(페이지 모드 & 비-Expert)
+    if (ui.mode === 'Page' && !expert && componentPolicy?.inspector?.controls?.[key]?.visible === false) {
         return 'component';
     }
 
+    // TagPolicy에 의해 제한
     if (tagPolicy?.styles) {
-        if (tagPolicy.styles.deny?.includes(key)) return 'tag';
-        if (tagPolicy.styles.allow && !tagPolicy.styles.allow.includes('*') && !tagPolicy.styles.allow.includes(key)) return 'tag';
+        const deny = tagPolicy.styles.deny ?? [];
+        if (deny.includes(key)) return 'tag';
+
+        // allow가 *가 아니고, 명시 포함도 아닐 때
+        const allow = tagPolicy.styles.allow;
+        if (allow && !allow.includes('*') && !allow.includes(key)) return 'tag';
     }
 
     return null;
 }
 
-// 🔹 개발 모드에 따른 상단 보더 색상 클래스 (공통 유틸)
+// 개발 모드에 따른 상단 보더 색상 클래스 (공통 유틸)
 export function modeBorderClass(mode?: string) {
     return mode === 'Page' ? 'border-t-blue-500' : 'border-t-purple-500';
 }
-

@@ -12,7 +12,7 @@ import type {
 import {
     ColorField,
     useAllowed,
-    PermissionLock,
+    PermissionLock, renderStyleLock,
 } from './common';
 
 // 공통 레이아웃 프리미티브 (라벨 80px + 우측 6그리드)
@@ -67,12 +67,15 @@ export function TypographyGroup(props: {
     const td = String((el as any).textDecoration ?? '');
     const fs = String((el as any).fontStyle ?? '');
 
+    /*
     const renderLock = (controlKey: string) => {
         if (ui.mode === 'Component') {
             return <PermissionLock controlKey={`styles:${controlKey}`} componentId={componentId} />;
         }
         return null;
     };
+    */
+    const renderLock = (controlKey: string) => renderStyleLock(ui, componentId, controlKey);
 
     // font-weight 셀렉트 옵션 (빈 값은 해제)
     const fontWeightOptions = [

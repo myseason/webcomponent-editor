@@ -15,7 +15,7 @@ import {
     type DisallowReason,
     PermissionLock,
     reasonForKey,
-    ColorField,
+    ColorField, renderStyleLock,
 } from './common';
 
 import {
@@ -148,12 +148,15 @@ export function EffectsGroup(props: {
         );
     }, [backgroundImage]);
 
+    /*
     const renderLock = (controlKey: string) => {
         if (ui.mode === 'Component') {
             return <PermissionLock controlKey={`styles:${controlKey}`} componentId={componentId} />;
         }
         return null;
     };
+    */
+    const renderLock = (controlKey: string) => renderStyleLock(ui, componentId, controlKey);
 
     /* handlers — safePatch 사용 */
     const applyGradient = (next?: { type?: GradType; angle?: string; stops?: Stop[] }) => {

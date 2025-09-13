@@ -14,7 +14,7 @@ import {
     DisabledHint,
     type DisallowReason,
     PermissionLock,
-    reasonForKey,
+    reasonForKey, renderStyleLock,
 } from './common';
 
 import { coerceLen } from '../../../../runtime/styleUtils';
@@ -64,12 +64,16 @@ export function PositionGroup(props: {
     const left = String((el as any).left ?? '');
     const zIndex = String((el as any).zIndex ?? '');
 
+    /*
     const renderLock = (controlKey: string) => {
         if (ui.mode === 'Component') {
             return <PermissionLock controlKey={`styles:${controlKey}`} componentId={componentId} />;
         }
         return null;
     };
+    */
+
+    const renderLock = (controlKey: string) => renderStyleLock(ui, componentId, controlKey);
 
     const zIndexOptions = ['', 'auto', '0', '10', '100', '1000'];
 

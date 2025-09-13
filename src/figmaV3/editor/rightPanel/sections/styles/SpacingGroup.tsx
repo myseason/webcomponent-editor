@@ -14,7 +14,7 @@ import {
     DisabledHint,
     type DisallowReason,
     PermissionLock,
-    reasonForKey,
+    reasonForKey, renderStyleLock,
 } from './common';
 
 import { coerceLen } from '../../../../runtime/styleUtils';
@@ -65,12 +65,15 @@ export function SpacingGroup(props: {
     const pB = String((el as any).paddingBottom ?? '');
     const pL = String((el as any).paddingLeft ?? '');
 
+    /*
     const renderLock = (controlKey: string) => {
         if (ui.mode === 'Component') {
             return <PermissionLock controlKey={`styles:${controlKey}`} componentId={componentId} />;
         }
         return null;
     };
+    */
+    const renderLock = (controlKey: string) => renderStyleLock(ui, componentId, controlKey);
 
     // 칩 프리셋(최대 5개 정책): 0/4/8/12/16
     const presetVals = ['0', '4px', '8px', '12px', '16px'] as const;

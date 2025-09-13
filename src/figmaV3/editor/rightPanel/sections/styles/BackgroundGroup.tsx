@@ -3,7 +3,7 @@
 import React from 'react';
 import type {CSSDict, InspectorFilter, NodeId, TagPolicy, TagPolicyMap,} from '../../../../core/types';
 
-import {ColorField, DisabledHint, type DisallowReason, PermissionLock, reasonForKey, useAllowed,} from './common';
+import {ColorField, DisabledHint, type DisallowReason, PermissionLock, reasonForKey, useAllowed, renderStyleLock} from './common';
 
 // 인스펙터 공통 레이아웃 프리미티브 (라벨 80px + 우측 6그리드)
 import {MiniInputV1, MiniSelectV1, RowLeftV1, RowRightGridV1, RowV1, SectionShellV1,} from './layoutV1';
@@ -37,10 +37,10 @@ export function BackgroundGroup(props: {
     componentId: string;
 }) {
     // ✅ RightPanelController 사용
-    const { reader } = useRightControllerFactory(RightDomain.Inspector);
+    const {reader} = useRightControllerFactory(RightDomain.Inspector);
     const R = reader;
 
-    const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
+    const {el, patch, expert, open, onToggle, nodeId, componentId} = props;
     const ui = R.getUI();
     const project = R.getProject();
     const allow = useAllowed(nodeId);
@@ -56,12 +56,15 @@ export function BackgroundGroup(props: {
     const initialMode: BGMode = detectMode(backgroundImage);
     const [mode, setMode] = React.useState<BGMode>(initialMode);
 
+    /*
     const renderLock = (controlKey: string) => {
         if (ui.mode === 'Component') {
-            return <PermissionLock controlKey={`styles:${controlKey}`} componentId={componentId} />;
+            return <PermissionLock controlKey={`styles:${controlKey}`} componentId={componentId}/>;
         }
         return null;
     };
+    */
+    const renderLock = (controlKey: string) => renderStyleLock(ui, componentId, controlKey);
 
     // placeholder 옵션(더미)을 포함한 배열. 더미 선택 시 undefined로 패치
     const sizeOptions = ['- size -', 'auto', 'cover', 'contain'] as const;

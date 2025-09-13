@@ -15,7 +15,7 @@ import {
     type DisallowReason,
     PermissionLock,
     reasonForKey,
-    ColorField,
+    ColorField, renderStyleLock,
 } from './common';
 
 import { coerceLen } from '../../../../runtime/styleUtils';
@@ -84,12 +84,16 @@ export function BorderGroup(props: {
     const rBR  = s((el as any).borderBottomRightRadius);
     const rBL  = s((el as any).borderBottomLeftRadius);
 
+    /*
     const renderLock = (controlKey: string) => {
         if (ui.mode === 'Component') {
             return <PermissionLock controlKey={`styles:${controlKey}`} componentId={componentId} />;
         }
         return null;
     };
+    */
+
+    const renderLock = (controlKey: string) => renderStyleLock(ui, componentId, controlKey);
 
     // style select: 기본 solid
     const styleOptions = ['solid', 'dashed', 'dotted', 'double', 'none'] as const;
