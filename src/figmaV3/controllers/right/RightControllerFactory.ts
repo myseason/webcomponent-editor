@@ -6,10 +6,11 @@ import { useStoreTick } from '../adapters/useStoreTick';
 import {makeSmartController, writerRerenderAspect} from '../makeSmartController';
 import { withLog } from '../adapters/aspect';
 import { getDefinition } from "@/figmaV3/core/registry";
-import {NodeId} from "@/figmaV3/core/types";
+import {NodeId, StylePolicy} from "@/figmaV3/core/types";
 
 import { useRerenderOnWrite } from '@/figmaV3/controllers/adapters/uiRerender';
 import {getEffectivePolicy} from "@/figmaV3/editor/rightPanel/sections/policyVis";
+import {StylePolicyService} from "@/figmaV3/domain/policies/StylePolicyService";
 
 export enum RightDomain {
     Inspector = 'Inspector',

@@ -43,7 +43,7 @@ export const STYLE_GROUP_MAP: Record<
             //'flexDirection', 'flexWrap', 'justifyContent', 'alignItems', 'alignContent', 'gap',
             //'gridTemplateColumns', 'gridTemplateRows', 'gridAutoFlow', 'gridGap',
             //'width', 'minWidth', 'maxWidth', 'height', 'minHeight', 'maxHeight',
-            'width_height',
+            'size',
         ] as NormalizedStyleKey[],
     },
     spacing: {

@@ -305,13 +305,14 @@ export type DisallowReason = 'template' | 'tag' | 'component' | null;
 /** ✅ 허용 키 집합: EffectivePolicyService를 통해 계산 */
 export function useAllowed(nodeId: NodeId): Set<string> {
     const { reader } = useRightControllerFactory(RightDomain.Policy);
-    const R = reader;
-    const project = R.getProject();
-    const ui = R.getUI();
+
+    const project = reader.getProject();
+    const ui = reader.getUI();
     const { mode, expertMode } = ui;
 
     return React.useMemo(() => {
-        if (!nodeId) return new Set<string>();
+        if (!nodeId)
+            return new Set<string>();
         const force = !!ui?.inspector?.forceTagPolicy;
         return getAllowedStyleKeysForNode(project, nodeId, { expertMode, force });
     }, [project, nodeId, mode, expertMode, ui?.inspector?.forceTagPolicy]);

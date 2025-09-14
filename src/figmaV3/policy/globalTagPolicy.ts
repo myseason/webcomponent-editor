@@ -33,7 +33,7 @@ export const GLOBAL_TAG_POLICIES: Record<string, TagPolicy> = {
             allow: ['*'],
             deny:  ['content'],
             groups: {
-                layout:     ['display','overflow','width','height','minWidth','minHeight','maxWidth','maxHeight','flexDirection','justifyContent','alignItems','gap','gridTemplateColumns','gridTemplateRows','gridAutoFlow','flexWrap','flexGrow','flexShrink','order'],
+                layout:     ['display','overflow','size'],
                 typography: ['fontSize','fontWeight','lineHeight','fontStyle','textAlign','letterSpacing','textTransform','color'],
                 spacing:    ['margin','padding','marginTop','marginRight','marginBottom','marginLeft','paddingTop','paddingRight','paddingBottom','paddingLeft','rowGap','columnGap'],
                 position:   ['position','top','right','bottom','left','zIndex','overflowX','overflowY'],
@@ -113,7 +113,7 @@ export const GLOBAL_TAG_POLICIES: Record<string, TagPolicy> = {
             allow: ['width','height','minWidth','minHeight','maxWidth','maxHeight','objectFit','objectPosition','border','borderWidth','borderStyle','borderColor','borderRadius','boxShadow','opacity','display','margin'],
             deny:  ['content'],
             groups: {
-                layout:     ['display','width','height','minWidth','minHeight','maxWidth','maxHeight','objectFit','objectPosition','margin'],
+                layout:     ['display','size','minWidth','minHeight','maxWidth','maxHeight','objectFit','objectPosition','margin'],
                 border:     ['border','borderWidth','borderStyle','borderColor','borderRadius'],
                 effects:    ['boxShadow','opacity'],
                 custom:     []
@@ -132,7 +132,7 @@ export const GLOBAL_TAG_POLICIES: Record<string, TagPolicy> = {
             groups: {
                 typography: ['fontSize','color'],
                 spacing:    ['margin','padding'],
-                layout:     ['display','width','height'],
+                layout:     ['display','size'],
                 border:     ['border','borderWidth','borderStyle','borderColor','borderRadius'],
                 background: ['backgroundColor'],
                 effects:    ['boxShadow','opacity'],
@@ -152,7 +152,7 @@ export const GLOBAL_TAG_POLICIES: Record<string, TagPolicy> = {
             groups: {
                 typography: ['fontSize','color','lineHeight'],
                 spacing:    ['margin','padding'],
-                layout:     ['display','width','height','minHeight'],
+                layout:     ['display','size'],
                 border:     ['border','borderWidth','borderStyle','borderColor','borderRadius'],
                 background: ['backgroundColor'],
                 effects:    ['boxShadow','opacity'],
@@ -185,11 +185,11 @@ export const GLOBAL_TAG_POLICIES: Record<string, TagPolicy> = {
         attributes: { allow: ['role','aria-*'] },
         events:     { allow: ['onClick'] },
         styles: {
-            allow: ['margin','padding','listStyle','display','gap','width','height'],
+            allow: ['margin','padding','listStyle','display','gap','size'],
             deny:  ['content'],
             groups: {
                 spacing: ['margin','padding','gap'],
-                layout:  ['display','width','height'],
+                layout:  ['display','size'],
                 custom:  ['listStyle']
             }
         }
@@ -201,11 +201,11 @@ export const GLOBAL_TAG_POLICIES: Record<string, TagPolicy> = {
         attributes: { allow: ['role','aria-*'] },
         events:     { allow: ['onClick'] },
         styles: {
-            allow: ['margin','padding','display','width','height','color','fontSize','lineHeight'],
+            allow: ['margin','padding','display','size','color','fontSize','lineHeight'],
             deny:  ['content'],
             groups: {
                 spacing:    ['margin','padding'],
-                layout:     ['display','width','height'],
+                layout:     ['display','size'],
                 typography: ['color','fontSize','lineHeight'],
                 custom:     []
             }
@@ -214,23 +214,23 @@ export const GLOBAL_TAG_POLICIES: Record<string, TagPolicy> = {
 
     nav: { version:'1.1', tag:'nav', attributes:{allow:['role','aria-*','title']}, events:{allow:['onClick']},
         styles:{ allow:['*'], deny:['content'],
-            groups:{ layout:['display','width','height'], spacing:['margin','padding','gap'], border:['border','borderRadius'], background:['background','backgroundColor'], effects:['boxShadow','opacity'], typography:['color','fontSize','lineHeight'] } } },
+            groups:{ layout:['display','size'], spacing:['margin','padding','gap'], border:['border','borderRadius'], background:['background','backgroundColor'], effects:['boxShadow','opacity'], typography:['color','fontSize','lineHeight'] } } },
 
     header: { version:'1.1', tag:'header', attributes:{allow:['role','aria-*','title']}, events:{allow:['onClick']},
         styles:{ allow:['*'], deny:['content'],
-            groups:{ layout:['display','width','height'], spacing:['margin','padding','gap'], border:['border','borderRadius'], background:['background','backgroundColor'], effects:['boxShadow','opacity'], typography:['color','fontSize','lineHeight'] } } },
+            groups:{ layout:['display','size'], spacing:['margin','padding','gap'], border:['border','borderRadius'], background:['background','backgroundColor'], effects:['boxShadow','opacity'], typography:['color','fontSize','lineHeight'] } } },
 
     footer: { version:'1.1', tag:'footer', attributes:{allow:['role','aria-*','title']}, events:{allow:['onClick']},
         styles:{ allow:['*'], deny:['content'],
-            groups:{ layout:['display','width','height'], spacing:['margin','padding','gap'], border:['border','borderRadius'], background:['background','backgroundColor'], effects:['boxShadow','opacity'], typography:['color','fontSize','lineHeight'] } } },
+            groups:{ layout:['display','size'], spacing:['margin','padding','gap'], border:['border','borderRadius'], background:['background','backgroundColor'], effects:['boxShadow','opacity'], typography:['color','fontSize','lineHeight'] } } },
 
     section: { version:'1.1', tag:'section', attributes:{allow:['role','aria-*','title']}, events:{allow:['onClick']},
         styles:{ allow:['*'], deny:['content'],
-            groups:{ layout:['display','width','height'], spacing:['margin','padding','gap'], border:['border','borderRadius'], background:['background','backgroundColor'], effects:['boxShadow','opacity'], typography:['color','fontSize','lineHeight'] } } },
+            groups:{ layout:['display','size'], spacing:['margin','padding','gap'], border:['border','borderRadius'], background:['background','backgroundColor'], effects:['boxShadow','opacity'], typography:['color','fontSize','lineHeight'] } } },
 
     article: { version:'1.1', tag:'article', attributes:{allow:['role','aria-*','title']}, events:{allow:['onClick']},
         styles:{ allow:['*'], deny:['content'],
-            groups:{ layout:['display','width','height'], spacing:['margin','padding','gap'], border:['border','borderRadius'], background:['background','backgroundColor'], effects:['boxShadow','opacity'], typography:['color','fontSize','lineHeight'] } } },
+            groups:{ layout:['display','size'], spacing:['margin','padding','gap'], border:['border','borderRadius'], background:['background','backgroundColor'], effects:['boxShadow','opacity'], typography:['color','fontSize','lineHeight'] } } },
 
     form: {
         version: '1.1',
@@ -238,10 +238,10 @@ export const GLOBAL_TAG_POLICIES: Record<string, TagPolicy> = {
         attributes: { allow: ['action','method','target','noValidate','name','aria-*'] },
         events:     { allow: ['onSubmit','onReset','onChange','onInput'] },
         styles: {
-            allow: ['display','width','height','margin','padding','gap','border','borderRadius','background','backgroundColor','boxShadow','opacity'],
+            allow: ['display','size','margin','padding','gap','border','borderRadius','background','backgroundColor','boxShadow','opacity'],
             deny:  ['content'],
             groups: {
-                layout:     ['display','width','height'],
+                layout:     ['display','size'],
                 spacing:    ['margin','padding','gap'],
                 border:     ['border','borderRadius'],
                 background: ['background','backgroundColor'],
