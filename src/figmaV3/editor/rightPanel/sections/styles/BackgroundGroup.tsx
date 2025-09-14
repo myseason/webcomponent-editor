@@ -3,7 +3,15 @@
 import React from 'react';
 import type {CSSDict, InspectorFilter, NodeId, TagPolicy, TagPolicyMap,} from '../../../../core/types';
 
-import {ColorField, DisabledHint, type DisallowReason, PermissionLock, reasonForKey, useAllowed, renderStyleLock} from './common';
+import {
+    ColorField,
+    DisabledHint,
+    DisallowReason,
+    PermissionLock,
+    reasonForKey,
+    renderStyleLock,
+    useAllowed
+} from './common';
 
 // 인스펙터 공통 레이아웃 프리미티브 (라벨 80px + 우측 6그리드)
 import {MiniInputV1, MiniSelectV1, RowLeftV1, RowRightGridV1, RowV1, SectionShellV1,} from './layoutV1';

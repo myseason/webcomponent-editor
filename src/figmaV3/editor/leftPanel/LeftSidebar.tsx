@@ -9,7 +9,7 @@ import {AssetsPanel} from './panels/AssetsPanel';
 import {ComponentsPanel} from './panels/ComponentsPanel';
 import {Layers as LayersPanel} from './Layers';
 
-import {modeBorderClass} from '../rightPanel/sections/styles/common';
+import {modeBorderClass} from '../ui/uiUtils';
 import {LeftDomain, useLeftControllerFactory} from '../../controllers/left/LeftControllerFactory';
 
 // 아이콘 (lucide-react)

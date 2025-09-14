@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { getDefinition } from '../../../core/registry';
 import type { NodeId, ComponentDefinition } from '../../../core/types';
+
 import { PermissionLock } from './styles/common';
 import {
     SectionShellV1,
@@ -12,35 +13,33 @@ import {
     MiniInputV1,
 } from './styles/layoutV1';
 
-import {RightDomain, useRightControllerFactory} from '../../../controllers/right/RightControllerFactory';
+import { RightDomain, useRightControllerFactory } from '../../../controllers/right/RightControllerFactory';
 
 type AttrMap = Record<string, string>;
 
-export function CommonSection({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
-    // ✅ 컨트롤러 교체 (호출 패턴 동일)
+export function CommonSection(props: {
+    nodeId: NodeId;
+    defId: string;
+    /** ✅ 선택 props: Inspector.tsx 미수정 */
+    open?: boolean;
+    onToggle?: () => void;
+}) {
+    const { nodeId, defId } = props;
+    const open = props.open ?? true;
+    const onToggle = props.onToggle ?? (() => {});
+
+    // ✅ 컨트롤러 경유 (reader/writer)
     const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
 
-    // ✅ 기존 state 구성 유지 (reader/writer에서 동일 기능 바인딩)
-    const state = {
-        ui: reader.getUI(),
-        project: reader.getProject(),
-        data: reader.data?.(), // 일부 구현에서는 data()가 없을 수 있으므로 optional
-        getEffectiveDecl: reader.getEffectiveDecl?.bind(reader),
-        updateNodeStyles: writer.updateNodeStyles.bind(writer),
-        updateNodeProps: writer.updateNodeProps.bind(writer),
-        setNotification: writer.setNotification?.bind(writer),
-        saveNodeAsComponent: writer.saveNodeAsComponent?.bind(writer),
-        updateComponentPolicy: writer.updateComponentPolicy?.bind(writer),
-        update: writer.update?.bind(writer),
-    };
-
-    const { ui, project, updateNodeProps } = state;
+    const ui = reader.getUI();
+    const project = reader.getProject();
 
     const node = project.nodes[nodeId];
+    if (!node) return null;
+
     const def = getDefinition(defId) as ComponentDefinition | undefined;
     const propsObj = (node.props ?? {}) as Record<string, unknown>;
 
-    // __tagAttrs(id) 관리
     const initialAttrs = (propsObj.__tagAttrs as AttrMap | undefined) ?? {};
     const [elemId, setElemId] = React.useState(String(initialAttrs.id ?? node.id));
     const [name, setName] = React.useState(String(propsObj.name ?? ''));
@@ -50,38 +49,46 @@ export function CommonSection({ nodeId, defId }: { nodeId: NodeId; defId: string
         const p = (project.nodes[nodeId].props ?? {}) as Record<string, unknown>;
         const a = (p.__tagAttrs as AttrMap | undefined) ?? {};
         setElemId(String((a.id as string | undefined) ?? project.nodes[nodeId].id));
-        setName(String(p.name ?? ''));
-        setSlotId(String(p.slotId ?? ''));
+        setName(String((p as any).name ?? ''));
+        setSlotId(String((p as any).slotId ?? ''));
     }, [nodeId, project.nodes]);
 
     const saveBasic = () => {
         // name/slotId 저장
-        updateNodeProps(nodeId, { name, slotId });
+        reader.getInspectorVM().updateNodeProps(nodeId, { name, slotId });
 
         // attrs(id) 저장
-        const curAttrs = ((project.nodes[nodeId].props ?? {}) as Record<string, unknown>).__tagAttrs as
-            | AttrMap
-            | undefined;
-        const nextAttrs: AttrMap = { ...(curAttrs ?? {}) };
-        if (elemId && elemId.trim()) nextAttrs.id = elemId.trim();
-        else delete nextAttrs.id;
-        updateNodeProps(nodeId, { __tagAttrs: nextAttrs });
+        const curAttrs = ((project.nodes[nodeId].props ?? {}) as any).__tagAttrs as AttrMap | undefined;
+        const next: AttrMap = { ...(curAttrs ?? {}) };
+
+        if (elemId && elemId.trim().length > 0) next.id = elemId.trim();
+        else delete next.id;
+
+        reader.getInspectorVM().updateNodeProps(nodeId, { __tagAttrs: next });
     };
 
-    // 섹션 열림 상태 (기존 패턴 유지)
-    const [open, setOpen] = React.useState(true);
+    // ✅ 잠금 토글 (메인 키만)
+    const lockControl = (controlKey: string) => {
+        if (ui.expertMode) return;
+        const componentId = def?.title ?? '';
+        const normalized = controlKey.replace(/:/g, '.'); // 'props:name' → 'props.name'
+        writer.updateComponentPolicy(componentId, {
+            inspector: {
+                controls: {
+                    [normalized]: { visible: false },
+                },
+            } as any,
+        });
+    };
 
     return (
-        <div className="mt-0">
-            <SectionShellV1 title="Common" open={open} onToggle={() => setOpen((v) => !v)}>
-                {/* id (attr) — 풀폭 */}
+        <div className="mt-4">
+            <SectionShellV1 title="Common" open={open} onToggle={onToggle}>
+                {/* id */}
                 <RowV1>
-                    <RowLeftV1 title="id (attr)" />
+                    <RowLeftV1 title="id" />
                     <RowRightGridV1>
                         <div className="col-span-6 min-w-0">
-                            {!ui.expertMode && (
-                                <PermissionLock controlKey="attr:id" componentId={def?.title ?? ''} />
-                            )}
                             <MiniInputV1
                                 value={elemId}
                                 onChange={setElemId}
@@ -94,14 +101,27 @@ export function CommonSection({ nodeId, defId }: { nodeId: NodeId; defId: string
                     </RowRightGridV1>
                 </RowV1>
 
-                {/* name — 풀폭 */}
+                {/* name */}
                 <RowV1>
-                    <RowLeftV1 title="name" />
+                    <RowLeftV1
+                        title={
+                            <>
+                                name
+                                {!ui.expertMode && (
+                                    <span className="ml-1 inline-flex">
+                    <PermissionLock
+                        controlKey="props:name"
+                        componentId={def?.title ?? ''}
+                        disabled={ui.expertMode}
+                        onClick={() => lockControl('props:name')}
+                    />
+                  </span>
+                                )}
+                            </>
+                        }
+                    />
                     <RowRightGridV1>
                         <div className="col-span-6 min-w-0">
-                            {!ui.expertMode && (
-                                <PermissionLock controlKey="props:name" componentId={def?.title ?? ''} />
-                            )}
                             <MiniInputV1
                                 value={name}
                                 onChange={setName}
@@ -114,14 +134,11 @@ export function CommonSection({ nodeId, defId }: { nodeId: NodeId; defId: string
                     </RowRightGridV1>
                 </RowV1>
 
-                {/* slotId — 풀폭 */}
+                {/* slotId */}
                 <RowV1>
                     <RowLeftV1 title="slotId" />
                     <RowRightGridV1>
                         <div className="col-span-6 min-w-0">
-                            {!ui.expertMode && (
-                                <PermissionLock controlKey="props:slotId" componentId={def?.title ?? ''} />
-                            )}
                             <MiniInputV1
                                 value={slotId}
                                 onChange={setSlotId}
@@ -133,8 +150,6 @@ export function CommonSection({ nodeId, defId }: { nodeId: NodeId; defId: string
                         </div>
                     </RowRightGridV1>
                 </RowV1>
-
-                {/* ⛔️ As(Tag) 블록은 PropsAutoSection으로 이관됨 */}
             </SectionShellV1>
         </div>
     );

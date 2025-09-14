@@ -3,11 +3,8 @@
 import React from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
-import { modeBorderClass } from './common';
+import { modeBorderClass } from '../../../ui/uiUtils';
 import {RightDomain, useRightControllerFactory} from '@/figmaV3/controllers/right/RightControllerFactory';
-
-// 나머지 MiniInputV1, MiniSelectV1 등 기존 export 들은 그대로 두세요.
-// 아래는 SectionShellV1만 교체/갱신한 것입니다.
 
 type SectionShellV1Props = {
     title: string;
@@ -165,32 +162,48 @@ export const MiniInputV1: React.FC<MiniInputV1Props> = ({
 };
 
 export const MiniSelectV1: React.FC<{
-    value: string | undefined;
-    options: string[];
+    value: string | number | undefined;
+    options: Array<string | number | { value: string | number; label?: string }>;
     onChange: (v: string) => void;
     disabled?: boolean;
     title?: string;
     className?: string;
     /** 기본값 true — 그리드 셀 폭을 꽉 채움 */
     fullWidth?: boolean;
-}> = ({ value, options, onChange, disabled, title, className, fullWidth = true }) => (
-    <select
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        title={title}
-        className={`h-[28px] text-[12px] px-1 rounded border border-[var(--mdt-color-border)] bg-white ${
-            disabled ? 'opacity-50 cursor-not-allowed' : ''
-        } ${fullWidth ? 'w-full block min-w-0' : ''} ${className ?? ''}`}
-    >
-        {value === undefined && <option value="">{'(unset)'}</option>}
-        {options.map((op) => (
-            <option key={op} value={op}>
-                {op}
-            </option>
-        ))}
-    </select>
-);
+}> = ({ value, options, onChange, disabled, title, className, fullWidth = true }) => {
+    // 옵션 정규화: string/number 또는 {value,label}
+    const norm = (options ?? []).map((op, idx) => {
+        if (typeof op === 'string' || typeof op === 'number') {
+            const v = String(op);
+            return { key: `s:${v}:${idx}`, value: v, label: v };
+        }
+        const v = String((op as any)?.value ?? '');
+        const label =
+            (op as any) && 'label' in (op as any) && (op as any).label != null
+                ? String((op as any).label)
+                : v;
+        return { key: `o:${v}:${idx}`, value: v, label };
+    });
+
+    return (
+        <select
+            value={value == null ? '' : String(value)}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={disabled}
+            title={title}
+            className={`h-[28px] text-[12px] px-1 rounded border border-[var(--mdt-color-border)] bg-white ${
+                disabled ? 'opacity-50 cursor-not-allowed' : ''
+            } ${fullWidth ? 'w-full block min-w-0' : ''} ${className ?? ''}`}
+        >
+            {value === undefined && <option value="">{'(unset)'}</option>}
+            {norm.map((op) => (
+                <option key={op.key} value={op.value}>
+                    {op.label}
+                </option>
+            ))}
+        </select>
+    );
+};
 
 export const ChipBtnV1: React.FC<{
     active?: boolean;

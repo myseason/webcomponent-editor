@@ -10,7 +10,7 @@ import type {
     ComponentDefinition,
 } from '../../../../core/types';
 
-import { useAllowed, PermissionLock, DisallowReason, reasonForKey, renderStyleLock } from './common';
+import { PermissionLock } from './common';
 import { getDefinition } from '../../../../core/registry';
 
 import {
@@ -59,51 +59,60 @@ export function LayoutGroup(props: {
     nodeId: NodeId;
     componentId: string;
 }) {
-    // ✅ 컨트롤러 (reader)
-    const { reader } = useRightControllerFactory(RightDomain.Inspector);
+    // ✅ 컨트롤러 (reader/writer)
+    const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
     const { el, patch, expert, open, onToggle, nodeId, componentId } = props;
 
     const ui = reader.getUI();
-    const project = reader.getProject();
     const def = getDefinition(componentId);
-    const allow = useAllowed(nodeId);
-    const dis = (k: string): DisallowReason => reasonForKey(project, ui, nodeId, k, expert);
 
+    // 허용 키/가시성(메인 1차 속성만 판단에 사용)
+    const allowed = reader.getAllowedKeys(nodeId);
+    const isVisible = (mainKey: 'display' | 'size' | 'overflow') =>
+        reader.isControlVisible(nodeId, `layout.${mainKey}`);
+
+    // 메인 1차 속성 노출 여부
+    const canDisplay  = allowed.has('display')  && isVisible('display');
+    const canSize     = (allowed.has('size') || allowed.has('width') || allowed.has('height')) && isVisible('size');
+    const canOverflow = allowed.has('overflow') && isVisible('overflow');
+
+    // Lock 노출/비활성 규칙
     const showLock = ui.mode === 'Component';
     const lockDisabled = ui.expertMode || !!ui?.inspector?.forceTagPolicy;
 
+    // 컨테이너/부모 맥락
     const display = (el as any).display ?? 'block';
     const isInline = display === 'inline';
-
     const dir = (el as any).flexDirection ?? 'row';
     const isCol = dir === 'column' || dir === 'column-reverse';
 
-    // ① 컨텍스트 판별: 부모가 flex인지, 현재 노드가 컨테이너인지
     const parentIsFlex = reader.isFlexParent?.(nodeId) ?? false;
     const isContainerNode = reader.isContainerNode?.(nodeId) ?? isContainer(def);
 
-    // ② 표시 규칙: 노드가 컨테이너가 아닌 경우 flex/grid 옵션 자체를 노출하지 않음
+    // display 후보 (컨테이너만 flex/grid)
     const rawDisplayOptions = isContainerNode
         ? (['block', 'inline', 'flex', 'grid'] as const)
         : (['block', 'inline'] as const);
 
-    // ─────────────────────────────────────────────────────────
-    // 메인 속성(1차) 가시성: TagPolicy 허용 + Policy(Controller) 가시성
-    // ─────────────────────────────────────────────────────────
-    //const policyVisible = (mainKey: 'display' | 'size' | 'overflow') =>
-    //    reader.isControlVisible(nodeId, `layout.${mainKey}`);
-    const policyVisible = (mainKey: 'display' | 'size' | 'overflow') => true;
-
-    const canDisplay = allow.has('display') && policyVisible('display');
-    const canSize = (allow.has('size') || allow.has('width') || allow.has('height')) && policyVisible('size');
-    const canOverflow = allow.has('overflow') && policyVisible('overflow');
-
-    // display 후보에 정책 반영
     const displayOptions = canDisplay ? rawDisplayOptions : ([] as string[]);
 
-    // 1차 속성 전용 Lock
-    const renderMainLock = (mainKey: 'display' | 'size' | 'overflow') =>
-        renderStyleLock(ui, componentId, `layout.${mainKey}`);
+    // 메인 락 버튼 (UI-only) + 실제 토글은 writer
+    const renderMainLock = (mainKey: 'display' | 'size' | 'overflow') => (
+        showLock ? (
+            <span className="ml-1 inline-flex">
+        <PermissionLock
+            controlKey={`styles:layout.${mainKey}`}
+            componentId={componentId}
+            disabled={lockDisabled}
+            onClick={() => {
+                if (lockDisabled) return;
+                // 페이지 모드에서 숨기도록 visible=false로 업서트
+                writer.upsertComponentControlVisibility(componentId, `styles:layout.${mainKey}`, false);
+            }}
+        />
+      </span>
+        ) : null
+    );
 
     const justifyIcons: { v: string; title: string; I: IconCmp }[] = isCol
         ? [
@@ -183,7 +192,6 @@ export function LayoutGroup(props: {
     return (
         <div className="mt-4">
             <SectionShellV1 title="Layout" open={open} onToggle={onToggle}>
-
                 {/* display (메인) */}
                 {displayOptions.length > 0 && (
                     <RowV1>
@@ -191,11 +199,7 @@ export function LayoutGroup(props: {
                             title={
                                 <>
                                     display
-                                    {showLock && (
-                                        <span className="ml-1 inline-flex">
-                                          {renderMainLock('display')}
-                                        </span>
-                                    )}
+                                    {renderMainLock('display')}
                                 </>
                             }
                         />
@@ -427,11 +431,7 @@ export function LayoutGroup(props: {
                             title={
                                 <>
                                     size
-                                    {showLock && (
-                                        <span className="ml-1 inline-flex">
-                      {renderMainLock('size')}
-                    </span>
-                                    )}
+                                    {renderMainLock('size')}
                                 </>
                             }
                         />
@@ -473,11 +473,7 @@ export function LayoutGroup(props: {
                             title={
                                 <>
                                     overflow
-                                    {showLock && (
-                                        <span className="ml-1 inline-flex">
-                      {renderMainLock('overflow')}
-                    </span>
-                                    )}
+                                    {renderMainLock('overflow')}
                                 </>
                             }
                         />

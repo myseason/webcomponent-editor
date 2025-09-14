@@ -9,8 +9,11 @@ import { getDefinition } from "@/figmaV3/core/registry";
 import {NodeId, StylePolicy} from "@/figmaV3/core/types";
 
 import { useRerenderOnWrite } from '@/figmaV3/controllers/adapters/uiRerender';
-import {getEffectivePolicy} from "@/figmaV3/editor/rightPanel/sections/policyVis";
-import {StylePolicyService} from "@/figmaV3/domain/policies/StylePolicyService";
+import {
+    buildOverlayFromComponentPolicy,
+    getAllowedStyleKeysForNode,
+    isControlVisibleForNode
+} from "@/figmaV3/runtime/capabilities";
 
 export enum RightDomain {
     Inspector = 'Inspector',
@@ -54,28 +57,26 @@ function createInspectorController(RE: any, WE: any) {
     return ctl
         .attachReader("getInspectorVM", () => {
             const ui = RE.getUI?.();
-            const project = RE.getProject?.();
             const nodeId: NodeId | null = ui?.selectedId ?? null;
-            if (!nodeId)
-                return { target: null, effectivePolicy: null };
+            if (!nodeId) return { target: null };
 
             const node = RE.getNode(nodeId);
-            if (!node)
-                return { target: null, effectivePolicy: null };
-
-            const componentId = node.componentId;
-            const componentPolicy = project.policies?.components?.[componentId];
-
-            // ✅ 확장된 policyVis.ts를 사용하여 최종 유효 정책을 계산합니다.
-            const effectivePolicy = getEffectivePolicy(node, ui.mode, ui.expertMode);
+            if (!node) return { target: null };
 
             return {
-                target: { nodeId, componentId },
-                effectivePolicy,
-                // UI에서 모드별 렌더링을 위해 추가 정보 제공
+                target: { nodeId, componentId: node.componentId },
                 mode: ui.mode,
                 expertMode: ui.expertMode,
             };
+        })
+        .attachReader('isControlVisible', () => (nodeId: NodeId, controlPath: string) => {
+            const project = RE.getProject();
+            const ui = RE.getUI();
+            const comp = RE.getComponentPolicyForNode(nodeId);
+            const overlay = buildOverlayFromComponentPolicy(comp);
+            return isControlVisibleForNode(project, ui, nodeId, controlPath as any, {
+                componentOverlay: overlay,
+            });
         })
         .attachReader('isFlexParent', (orig) => () => {
             const ui = RE.getUI?.();
@@ -90,6 +91,9 @@ function createInspectorController(RE: any, WE: any) {
             if (!nodeId)
                 return false;
             return RE.isContainerNode(nodeId)})
+        .attachWriter('setControlVisibility', () => (componentId: string, controlPath: string, visible: boolean) => {
+            WE.upsertComponentControlVisibility(componentId, controlPath, visible);
+        })
         //.pickReader('getProject', 'getUI', 'getNodeById', 'getEffectiveDecl', 'getInspectorVM')
         //.pickWriter('updateNodeStyles', 'updateNodeProps', 'setNotification', 'updateComponentPolicy')
         .exposeAll()
@@ -100,7 +104,6 @@ function createPolicyController(RE: any, WE: any) {
     const ctl = makeSmartController('Right/Policy', RE, WE, {
         wrap: { updateComponentPolicy: withLog('updateComponentPolicy') },
     });
-
     return ctl
         //.pickReader('getProject', 'getUI')
         //.pickWriter('updateComponentPolicy')

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Info } from 'lucide-react';
 import { RightDomain, useRightControllerFactory } from '@/figmaV3/controllers/right/RightControllerFactory';
-import { modeBorderClass } from './styles/common';
+import {modeBorderClass} from '../../ui/uiUtils';
 
 /**
  * Inspector 중앙 상태 패널

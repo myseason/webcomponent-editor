@@ -1,19 +1,15 @@
-// src/figmaV3/engine/domains/policy.ts
 import { EditorCore } from '../EditorCore';
 import type { NodeId } from '../../core/types';
 import { getDefinition } from '../../core/registry';
-import { GLOBAL_STYLE_POLICY } from '../../policy/globalStylePolicy';
 import { deepMerge } from '../../runtime/deepMerge';
-import type { ComponentPolicy, StylePolicy as CoreStylePolicy } from '../../core/types';
-import { DEFAULT_STYLE_PRESETS, StylePresets } from '../../policy/stylePresets';
-// 정책 계산은 서비스로 위임(전역/태그/컴포넌트 병합 로직의 단일화)
-import { StylePolicyService } from '../../domain/policies/StylePolicyService';
+import type { ComponentPolicy } from '../../core/types';
 
-/**
- * controlKey 정규화
- * - 콜론/점 혼재를 대비하여 일괄 점(.) 표기로 변환
- *   예) "styles:layout.display" | "styles:layout:display" -> "styles.layout.display"
- */
+import {
+    getAllowedStyleKeysForNode,
+    isControlVisibleForNode,
+    buildOverlayFromComponentPolicy,
+} from '../../runtime/capabilities';
+
 function normalizeKey(k: string): { group: string; control: string } | null {
     const path = k.replace(/:/g, '.');
     const parts = path.split('.');
@@ -24,9 +20,6 @@ function normalizeKey(k: string): { group: string; control: string } | null {
     return { group, control };
 }
 
-/**
- * 컴포넌트 정책 기본 골격 보장
- */
 function ensureComponentPolicyBase(componentId: string): ComponentPolicy {
     const def = getDefinition(componentId);
     return {
@@ -41,50 +34,37 @@ function ensureComponentPolicyBase(componentId: string): ComponentPolicy {
 }
 
 export function policyDomain() {
-    // === Reader: 읽기 전용 ===
-    const R = {
-        getGlobalStylePolicy: (): CoreStylePolicy => GLOBAL_STYLE_POLICY, // SSOT
-
-        // 프리셋 (선택지) — 필요 시 사용
-        getStylePresets: (): StylePresets => DEFAULT_STYLE_PRESETS,
-        getShadowPresets: () => R.getStylePresets().shadows.presets,
-        getFilterPresets: () => R.getStylePresets().filters.presets,
-
-        /**
-         * 노드 기준 Effective Policy (Style + Tag [+ Component(페이지 모드/비전문가)])
-         */
-        getEffectivePolicyForNode(nodeId: NodeId): CoreStylePolicy {
+    const reader = {
+        getComponentPolicy(componentId: string) {
             const state = EditorCore.store.getState();
-            const node = state.project.nodes[nodeId];
-            if (!node) {
-                throw new Error(`[policyDomain] node(${String(nodeId)}) not found`);
-            }
-            return StylePolicyService.computeEffectivePolicy(state, node);
+            return state.project?.policies?.components?.[componentId];
         },
-
-        /**
-         * 특정 컨트롤 가시성 조회
-         * @param controlPath 예) "layout.display", "typography.fontSize", "props.__tag"
-         */
-        getControlVisibilityForNode(nodeId: NodeId, controlPath: string): boolean {
-            const effective = R.getEffectivePolicyForNode(nodeId);
-            return StylePolicyService.getControlVisibility(effective, controlPath);
+        getComponentPolicyForNode(nodeId: NodeId) {
+            const state = EditorCore.store.getState();
+            const node: any = state.project?.nodes?.[nodeId];
+            const compId = node?.componentId;
+            return compId ? state.project?.policies?.components?.[compId] : undefined;
         },
-
-        isControlVisible(nodeId: NodeId, controlKey: string): boolean {
-            const eff = R.getEffectivePolicyForNode(nodeId);
-            return StylePolicyService.getControlVisibility(eff, controlKey);
+        getAllowedKeys(nodeId: NodeId): Set<string> {
+            const project = EditorCore.store.getState().project;
+            const ui = EditorCore.store.getState().ui;
+            return getAllowedStyleKeysForNode(project, nodeId, {
+                expertMode: ui?.expertMode,
+                withSizeAlias: true,
+            });
         },
-
+        isControlVisible(nodeId: NodeId, controlPath: string): boolean {
+            const project = EditorCore.store.getState().project;
+            const ui = EditorCore.store.getState().ui;
+            const comp = reader.getComponentPolicyForNode(nodeId);
+            const overlay = buildOverlayFromComponentPolicy(comp);
+            return isControlVisibleForNode(project, ui, nodeId, controlPath as any, {
+                componentOverlay: overlay,
+            });
+        },
     } as const;
 
-    // === Writer: 쓰기(업서트) ===
-    const W = {
-        /**
-         * 프로젝트별 컴포넌트 정책을 업데이트(병합)합니다.
-         * @param componentId - 정책을 적용할 컴포넌트의 ID (e.g., 'Button')
-         * @param patch - 변경할 정책 내용
-         */
+    const writer = {
         updateComponentPolicy(componentId: string, patch: Partial<ComponentPolicy>) {
             const state = EditorCore.store.getState();
             const currentPolicies = state.project.policies?.components ?? {};
@@ -104,15 +84,6 @@ export function policyDomain() {
             state._setComponentPolicy(componentId, newPolicy);
         },
 
-        /**
-         * PermissionLock에서 사용하는 가벼운 API
-         * - 특정 컨트rol의 visible을 오버라이드(업서트)한다.
-         * - controlKey는 콜론/점 혼용을 허용하고, 내부적으로 점 표기로 통일 저장
-         *
-         * @param componentId 대상 컴포넌트 ID (정의 ID)
-         * @param controlKey  예) "styles:layout.display" | "styles.layout.display"
-         * @param visible     true/false
-         */
         upsertComponentControlVisibility(componentId: string, controlKey: string, visible: boolean) {
             const state = EditorCore.store.getState();
 
@@ -121,21 +92,18 @@ export function policyDomain() {
                 console.warn('[policyDomain] invalid controlKey:', controlKey);
                 return;
             }
+            const flatKey = `${key.group}.${key.control}`;
 
             const all = state.project.policies?.components ?? {};
             const curr = all[componentId] ?? ensureComponentPolicyBase(componentId);
 
-            const flatKey = `${key.group}.${key.control}`; // ❗ 그룹 정보를 포함해 평탄화
             const next: ComponentPolicy = {
                 ...curr,
                 inspector: {
                     ...(curr.inspector ?? { groups: {}, controls: {} }),
                     controls: {
                         ...(curr.inspector?.controls ?? {}),
-                        [flatKey]: {
-                            // 단순 visible만 관리(추후 reason/lockedBy 등 확장 가능)
-                            visible,
-                        },
+                        [flatKey]: { visible },
                     },
                 },
             };
@@ -144,5 +112,5 @@ export function policyDomain() {
         },
     } as const;
 
-    return { reader: R, writer: W } as const;
+    return { reader, writer } as const;
 }

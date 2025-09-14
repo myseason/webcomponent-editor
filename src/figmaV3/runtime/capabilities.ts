@@ -1,146 +1,141 @@
-/**
- * ✨ Policy Engine (v1.2)
- * - TagPolicy / StylePolicy / ComponentPolicy를 병합해 노드의 허용 능력(capabilities)을 산출
- * - Inspector 및 스타일 그룹 컴포넌트에서 공통 사용
- */
-
-import {
-    Project,
-    Node,
-    NodeId,
-    ComponentDefinition,
-    EffectivePolicies,
-    ProjectSettingsPoliciesOverride,
-    TagPolicy,
-    StylePolicy,
-    ComponentPolicy,
-} from '../core/types';
-import { getDefinition } from '../core/registry';
+// 정책 계산의 단일 출처(SSOT). 오직 "순수 함수"만 존재해야 합니다.
+import type { Project, EditorUI, NodeId, TagPolicy } from '../core/types';
 import { GLOBAL_TAG_POLICIES } from '../policy/globalTagPolicy';
 import { GLOBAL_STYLE_POLICY } from '../policy/globalStylePolicy';
 import { deepMerge } from './deepMerge';
 
-/* -------------------------------------------------------
- * Build effective policies (global + project override)
- * ----------------------------------------------------- */
-export function buildEffectivePolicies(
-    overrides?: ProjectSettingsPoliciesOverride
-): EffectivePolicies {
-    return {
-        tag: deepMerge({}, GLOBAL_TAG_POLICIES, overrides?.tag ?? {}) as Record<string, TagPolicy>,
-        style: deepMerge({}, GLOBAL_STYLE_POLICY, overrides?.style ?? {}) as StylePolicy,
-        components: deepMerge({}, {}, overrides?.components ?? {}) as Record<string, ComponentPolicy>,
-    };
+// ────────────────────────────────────────────────
+// 내부 유틸(순수)
+// ────────────────────────────────────────────────
+function normalizeControlPath(path: string): { group: string; key: string } {
+    const p = path.startsWith('styles:') ? path.slice(7) : path;
+    const [group, key] = p.split('.');
+    return { group, key };
 }
 
-/* -------------------------------------------------------
- * Utility: resolve tag / tagPolicy for node
- * ----------------------------------------------------- */
-export function getEffectiveTag(node: Node, def?: ComponentDefinition): string {
-    const p = node.props as Record<string, unknown>;
-    const d = def ?? getDefinition(node.componentId);
-    return (p?.__tag as string) || d?.capabilities?.defaultTag || 'div';
+function resolveNodeTag(project: Readonly<Project>, nodeId: NodeId): string {
+    const node: any = project.nodes?.[nodeId];
+    const fromProps = node?.props?.__tag;
+    if (fromProps) return String(fromProps);
+    // 순수성 유지 차원에서 registry 접근은 하지 않습니다.
+    // props 우선, 없으면 'div'로 폴백.
+    return 'div';
 }
 
-export function getTagPolicy(policies: EffectivePolicies, tag: string): TagPolicy | undefined {
-    return policies.tag[tag];
+function getTagPolicy(tag: string): TagPolicy | undefined {
+    return (GLOBAL_TAG_POLICIES as any)?.[tag];
 }
 
-/** Node별로 합쳐진 정책/부가정보 반환 */
-export function getEffectivePoliciesForNode(project: Project, nodeId: NodeId | null) {
-    if (!nodeId) return null;
-    const node = project.nodes[nodeId];
-    if (!node) return null;
-
-    const def = getDefinition(node.componentId);
-    if (!def) return null;
-
-    const effectivePolicies = buildEffectivePolicies(project.policies);
-    const tag = getEffectiveTag(node, def);
-    const tagPolicy = getTagPolicy(effectivePolicies, tag);
-    const componentPolicy = effectivePolicies.components?.[def.id];
-
-    return {
-        node,
-        def,
-        tag,
-        effectivePolicies,
-        tagPolicy,
-        stylePolicy: effectivePolicies.style,
-        componentPolicy,
-    };
-}
-
-/* -------------------------------------------------------
- * Helpers
- * ----------------------------------------------------- */
-const norm = (key: string) => {
-    // 'styles:width' | 'props:title' → 'width' | 'title'
-    const idx = key.indexOf(':');
-    return idx >= 0 ? key.slice(idx + 1) : key;
-};
-
-const collectTagStyleKeys = (tagPolicy?: TagPolicy): Set<string> => {
-    const set = new Set<string>();
-    const groups = tagPolicy?.styles?.groups;
-    if (groups) {
-        Object.values(groups).forEach((arr) => arr.forEach((k) => set.add(k)));
+// TagPolicy.groups → group/controls visible:true 시드
+function buildTagSeed(tagPolicy: Readonly<TagPolicy> | undefined): any {
+    if (!tagPolicy?.styles?.groups) return {};
+    const seed: any = {};
+    for (const [group, keys] of Object.entries(tagPolicy.styles.groups)) {
+        seed[group] = seed[group] ?? { visible: true, controls: {} };
+        for (const k of keys as string[]) {
+            seed[group].controls[k] = { visible: true };
+        }
     }
-    // 명시적으로 allow 지정된 키가 있으면 그것도 포함
-    tagPolicy?.styles?.allow?.forEach((k) => set.add(k));
-    return set;
-};
+    return seed;
+}
 
-export type AllowedStyleOptions = {
-    /** 기존 expertMode 의미 유지(광범위 허용) */
-    expertMode?: boolean;
-    /**
-     * Page 모드에서 “TagPolicy 강제 공개” 토글에 해당
-     * - true면 ComponentPolicy.inspector.controls.visible === false를 무시
-     */
-    force?: boolean;
-};
+// 메인(1차) 속성 기본 시드 — 요구 사항: Layout의 display/size/overflow
+function buildMainSeed(): any {
+    return {
+        layout: {
+            visible: true,
+            controls: {
+                display: { visible: true },
+                size: { visible: true },
+                overflow: { visible: true },
+            },
+        },
+    };
+}
 
-/* -------------------------------------------------------
- * 메인: 허용 스타일 키 계산
- * ----------------------------------------------------- */
+// ComponentPolicy(inspector.controls) 평탄 키 → group overlay
+export function buildOverlayFromComponentPolicy(
+    compPolicy: Readonly<any> | undefined
+): any {
+    const overlay: any = {};
+    const flat = compPolicy?.inspector?.controls;
+    if (!flat) return overlay;
+
+    for (const [path, meta] of Object.entries(flat)) {
+        const { group, key } = normalizeControlPath(path);
+        if (!group || !key) continue;
+        overlay[group] = overlay[group] ?? { controls: {} };
+        overlay[group].controls[key] = { ...(overlay[group].controls[key] ?? {}) };
+        if ((meta as any).visible === false) {
+            overlay[group].controls[key].visible = false;
+        }
+    }
+    return overlay;
+}
+
+// ────────────────────────────────────────────────
+// 허용 키 계산 (alias 포함, 순수)
+// ────────────────────────────────────────────────
 export function getAllowedStyleKeysForNode(
-    project: Project,
+    project: Readonly<Project>,
     nodeId: NodeId,
-    opts?: AllowedStyleOptions
+    opts?: {
+        expertMode?: boolean;     // 현재 버전에서는 allow/deny에 직접 영향 없음(deny/allow는 전역/태그에서 적용)
+        withSizeAlias?: boolean;  // width/height → size 추가
+    }
 ): Set<string> {
-    const policyInfo = getEffectivePoliciesForNode(project, nodeId);
-    if (!policyInfo) return new Set<string>();
+    const tag = resolveNodeTag(project, nodeId);
+    const tagPolicy = getTagPolicy(tag);
 
-    const { tagPolicy, stylePolicy, componentPolicy } = policyInfo;
-    const expertMode = !!opts?.expertMode;
-    const force = !!opts?.force;
-
-    // 1) 기본 후보: TagPolicy 그룹/allow 기반
-    let allowed = collectTagStyleKeys(tagPolicy);
-
-    // 2) expertMode면 태그 정책 기반으로 광범위 허용(deny는 계속 적용)
-    if (expertMode) {
-        // 이미 collectTagStyleKeys로 충분히 수집됨
-    } else {
-        // non-expert 모드에서도 전역 style.allow가 명시되어 있다면 포함
-        if (stylePolicy.allow?.length) {
-            stylePolicy.allow.forEach((k) => allowed.add(k));
+    // 1) 태그 그룹에서 허용 키 수집
+    const allowed = new Set<string>();
+    const groups = tagPolicy?.styles?.groups ?? {};
+    for (const [, keys] of Object.entries(groups)) {
+        for (const k of keys as string[]) {
+            allowed.add(k);
         }
     }
 
-    // 3) 전역/태그 deny 일괄 적용
-    stylePolicy.deny?.forEach((k) => allowed.delete(k));
-    tagPolicy?.styles?.deny?.forEach((k) => allowed.delete(k));
+    // 2) 전역 allow/deny 반영
+    (GLOBAL_STYLE_POLICY.allow ?? []).forEach((k) => allowed.add(k));
+    (GLOBAL_STYLE_POLICY.deny ?? []).forEach((k) => allowed.delete(k));
+    (tagPolicy?.styles?.deny ?? []).forEach((k) => allowed.delete(k));
 
-    // 4) 컴포넌트 정책(controls.visible === false) 적용
-    //    단, force=true면 무시(=강제 공개)
-    if (!force && componentPolicy?.inspector?.controls) {
-        for (const [k, ctl] of Object.entries(componentPolicy.inspector.controls)) {
-            if (ctl?.visible === false) {
-                allowed.delete(norm(k)); // 'styles:width'와 'width' 모두 대응
-            }
-        }
+    // 3) alias: width/height 중 하나라도 있으면 size 허용
+    if (opts?.withSizeAlias && (allowed.has('width') || allowed.has('height'))) {
+        allowed.add('size');
     }
+
     return allowed;
+}
+
+// ────────────────────────────────────────────────
+// 메인(1차) 속성 가시성 판단 (기본 true, 명시적 false만 숨김) — 순수
+// ────────────────────────────────────────────────
+export function isControlVisibleForNode(
+    project: Readonly<Project>,
+    ui: Readonly<EditorUI>,
+    nodeId: NodeId,
+    controlPath: `${string}.${string}`,
+    opts?: {
+        componentOverlay?: Readonly<any>; // 컨트롤러/도메인에서 만들어 주입
+    }
+): boolean {
+    const tag = resolveNodeTag(project, nodeId);
+    const tagPolicy = getTagPolicy(tag);
+
+    // 1) 메인 시드 + 태그 시드
+    let eff = deepMerge(buildMainSeed(), buildTagSeed(tagPolicy));
+
+    // 2) Page & 비-Expert에서만 Component overlay 적용
+    if (ui?.mode === 'Page' && !ui?.expertMode && opts?.componentOverlay) {
+        eff = deepMerge(eff, opts.componentOverlay);
+    }
+
+    // 3) 평가
+    const { group, key } = normalizeControlPath(controlPath);
+    const g = (eff as any)[group];
+    if (!g || g.visible === false) return false;
+    const c = g.controls?.[key];
+    return c?.visible !== false;
 }
