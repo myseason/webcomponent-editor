@@ -9,44 +9,33 @@ import {
     type PropertySpec,
     type DependentGroupSpec,
     type WhenExpr,
-    type UISize,
-    type UIWidth,
+    type LocaleLabel,
+    type Option, // ← 추가
 } from './InspectorStyle';
 
 import {
-    ChevronDown,
-    ChevronRight,
-    Info,
-    Wand2,
-    Lock,
-    Unlock,
-    Layout as LayoutIcon,
-    Maximize,
-    MoveHorizontal,
-    Type as TypeIcon,
-    Text as TextIcon,
-    Palette,
-    Sparkles,
-    Hand,
-    Square,
-    Grid2x2,
+    Lock, Unlock, ChevronDown, ChevronRight, Info, Wand2,
+    Layout as LayoutIcon, Maximize, MoveHorizontal, Type as TypeIcon, Text as TextIcon,
+    Palette, Sparkles, Hand, Square, Grid2x2
 } from 'lucide-react';
 
 import { getIconFor } from './InspectorStyleIcons';
 
+// ─────────────────────────────────────────────────────────────
+// Props & State Types
+// ─────────────────────────────────────────────────────────────
 type Props = {
     nodeId: string;
     defId: string;
     width?: number; // default 360
-
-    /** WhenExpr 평가용 컨텍스트(부모/컨테이너 정보) */
-    isContainer?: boolean;
-    parentDisplay?: string | null;
 };
 
-type Values = Record<string, string | undefined>;
+type Values = Record<string, string>;
 type Expanded = Record<string, boolean>;
 
+// ─────────────────────────────────────────────────────────────
+// Static Mappings
+// ─────────────────────────────────────────────────────────────
 const SECTION_ORDER: (keyof InspectorStyle)[] = [
     'Layout',
     'Typography',
@@ -55,9 +44,7 @@ const SECTION_ORDER: (keyof InspectorStyle)[] = [
     'Interactivity',
 ];
 
-const SECTION_ICONS: Partial<
-    Record<keyof InspectorStyle, React.ComponentType<{ size?: number; className?: string }>>
-> = {
+const SECTION_ICONS: Partial<Record<keyof InspectorStyle, React.ComponentType<{ size?: number; className?: string }>>> = {
     Layout: LayoutIcon,
     Typography: TypeIcon,
     Appearance: Palette,
@@ -74,18 +61,22 @@ const GROUP_ICONS: Record<string, React.ComponentType<{ size?: number; className
     Border: Square,
 };
 
-/** Row = 좌 2, 우 7 / 우측 끝 상세 토글 (Lock은 그룹 헤더로 이동) */
+// ─────────────────────────────────────────────────────────────
+// Helpers (UI)
+// ─────────────────────────────────────────────────────────────
+/** 두 줄 레이아웃 (Left 2 : Right 7) - 오른쪽은 내부 10분할 (controls: 9, detail:1) */
 const RowShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="grid grid-cols-9 gap-[4px] py-[4px] px-[6px] border-b border-neutral-100 items-center">
+    <div className="grid grid-cols-9 gap-[4px] py-[4px] px-[6px] border-b border-neutral-100 items-center overflow-x-hidden">
         {children}
     </div>
 );
 
-const LeftCell: React.FC<{ title: string; tooltip?: string }> = ({ title, tooltip }) => (
-    <div className="col-span-2 flex flex-col justify-center">
-        <div className="text-[11px] font-medium leading-[14px] text-neutral-800" title={tooltip}>
+const LeftCell: React.FC<{ title: string; subtitle?: string; tooltip?: string }> = ({ title, subtitle, tooltip }) => (
+    <div className="col-span-2 flex flex-col justify-center min-w-0">
+        <div className="text-[11px] font-medium leading-[14px] text-neutral-800 truncate" title={tooltip || title}>
             {title}
         </div>
+        {subtitle ? <div className="text-[10px] text-neutral-500 ml-[8px] leading-[12px] truncate">{subtitle}</div> : null}
     </div>
 );
 
@@ -94,7 +85,7 @@ const RightCell: React.FC<{
     onToggleDetail?: () => void;
     detailActive?: boolean;
 }> = ({ children, onToggleDetail, detailActive }) => (
-    <div className="col-span-7 grid grid-cols-10 items-center gap-[4px]">
+    <div className="col-span-7 grid grid-cols-10 items-center gap-[4px] min-w-0">
         <div className="col-span-9 min-w-0 flex items-center">{children}</div>
         <div className="col-span-1 flex justify-center">
             {onToggleDetail ? (
@@ -111,7 +102,7 @@ const RightCell: React.FC<{
     </div>
 );
 
-/** 메인 섹션 프레임 — 기존 스타일 유지 */
+/** 섹션 프레임 (접기/펼치기) */
 const SectionFrame: React.FC<{
     title: string;
     Icon?: React.ComponentType<{ size?: number; className?: string }>;
@@ -139,14 +130,13 @@ const SectionFrame: React.FC<{
             </div>
             {!collapsed && (
                 <div className="p-2">
-                    <div className="rounded-lg border border-neutral-200 bg-white">{children}</div>
+                    <div className="rounded-lg border border-neutral-200 bg-white overflow-x-hidden">{children}</div>
                 </div>
             )}
         </div>
     </section>
 );
 
-/** 그룹 헤더: 좌측 라벨/아이콘, 우측 Lock 버튼(요구사항) */
 const GroupHeader: React.FC<{
     label: string;
     iconKey?: string;
@@ -161,12 +151,12 @@ const GroupHeader: React.FC<{
                 <div className="text-[11px] font-semibold text-neutral-800">{label}</div>
                 <div className="ml-auto">
                     <button
-                        className="p-1 rounded hover:bg-neutral-100 text-neutral-600"
+                        className="p-1 rounded hover:bg-neutral-100"
                         title={locked ? 'Unlock' : 'Lock'}
                         onClick={onToggleLock}
                         type="button"
                     >
-                        {locked ? <Unlock size={14} /> : <Lock size={14} />}
+                        {locked ? <Lock size={14}/> : <Unlock size={14} />}
                     </button>
                 </div>
             </div>
@@ -174,12 +164,10 @@ const GroupHeader: React.FC<{
     );
 };
 
-/* ============================ 유틸 ============================ */
-function toLabel(v: any, fallback: string) {
-    if (!v) return fallback;
-    if (typeof v === 'string') return v;
-    return v.ko ?? v.en ?? fallback;
-}
+// ─────────────────────────────────────────────────────────────
+// Helpers (data/format)
+// ─────────────────────────────────────────────────────────────
+const toLabel = (lbl?: LocaleLabel, fallback?: string) => lbl?.ko ?? lbl?.en ?? fallback ?? '';
 
 function normalizeColor(v?: string) {
     if (!v) return '#000000';
@@ -187,90 +175,107 @@ function normalizeColor(v?: string) {
     return '#000000';
 }
 
-function sizeClass(size?: UISize) {
+/** extra input width는 스키마에서 제거 → 사이즈 힌트만 해석 */
+function freeInputClass(size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | undefined) {
     switch (size) {
-        case 'xs':
-            return 'h-6 text-[11px]';
-        case 'sm':
-            return 'h-7 text-[12px]';
-        case 'md':
-            return 'h-8 text-[12px]';
-        case 'lg':
-            return 'h-9 text-[13px]';
-        case 'xl':
-            return 'h-10 text-[14px]';
-        default:
-            return 'h-7 text-[12px]';
+        case 'xs': return 'min-w-[64px] w-[96px]';
+        case 'sm': return 'min-w-[96px] w-[128px]';
+        case 'md': return 'min-w-[120px] w-[160px]';
+        case 'lg': return 'w-full';
+        case 'xl': return 'w-full';
+        default:   return 'min-w-[120px] w-[160px]';
     }
 }
 
-function toCssWidth(w?: UIWidth) {
-    if (w == null) return undefined;
-    if (typeof w === 'number') return `${w}px`;
-    return w;
+/** option.iconKey ("group.prop:value")를 파싱하여 getIconFor 호출 */
+function resolveIconByKey(iconKey: string | undefined, fallbackGroup: string, propKey: string, fallbackValue: string) {
+    if (!iconKey || iconKey.trim() === '') {
+        return getIconFor(fallbackGroup, propKey, fallbackValue);
+    }
+    const h = iconKey.trim();
+    const hasDot = h.includes('.');
+    const hasColon = h.includes(':');
+    if (hasDot && hasColon) {
+        const [g, rest] = h.split('.', 2);
+        const [p, v] = rest.split(':', 2);
+        if (g && p && v) return getIconFor(g.toLowerCase(), p, v);
+    }
+    // value-only 힌트로 처리
+    return getIconFor(fallbackGroup, propKey, h);
 }
 
-/** WhenExpr 평가 */
-function evalWhen(
-    expr: WhenExpr | undefined,
-    ctx: { isContainer?: boolean; parentDisplay?: string | null },
-    values: Values
-): boolean {
-    if (!expr) return true;
+/** WhenExpr 평가기 */
+type Context = { isContainer?: boolean; parentDisplay?: string | number | boolean };
 
-    if ('all' in expr) return expr.all.every((e) => evalWhen(e, ctx, values));
-    if ('any' in expr) return expr.any.some((e) => evalWhen(e, ctx, values));
-    if ('not' in expr) return !evalWhen(expr.not, ctx, values);
-
+/** 값 조회자는 propKey 기반 */
+const evalWhen = (expr: WhenExpr, ctx: Context, getVal: (k: string) => any): boolean => {
+    if ('all' in expr) return expr.all.every((e) => evalWhen(e, ctx, getVal));
+    if ('any' in expr) return expr.any.some((e) => evalWhen(e, ctx, getVal));
+    if ('not' in expr) return !evalWhen(expr.not, ctx, getVal);
     if ('context' in expr) {
-        const cur = expr.context === 'isContainer' ? !!ctx.isContainer : (ctx.parentDisplay ?? '');
+        const cur =
+            expr.context === 'isContainer' ? ctx.isContainer :
+                expr.context === 'parentDisplay' ? ctx.parentDisplay : undefined;
+        if ('in' in expr && expr.in) return expr.in.includes(cur as any);
         if ('is' in expr) return cur === expr.is;
-        if ('in' in expr && Array.isArray(expr.in)) return (expr.in as any[]).includes(cur as any);
-        return false;
+        return Boolean(cur);
     }
     if ('value' in expr) {
-        // cssKey 제거 → propKey가 곧 값 키
-        const cur = values[expr.value] ?? '';
-        if ('is' in expr) return cur === String(expr.is);
-        if ('in' in expr && Array.isArray(expr.in)) return (expr.in as any[]).map(String).includes(String(cur));
-        return false;
+        const cur = getVal(expr.value);
+        if ('in' in expr && expr.in) return expr.in.includes(cur);
+        if ('is' in expr) return cur === expr.is;
+        return cur != null && cur !== '';
     }
     return true;
+};
+
+/** spec.options 우선, 없으면 presets를 options로 변환 */
+function getOptions(spec: PropertySpec): Option[] {
+    if (spec.options && spec.options.length > 0) {
+        // 이미 Option[]
+        return spec.options as Option[];
+    }
+    if (spec.presets && spec.presets.length > 0) {
+        // presets → Option으로 정규화
+        return spec.presets.map((p): Option => ({
+            value: p.value,
+            label: p.label ? { ko: p.label } : undefined,
+            iconKey: (p as any).icon,
+            disabled: false,            // ← 명시해서 Option으로 수렴
+            description: undefined,
+        }));
+    }
+    return [];
 }
 
-/* ===================== 컨트롤 렌더러 (UI/UX 유지) ===================== */
-function ControlRenderer(props: {
-    sectionKey: string;
-    propKey: string;
-    spec: PropertySpec;
-    value: string | undefined;
-    onChange: (v: string) => void;
-    disabled?: boolean;
-}) {
-    const { sectionKey, propKey, spec, value, onChange, disabled } = props;
+// ─────────────────────────────────────────────────────────────
+// Control Renderer
+// ─────────────────────────────────────────────────────────────
+function renderValueControl(
+    sectionKey: string,
+    propKey: string,
+    spec: PropertySpec,
+    value: string | undefined,
+    onChange: (v: string) => void,
+    disabled?: boolean
+) {
     const group = sectionKey.toLowerCase();
-    const isColor = spec.control === 'color' || propKey.toLowerCase().includes('color');
-    const ui = spec.ui;
-
-    const baseCls = `px-2 border border-neutral-200 rounded ${sizeClass(ui?.size)} ${
-        disabled ? 'opacity-60 cursor-not-allowed bg-neutral-50' : ''
-    }`;
 
     // SELECT
     if (spec.control === 'select') {
-        const opts = spec.options ?? [];
+        const opts = getOptions(spec);
         return (
             <select
-                className={`${baseCls} w-full`}
+                className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
                 value={value ?? ''}
                 onChange={(e) => onChange(e.target.value)}
                 disabled={disabled}
             >
                 <option value="">{'(unset)'}</option>
-                {opts.map((op, idx) => {
+                {opts.map((op, i) => {
                     const val = String(op.value);
                     return (
-                        <option key={`${propKey}:opt:${val}:${idx}`} value={val}>
+                        <option key={`${propKey}:opt:${val}:${i}`} value={val}>
                             {toLabel(op.label, val)}
                         </option>
                     );
@@ -279,93 +284,16 @@ function ControlRenderer(props: {
         );
     }
 
-    // RADIO / CHECKBOX
-    if (spec.control === 'radio' || spec.control === 'checkbox') {
-        const opts = spec.options ?? [];
-        const isMulti = spec.control === 'checkbox';
-        const selSet = new Set((isMulti ? (value ?? '').split(/\s*,\s*/) : [value ?? '']).filter(Boolean));
-
-        const toggle = (val: string) => {
-            if (!isMulti) return onChange(val);
-            const next = new Set(selSet);
-            if (next.has(val)) next.delete(val);
-            else next.add(val);
-            onChange(Array.from(next).join(','));
-        };
-
-        return (
-            <div className="flex flex-wrap gap-1">
-                {opts.map((op, idx) => {
-                    const val = String(op.value);
-                    const active = selSet.has(val);
-                    return (
-                        <button
-                            key={`${propKey}:rb:${val}:${idx}`}
-                            className={`rounded border ${sizeClass(ui?.size)} text-[10px] px-1.5 ${
-                                disabled
-                                    ? 'opacity-60 cursor-not-allowed border-neutral-200 bg-neutral-50'
-                                    : active
-                                        ? 'border-blue-500 text-blue-600 bg-blue-50'
-                                        : 'border-neutral-200 hover:bg-neutral-50'
-                            }`}
-                            onClick={() => !disabled && toggle(val)}
-                            title={toLabel(op.label, val)}
-                            disabled={disabled}
-                            type="button"
-                        >
-                            {toLabel(op.label, val)}
-                        </button>
-                    );
-                })}
-            </div>
-        );
-    }
-
-    // CHIPS / ICONS (chips도 option.iconKey가 있으면 아이콘 표시)
-    // NewInspector.tsx - ControlRenderer 내부의 "CHIPS / ICONS" 분기 전체를 이 블록으로 교체
-
-// CHIPS / ICONS (chips도 option.iconKey가 있으면 아이콘 표시)
+    // CHIPS / ICONS (chips도 iconKey 있으면 아이콘 표시)
     if (spec.control === 'chips' || spec.control === 'icons') {
-        const opts =
-            (spec.options && spec.options.length > 0
-                ? spec.options
-                : (spec.presets ?? []).map((p) => ({
-                    value: p.value,
-                    label: p.label ? { ko: p.label } : undefined,
-                    iconKey: (p as any).icon,
-                }))) as Array<{ value: string | number; label?: any; iconKey?: string; disabled?: boolean }>;
-
-        // ✅ iconKey가 "layout.display:flex" 같은 정규화된 키라면 파싱해서 getIconFor에 넘겨준다.
-        const resolveIcon = (hint: string | undefined, fallbackVal: string) => {
-            if (!hint || hint.trim() === '') {
-                return getIconFor(group, propKey, fallbackVal);
-            }
-            const h = hint.trim();
-
-            // fully-qualified: "<group>.<prop>:<value>"
-            const hasDot = h.includes('.');
-            const hasColon = h.includes(':');
-            if (hasDot && hasColon) {
-                const [g, rest] = h.split('.', 2);
-                const [p, v] = rest.split(':', 2);
-                if (g && p && v) {
-                    return getIconFor(g.toLowerCase(), p, v);
-                }
-            }
-
-            // value-only 힌트로 해석
-            return getIconFor(group, propKey, h);
-        };
-
+        const opts = getOptions(spec);
         const Chips = (
             <div className="flex flex-wrap items-center gap-[4px] min-w-0 max-w-full">
                 {opts.map((op, idx) => {
                     const val = String(op.value);
                     const active = val === value;
-
-                    // chips라도 iconKey가 있으면 아이콘 사용
                     const wantIcon = spec.control === 'icons' || !!op.iconKey;
-                    const Icon = wantIcon ? resolveIcon(op.iconKey, val) : null;
+                    const Icon = wantIcon ? resolveIconByKey(op.iconKey, group, propKey, val) : null;
 
                     return (
                         <button
@@ -377,91 +305,78 @@ function ControlRenderer(props: {
                                         ? 'border-blue-500 text-blue-600 bg-blue-50'
                                         : 'border-neutral-200 hover:bg-neutral-50'
                             }`}
-                            title={(op.label && (op.label.ko || op.label.en)) || spec.description || val}
+                            title={toLabel(op.label, spec.description || val)}
                             onClick={() => !disabled && !op.disabled && onChange(val)}
-                            disabled={disabled}
+                            disabled={disabled || op.disabled}
                             type="button"
                         >
                             {Icon ? <Icon size={12} className="shrink-0" /> : null}
-                            {!Icon ? ((op.label && (op.label.ko || op.label.en)) || val) : null}
+                            {!Icon ? toLabel(op.label, val) : null}
                         </button>
                     );
                 })}
             </div>
         );
 
-        const extra = spec.ui?.extraInput?.enabled ? (
-            <input
-                className={`${baseCls}`}
-                style={{ width: toCssWidth(spec.ui?.extraInput?.width), maxWidth: '100%' }}
-                value={value ?? ''}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={spec.ui?.extraInput?.placeholder || spec.placeholder || spec.description}
-                disabled={disabled}
-                type={spec.ui?.extraInput?.type === 'number' ? 'number' : 'text'}
-            />
-        ) : null;
+        // extra input
+        if (spec.ui?.extraInput?.enabled) {
+            const ei = spec.ui.extraInput;
+            return (
+                <div className="flex items-center gap-[6px] w-full min-w-0 max-w-full">
+                    {Chips}
+                    <input
+                        className={`h-6 px-1 border border-neutral-200 rounded text-[11px] ${freeInputClass(ei?.size)} flex-1 min-w-0`}
+                        value={value ?? ''}
+                        onChange={(e) => onChange(e.target.value)}
+                        placeholder={ei?.placeholder || spec.placeholder || spec.description}
+                        disabled={disabled}
+                        type={ei?.type === 'number' ? 'number' : 'text'}
+                    />
+                </div>
+            );
+        }
 
-        if (!extra) return Chips;
-
-        return (
-            <div className="flex items-center gap-[6px] w-full min-w-0 max-w-full">
-                {Chips}
-                {extra}
-            </div>
-        );
+        return Chips;
     }
 
-    // COLOR
-    if (isColor) {
-        const cur = normalizeColor(value);
+    // COLOR (propKey에 color 포함 시 간단 처리)
+    const isColor = propKey.toLowerCase().includes('color');
+    if (spec.control === 'color' || isColor) {
         return (
-            <div className="flex items-center gap-2 w-full">
+            <div className="flex items-center gap-2 w-full min-w-0">
                 <input
                     type="color"
                     className="h-6 w-7 p-0 border border-neutral-200 rounded"
-                    value={cur}
+                    value={normalizeColor(value)}
                     onChange={(e) => onChange(e.target.value)}
                     title="Pick color"
                     disabled={disabled}
                 />
                 <input
                     type="text"
-                    className={`${baseCls} w-full`}
+                    className="h-6 px-1 border border-neutral-200 rounded text-[11px] flex-1 min-w-0"
                     value={value ?? ''}
                     onChange={(e) => onChange(e.target.value)}
-                    placeholder="#000000 or rgba()"
+                    placeholder={spec.placeholder || spec.description || '#000000'}
                     disabled={disabled}
                 />
             </div>
         );
     }
 
-    // ratio
-    if (spec.control === 'ratio') {
-        return (
-            <input
-                className={`${baseCls} w-full`}
-                value={value ?? ''}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={spec.placeholder || 'ex) 1/1'}
-                disabled={disabled}
-            />
-        );
-    }
-
-    // shorthand
+    // SHORTHAND
     if (spec.shorthand?.enabled) {
         const placeholder = spec.shorthand.examples?.[0] ?? spec.shorthand.syntax ?? 'shorthand';
         const hint = spec.shorthand.syntax;
         return (
             <input
-                className={`${baseCls} w-full`}
+                className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
                 placeholder={placeholder}
                 value={value ?? ''}
                 onChange={(e) => onChange(e.target.value)}
                 title={hint}
                 disabled={disabled}
+                type={spec.ui?.inputType === 'number' ? 'number' : 'text'}
             />
         );
     }
@@ -469,25 +384,27 @@ function ControlRenderer(props: {
     // 기본 input
     return (
         <input
-            className={`${baseCls} w-full`}
+            type={spec.ui?.inputType === 'number' ? 'number' : 'text'}
+            className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
             value={value ?? ''}
             onChange={(e) => onChange(e.target.value)}
             placeholder={spec.placeholder || spec.description}
             disabled={disabled}
-            type={spec.ui?.inputType ?? 'text'}
         />
     );
 }
 
-/* 종속 그룹 블록 */
+// ─────────────────────────────────────────────────────────────
+// Dependent Blocks
+// ─────────────────────────────────────────────────────────────
 const DependentBlock: React.FC<{
     title?: string;
     propsMap: Record<string, PropertySpec>;
     values: Values;
     setValue: (key: string, v: string) => void;
     sectionKey: string;
-    groupLocked?: boolean;
-}> = ({ title, propsMap, values, setValue, sectionKey, groupLocked }) => {
+    disabled?: boolean;
+}> = ({ title, propsMap, values, setValue, sectionKey, disabled }) => {
     const entries = Object.entries(propsMap);
     if (entries.length === 0) return null;
 
@@ -502,19 +419,11 @@ const DependentBlock: React.FC<{
             {entries.map(([k, p]) => {
                 const rowKey = `dep:${sectionKey}:${k}`;
                 const v = values[k];
-                const disabled = !!(groupLocked && p.ui?.lockUnit);
                 return (
                     <RowShell key={rowKey}>
                         <LeftCell title={toLabel(p.label, k)} tooltip={p.ui?.tooltip} />
                         <RightCell>
-                            <ControlRenderer
-                                sectionKey={sectionKey}
-                                propKey={k}
-                                spec={p}
-                                value={v}
-                                onChange={(val) => setValue(k, val)}
-                                disabled={disabled}
-                            />
+                            {renderValueControl(sectionKey, k, p, v, (val) => setValue(k, val), disabled)}
                         </RightCell>
                     </RowShell>
                 );
@@ -523,14 +432,13 @@ const DependentBlock: React.FC<{
     );
 };
 
-/* 상세 블록 */
 const DetailBlock: React.FC<{
     propsMap?: Record<string, PropertySpec>;
     values: Values;
     setValue: (key: string, v: string) => void;
     sectionKey: string;
-    groupLocked?: boolean;
-}> = ({ propsMap, values, setValue, sectionKey, groupLocked }) => {
+    disabled?: boolean;
+}> = ({ propsMap, values, setValue, sectionKey, disabled }) => {
     if (!propsMap) return null;
     const entries = Object.entries(propsMap);
     if (entries.length === 0) return null;
@@ -544,28 +452,28 @@ const DetailBlock: React.FC<{
             {entries.map(([k, p]) => {
                 const detailKey = `detail:${sectionKey}:${k}`;
                 const v = values[k];
-                const disabled = !!(groupLocked && p.ui?.lockUnit);
 
                 const mainRow = (
                     <RowShell key={`${detailKey}.__row`}>
                         <LeftCell title={toLabel(p.label, k)} tooltip={p.ui?.tooltip} />
                         <RightCell>
-                            <ControlRenderer
-                                sectionKey={sectionKey}
-                                propKey={k}
-                                spec={p}
-                                value={v}
-                                onChange={(val) => setValue(k, val)}
-                                disabled={disabled}
-                            />
+                            {renderValueControl(sectionKey, k, p, v, (val) => setValue(k, val), disabled)}
                         </RightCell>
                     </RowShell>
                 );
 
+                // detail 속성의 의존 하위 그룹(* 등)
                 const depGroups: DependentGroupSpec[] = [];
                 if (p.dependentProperties) {
-                    if (v && p.dependentProperties[v]) depGroups.push(p.dependentProperties[v]);
+                    const cur = v;
+                    // 현재 값과 일치
+                    if (cur && p.dependentProperties[cur]) depGroups.push(p.dependentProperties[cur]);
+                    // 와일드카드
                     if (p.dependentProperties['*']) depGroups.push(p.dependentProperties['*']);
+                    // 특수키("*:...")는 무조건 후보
+                    Object.entries(p.dependentProperties).forEach(([dk, dg]) => {
+                        if (dk.startsWith('*:')) depGroups.push(dg);
+                    });
                 }
 
                 return (
@@ -576,12 +484,12 @@ const DetailBlock: React.FC<{
                                 {depGroups.map((g, idx) => (
                                     <DependentBlock
                                         key={`${detailKey}.__dep.${idx}`}
-                                        title={toLabel(g.label, '')}
+                                        title={toLabel(g.label)}
                                         propsMap={g.properties}
                                         values={values}
                                         setValue={setValue}
                                         sectionKey={sectionKey}
-                                        groupLocked={groupLocked}
+                                        disabled={disabled}
                                     />
                                 ))}
                             </div>
@@ -593,35 +501,28 @@ const DetailBlock: React.FC<{
     );
 };
 
+// ─────────────────────────────────────────────────────────────
+// Defaults
+// ─────────────────────────────────────────────────────────────
 function defaultFromSpec(prop: PropertySpec): string | undefined {
-    if (prop.control === 'select' && prop.options && prop.options.length > 0) {
-        return String(prop.options[0].value);
-    }
-    if (prop.control === 'chips' || prop.control === 'icons') {
-        if (prop.options && prop.options.length > 0) return String(prop.options[0].value);
-        if (prop.presets && prop.presets.length > 0) return String(prop.presets[0].value);
-    }
+    const opts = getOptions(prop);
+    if (prop.control === 'select' && opts.length > 0) return String(opts[0].value);
+    if ((prop.control === 'chips' || prop.control === 'icons') && opts.length > 0) return String(opts[0].value);
     return undefined;
 }
 
-/* ============================== 메인 ============================== */
-export const NewInspector: React.FC<Props> = ({
-                                                  nodeId,
-                                                  defId,
-                                                  width = 340,
-                                                  isContainer = true,
-                                                  parentDisplay = 'flex',
-                                              }) => {
+// ─────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────
+export const NewInspector: React.FC<Props> = ({ nodeId, defId, width = 360 }) => {
     const [values, setValues] = useState<Values>({});
+    const [lockedGroups, setLockedGroups] = useState<Record<string, boolean>>({});
     const [expandedDetail, setExpandedDetail] = useState<Expanded>({});
     const [collapsedSection, setCollapsedSection] = useState<Record<string, boolean>>({});
-    // 그룹 단위 Lock (그룹 헤더 우측)
-    const [lockedGroups, setLockedGroups] = useState<Record<string, boolean>>({});
 
     const style = useMemo(() => INSPECTOR_STYLE, []);
-    const ctx = useMemo(() => ({ isContainer, parentDisplay }), [isContainer, parentDisplay]);
 
-    // 초기값 부트스트랩 (propKey 기반)
+    // 초기값 주입 (propKey 기반)
     useEffect(() => {
         const next: Values = {};
         (SECTION_ORDER as (keyof InspectorStyle)[]).forEach((secKey) => {
@@ -630,8 +531,15 @@ export const NewInspector: React.FC<Props> = ({
             Object.entries(sec.groups).forEach(([groupKey, group]: [string, GroupSpec]) => {
                 Object.entries(group.properties).forEach(([propKey, prop]) => {
                     const defVal = defaultFromSpec(prop);
-                    if (defVal !== undefined && next[propKey] === undefined) {
+                    if (defVal !== undefined) {
                         next[propKey] = defVal;
+                    }
+                    // 상세 속성에도 기본값 있을 수 있으니 주입
+                    if (prop.detailProperties) {
+                        Object.entries(prop.detailProperties).forEach(([dk, ds]) => {
+                            const dv = defaultFromSpec(ds);
+                            if (dv !== undefined) next[dk] = dv;
+                        });
                     }
                 });
             });
@@ -641,36 +549,58 @@ export const NewInspector: React.FC<Props> = ({
         }
     }, [style]);
 
-    const setValue = (key: string, v: string) => {
-        setValues((prev) => ({ ...prev, [key]: v }));
-        // TODO: editorStore와 연동 (예: updateNodeStyles(nodeId, { [key]: v }))
+    // 값 변경
+    const setValue = (propKey: string, v: string) => {
+        setValues((prev) => ({ ...prev, [propKey]: v }));
     };
 
-    const toggleDetail = (rowKey: string) => {
-        setExpandedDetail((prev) => ({ ...prev, [rowKey]: !prev[rowKey] }));
+    const toggleDetail = (mainKey: string) => {
+        setExpandedDetail((prev) => ({ ...prev, [mainKey]: !prev[mainKey] }));
     };
 
-    const toggleGroupLock = (secKey: string, groupKey: string) => {
-        const k = `${secKey}.${groupKey}`;
+    const toggleGroupLock = (sectionKey: string, groupKey: string) => {
+        const k = `${sectionKey}.${groupKey}`;
         setLockedGroups((prev) => ({ ...prev, [k]: !prev[k] }));
     };
 
-    const getActiveDependentGroups = (
-        propKey: string,
-        prop: PropertySpec,
-        currentValue?: string
-    ): DependentGroupSpec[] => {
-        if (!prop.dependentProperties) return [];
-        const out: DependentGroupSpec[] = [];
+    // 간이 컨텍스트 추정:
+    // - display가 flex/grid면 컨테이너라고 가정
+    // - parentDisplay는 실제 편집기 컨텍스트에서 주입되어야 함 (TODO)
+    const getContext = (): Context => {
+        const display = values['display'];
+        return {
+            //isContainer: display === 'flex' || display === 'grid',
+            //parentDisplay: undefined, // TODO: 편집기에서 실제 부모 display 전달
+            isContainer: true,
+            parentDisplay: 'grid', // TODO: 편집기에서 실제 부모 display 전달
+        };
+    };
 
-        // 모든 정의를 순회하면서 *, exact, *:wildcard 모두 후보 포함
-        for (const [k, g] of Object.entries(prop.dependentProperties)) {
-            const match = k === '*' || k === (currentValue ?? '') || k.startsWith('*:');
-            if (match && evalWhen(g.displayWhen, ctx, values)) {
-                out.push(g);
-            }
+    // 의존 그룹 수집 + WhenExpr 평가
+    const getActiveDependentGroups = (propKey: string, prop: PropertySpec, currentValue?: string): DependentGroupSpec[] => {
+        if (!prop.dependentProperties) return [];
+        const list: DependentGroupSpec[] = [];
+        const ctx = getContext();
+        const getVal = (k: string) => values[k];
+
+        // 1) 현재 값과 일치하는 키 (예: 'flex', 'grid')
+        if (currentValue && prop.dependentProperties[currentValue]) {
+            const g = prop.dependentProperties[currentValue];
+            if (!g.displayWhen || evalWhen(g.displayWhen, ctx, getVal)) list.push(g);
         }
-        return out;
+        // 2) 와일드카드 '*'
+        if (prop.dependentProperties['*']) {
+            const g = prop.dependentProperties['*'];
+            if (!g.displayWhen || evalWhen(g.displayWhen, ctx, getVal)) list.push(g);
+        }
+        // 3) 특수키 '*:...'
+        Object.entries(prop.dependentProperties).forEach(([k, g]) => {
+            if (k.startsWith('*:')) {
+                if (!g.displayWhen || evalWhen(g.displayWhen, ctx, getVal)) list.push(g);
+            }
+        });
+
+        return list;
     };
 
     const renderPropertyRow = (
@@ -678,28 +608,16 @@ export const NewInspector: React.FC<Props> = ({
         groupKey: string,
         propKey: string,
         prop: PropertySpec,
-        groupLocked: boolean
+        disabled?: boolean
     ) => {
-        // 프로퍼티 자체 표시 조건
-        if (!evalWhen(prop.displayWhen, ctx, values)) return null;
-
         const title = toLabel(prop.label, propKey);
         const mainKey = `${sectionKey}.${groupKey}.${propKey}`;
         const v = values[propKey];
+
         const hasDetail = !!prop.detailProperties;
         const detailOpen = expandedDetail[mainKey] === true;
-        const disabled = !!(groupLocked && prop.ui?.lockUnit);
 
-        const controls = (
-            <ControlRenderer
-                sectionKey={String(sectionKey)}
-                propKey={propKey}
-                spec={prop}
-                value={v}
-                onChange={(nv) => setValue(propKey, nv)}
-                disabled={disabled}
-            />
-        );
+        const controls = renderValueControl(String(sectionKey), propKey, prop, v, (nv) => setValue(propKey, nv), disabled);
 
         const row = (
             <RowShell key={`${mainKey}.__row`}>
@@ -720,12 +638,12 @@ export const NewInspector: React.FC<Props> = ({
                     {depGroups.map((g, idx) => (
                         <DependentBlock
                             key={`${mainKey}.__dep.${idx}`}
-                            title={toLabel(g.label, '')}
+                            title={toLabel(g.label)}
                             propsMap={g.properties}
                             values={values}
                             setValue={setValue}
                             sectionKey={String(sectionKey)}
-                            groupLocked={groupLocked}
+                            disabled={disabled}
                         />
                     ))}
                 </div>
@@ -739,7 +657,7 @@ export const NewInspector: React.FC<Props> = ({
                     values={values}
                     setValue={setValue}
                     sectionKey={String(sectionKey)}
-                    groupLocked={groupLocked}
+                    disabled={disabled}
                 />
             ) : null;
 
@@ -754,20 +672,20 @@ export const NewInspector: React.FC<Props> = ({
 
     const renderGroup = (sectionKey: keyof InspectorStyle, groupKey: string, group: GroupSpec) => {
         const entries = Object.entries(group.properties);
-        const groupId = `${sectionKey}.${groupKey}`;
-        const locked = !!lockedGroups[groupId];
+        const groupKeyFull = `${sectionKey}.${groupKey}`;
+        const isLocked = !!lockedGroups[groupKeyFull];
 
         return (
-            <div key={groupId} className="border-b border-neutral-200">
+            <div key={`${sectionKey}.${groupKey}`} className="border-b border-neutral-200">
                 <GroupHeader
                     label={toLabel(group.label, groupKey)}
                     iconKey={groupKey}
-                    locked={locked}
+                    locked={isLocked}
                     onToggleLock={() => toggleGroupLock(String(sectionKey), groupKey)}
                 />
-                <div>
+                <div className="min-w-0">
                     {entries.map(([propKey, prop]) =>
-                        renderPropertyRow(sectionKey, groupKey, propKey, prop, locked),
+                        renderPropertyRow(sectionKey, groupKey, propKey, prop, isLocked)
                     )}
                 </div>
             </div>
@@ -778,10 +696,9 @@ export const NewInspector: React.FC<Props> = ({
         const groups = Object.entries(section.groups);
         const SecIcon = SECTION_ICONS[sectionKey];
         const collapsed = !!collapsedSection[sectionKey as string];
-
         return (
             <SectionFrame
-                key={`sec:${String(sectionKey)}`} // key 경고 해결
+                key={`section:${String(sectionKey)}`}
                 title={toLabel(section.label, String(sectionKey))}
                 Icon={SecIcon}
                 collapsed={collapsed}
@@ -795,7 +712,7 @@ export const NewInspector: React.FC<Props> = ({
     };
 
     return (
-        <div style={{ width }} className="text-[11px] text-neutral-800 min-w-0 max-w-full">
+        <div style={{ width }} className="text-[11px] text-neutral-800 overflow-x-hidden">
             {SECTION_ORDER.map((sec) => renderSection(sec, (style as any)[sec] as SectionSpec))}
         </div>
     );
