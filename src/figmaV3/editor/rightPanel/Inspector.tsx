@@ -12,7 +12,7 @@ import {SaveAsComponentDialog} from './sections/SaveAsComponentDialog';
 
 import {RightDomain, useRightControllerFactory} from '../../controllers/right/RightControllerFactory';
 import {InspectorStatusPanel} from "@/figmaV3/editor/rightPanel/sections/InspectorStatusPanel";
-import NewInspector from "@/figmaV3/editor/rightPanel/NewInspector";
+import StyleInspector from "@/figmaV3/editor/rightPanel/StyleInspector";
 
 function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     // def는 필요 시 참조만, propsSchema 유무와 무관하게 PropsAutoSection을 항상 렌더
@@ -34,7 +34,7 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
             </div>
             */}
             <div className="mt-4">
-                <NewInspector nodeId={nodeId} defId={defId} width={320} />
+                <StyleInspector nodeId={nodeId} defId={defId} width={320} />
             </div>
             {/* Schema — 베이스 시그니처는 { nodeId }
             <div className="mt-4">
