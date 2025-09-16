@@ -29,8 +29,11 @@ import {
     // Generic / Effects / Misc
     Image, Repeat, Crosshair, Layers, Pin, Box,
     Square, SquareDashed, Scan, Sun, Contrast, Droplet, Filter,
-    RotateCcw, Maximize2, Italic, Timer, Clock, Underline, Strikethrough
+    RotateCcw, Maximize2, Italic, Timer, Clock, Underline, Strikethrough,
     //, BorderAll, BezierCurve,
+
+    // file upload icons
+    ImageUp, FileUp, UploadCloud, Link
 } from 'lucide-react';
 
 export type IconCmp = React.ComponentType<{ size?: number; className?: string }>;
@@ -220,6 +223,13 @@ const ICONS: Record<string, IconCmp> = {
 
     [key('appearance', 'opacity')]: Sun, // 투명도는 Sun/Contrast로 대응
     [key('effects', 'opacity')]: Sun,
+
+
+    // File upload
+    [key('appearance','backgroundImage', 'upload')]: ImageUp,
+    [key('appearance','backgroundImage', 'file')]: FileUp,
+    [key('appearance','backgroundImage', 'cloud-upload')]: UploadCloud,
+    [key('appearance','backgroundImage','link')]: Link,
 
     // ───────────────────────────────────────────────────────────
     // Effects

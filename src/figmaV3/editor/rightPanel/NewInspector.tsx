@@ -16,7 +16,8 @@ import {
 import {
     Lock, Unlock, ChevronDown, ChevronRight, Info, Wand2,
     Layout as LayoutIcon, Maximize, MoveHorizontal, Type as TypeIcon, Text as TextIcon,
-    Palette, Sparkles, Hand, Square, Grid2x2
+    Palette, Sparkles, Hand, Square, Grid2x2,
+    ImageUp
 } from 'lucide-react';
 
 import { getIconFor } from './InspectorStyleIcons';
@@ -165,6 +166,56 @@ const GroupHeader: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────
+// Helpers (upload button)
+// ─────────────────────────────────────────────────────────────
+// (컴포넌트 윗부분) 공용 업로드 버튼
+const FileUploadButton: React.FC<{
+    accept?: string;
+    title?: string;
+    Icon?: React.ComponentType<{size?: number; className?: string}>;
+    onFile: (file: File) => void;
+}> = ({ accept = 'image/*', title = '파일 업로드', Icon = ImageUp, onFile }) => {
+    const inputId = React.useId();
+    return (
+        <>
+            <input
+                id={inputId}
+                type="file"
+                accept={accept}
+                className="hidden"
+                onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onFile(f);
+                    e.currentTarget.value = '';
+                }}
+            />
+            <label
+                htmlFor={inputId}
+                className="inline-flex items-center justify-center h-6 w-6 rounded border border-neutral-200 hover:bg-neutral-50 cursor-pointer"
+                title={title}
+            >
+                <Icon size={14} />
+            </label>
+        </>
+    );
+};
+
+// 파일 → 값 변환 (CDN 업로드/로컬 대체)
+function fileToValue(file: File, mode: 'url()'|'dataURL'|'objectURL', template?: string): Promise<string> {
+    return new Promise((resolve) => {
+        if (mode === 'dataURL') {
+            const r = new FileReader();
+            r.onload = () => resolve(String(r.result || ''));
+            r.readAsDataURL(file);
+            return;
+        }
+        const src = URL.createObjectURL(file);
+        resolve(template ? template.replace('${src}', src) : (mode === 'url()' ? `url(${src})` : src));
+    });
+}
+
+
+// ─────────────────────────────────────────────────────────────
 // Helpers (data/format)
 // ─────────────────────────────────────────────────────────────
 const toLabel = (lbl?: LocaleLabel, fallback?: string) => lbl?.ko ?? lbl?.en ?? fallback ?? '';
@@ -260,6 +311,77 @@ function renderValueControl(
     disabled?: boolean
 ) {
     const group = sectionKey.toLowerCase();
+
+    // INPUT
+    if (spec.control === 'input') {
+        const showUpload = spec.ui?.uploadButton?.enabled;
+        if (!showUpload) {
+            return (
+                <input
+                    type={spec.ui?.inputType === 'number' ? 'number' : 'text'}
+                    className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full"
+                    value={value ?? ''}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder={spec.placeholder || spec.description}
+                />
+            );
+        }
+
+        const accept   = spec.ui?.uploadButton?.accept ?? 'image/*';
+        const toValue  = spec.ui?.uploadButton?.toValue ?? 'url()';
+        const template = spec.ui?.uploadButton?.template;
+        const iconKey  = spec.ui?.uploadButton?.iconKey;
+
+        // 🔹 아이콘 동적 선택: iconKey가 있으면 그것으로, 없으면 기본(ImageUp)
+        const UploadIcon =
+            (iconKey && getIconFor(sectionKey.toLowerCase(), propKey, iconKey)) || ImageUp;
+
+        return (
+            <div className="flex items-center gap-[6px] w-full">
+                <input
+                    type={spec.ui?.inputType === 'number' ? 'number' : 'text'}
+                    className="h-6 px-1 border border-neutral-200 rounded text-[11px] flex-1 min-w-0"
+                    value={value ?? ''}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder={spec.placeholder || spec.description}
+                />
+                <FileUploadButton
+                    accept={accept}
+                    title="파일 업로드"
+                    Icon={UploadIcon}
+                    onFile={async (file) => {
+                        // 1) 우선 전역 업로더(window.__editorUpload)가 있으면 CDN 업로드를 시도
+                        const uploaderKey = spec.ui?.uploadButton?.uploaderKey;
+                        const globalAny = window as any;
+                        if (uploaderKey && typeof globalAny?.__editorUpload === 'function') {
+                            try {
+                                const cdnUrl: string = await globalAny.__editorUpload(file, uploaderKey);
+                                // 표시 문자열과 스타일 값 모두 url(...)로 통일 (요구사항)
+                                const v = template
+                                    ? template.replace('${src}', cdnUrl)
+                                    : `url(${cdnUrl})`;
+                                onChange(v); // ← 텍스트필드에 그대로 표시됨
+                                return;
+                            } catch {
+                                // 업로드 실패 시 아래 로컬 대체로 폴백
+                            }
+                        }
+
+                        // 2) 폴백: 로컬 객체 URL / dataURL
+                        const v = await fileToValue(file, toValue, template);
+                        // 요구사항: 텍스트필드에 “URL”이 보여야 하고 스타일 적용은 url(...) 여야 함.
+                        // - dataURL/objectURL도 문자열이므로 v 자체를 onChange에 넣으면 텍스트에 그대로 노출됩니다.
+                        // - toValue='url()'이면 이미 url(...) 포맷으로 반환됩니다.
+                        if (toValue === 'url()' && !/^url\(/.test(v)) {
+                            onChange(`url(${v})`);
+                        } else {
+                            onChange(v);
+                        }
+                    }}
+                />
+            </div>
+        );
+    }
 
     // SELECT
     if (spec.control === 'select') {

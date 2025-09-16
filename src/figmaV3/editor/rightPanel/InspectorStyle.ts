@@ -105,6 +105,19 @@ export type PropertySpec = {
             placeholder?: string; // width 제거
         };
 
+        /** 업로드 버튼(파일 선택) — input 옆 suffix 버튼으로 노출 */
+        uploadButton?: {
+            enabled: boolean;
+            accept?: string;  // e.g. 'image/*'
+            /** 파일을 CSS 값으로 변환하는 방법 */
+            toValue?: 'url()' | 'dataURL' | 'objectURL';
+            /** url()일 때, 포맷: e.g. 'url(${src})' — 기본값은 자동으로 'url(...)' 생성 */
+            template?: string;
+            /** 비동기 업로더 키(있다면 업로드 API로 전송 후 CDN URL을 value에 주입) */
+            uploaderKey?: string; // 프로젝트 업로더 식별자
+            iconKey?: string; // 버튼 아이콘 선택용 키 (예: 'upload' | 'file' | 'cloud-upload' | 'link')
+        };
+
         // 1차 락 단위
         lockUnit?: boolean;
     };
@@ -371,6 +384,24 @@ export const INSPECTOR_STYLE: InspectorStyle = {
                             size: 'xs',
                             extraInput: { enabled: true, size: 'xs', placeholder: 'ex) 320px' },
                         },
+                        detailProperties:{
+                            minWidth: {
+                                label: { ko: '최소너비' },
+                                control: 'input',
+                                ui: {
+                                    size: 'xs',
+                                    extraInput: { enabled: true, size: 'xs', placeholder: 'ex) 100' },
+                                }
+                            },
+                            maxWidth: {
+                                label: { ko: '최대너비' },
+                                control: 'input',
+                                ui: {
+                                    size: 'xs',
+                                    extraInput: { enabled: true, size: 'xs', placeholder: 'ex) 100' },
+                                }
+                            },
+                        }
                     },
                     height: {
                         label: { ko: '높이' },
@@ -382,6 +413,24 @@ export const INSPECTOR_STYLE: InspectorStyle = {
                             size: 'xs',
                             extraInput: { enabled: true, size: 'xs', placeholder: 'ex) 200px' },
                         },
+                        detailProperties:{
+                            minHeight: {
+                                label: { ko: '최소높이' },
+                                control: 'input',
+                                ui: {
+                                    size: 'xs',
+                                    extraInput: { enabled: true, size: 'xs', placeholder: 'ex) 100' },
+                                }
+                            },
+                            maxHeight: {
+                                label: { ko: '최대높이' },
+                                control: 'input',
+                                ui: {
+                                    size: 'xs',
+                                    extraInput: { enabled: true, size: 'xs', placeholder: 'ex) 100' },
+                                }
+                            },
+                        }
                     },
                     aspectRatio: {
                         label: { ko: '종횡비' },
@@ -625,9 +674,15 @@ export const INSPECTOR_STYLE: InspectorStyle = {
         },
     },
 
+    //------------------------------------------------------------------------------------------------------------------
+    //  Appearance > Border
+    //------------------------------------------------------------------------------------------------------------------
     Appearance: {
         label: { ko: '모양', en: 'Appearance' },
         groups: {
+            //----------------------------------------------------------------------------------------------------------
+            //  Appearance > fill
+            //----------------------------------------------------------------------------------------------------------
             Fill: {
                 properties: {
                     backgroundColor: {
@@ -638,6 +693,17 @@ export const INSPECTOR_STYLE: InspectorStyle = {
                     background: {
                         label: { ko: '배경 상세' },
                         control: 'input',
+                        placeholder: 'url(...) / none',
+                        ui: {
+                            size: 'sm',
+                            uploadButton: {
+                                enabled: true,
+                                accept: 'image/*',
+                                toValue: 'url()',       // 'dataURL' 또는 'objectURL'도 가능
+                                // template: 'url(${src})' // 커스텀 포맷 필요하면 지정
+                                // uploaderKey: 'assets'  // 프로젝트 업로더 연동 시 식별자
+                            }
+                        },
                         shorthand: {
                             enabled: true,
                             layered: true,
@@ -658,6 +724,16 @@ export const INSPECTOR_STYLE: InspectorStyle = {
                                 label: { ko: '이미지' },
                                 control: 'input',
                                 placeholder: 'url(...) / none',
+                                ui: {
+                                    size: 'sm',
+                                    uploadButton: {
+                                        enabled: true,
+                                        accept: 'image/*',
+                                        toValue: 'url()',       // 'dataURL' 또는 'objectURL'도 가능
+                                        // template: 'url(${src})' // 커스텀 포맷 필요하면 지정
+                                        // uploaderKey: 'assets'  // 프로젝트 업로더 연동 시 식별자
+                                    }
+                                },
                                 dependentProperties: {
                                     '*': {
                                         label: { ko: '이미지 설정' },
@@ -719,25 +795,31 @@ export const INSPECTOR_STYLE: InspectorStyle = {
                     },
                 },
             },
-
+            //----------------------------------------------------------------------------------------------------------
+            //  Appearance > Border
+            //----------------------------------------------------------------------------------------------------------
             Border: {
                 properties: {
                     border: {
                         label: { ko: '테두리' },
-                        control: 'chips',
-                        options: [{ value: '1px solid currentColor' }, { value: '2px solid currentColor' }],
+                        control: 'input',
+                        //options: [{ value: '1px solid currentColor' }, { value: '2px solid currentColor' }],
+                        placeholder: '1px solid currentColor',
                         shorthand: {
                             enabled: true,
                             syntax: '<width> || <style> || <color>',
                             examples: ['1px solid #000'],
                             longhandKeys: ['borderWidth', 'borderStyle', 'borderColor'],
                         },
+                        ui: {
+                            size: 'xs', extraInput: { enabled: true, size: 'xs', placeholder: '1px solid black' },
+                        },
                         detailProperties: {
                             borderWidth: {
                                 label: { ko: '두께' },
                                 control: 'chips',
-                                options: [{ value: '1px' }, { value: '2px' }, { value: '4px' }, { value: '8px' }, { value: '16px' }],
-                                ui: { size: 'xs', extraInput: { enabled: true, size: 'xs' } },
+                                options: [{ value: '0' }, { value: '1' }, { value: '2' }, { value: '4' }],
+                                ui: { size: 'xs', extraInput: { enabled: true, size: 'xs', placeholder:'0' } },
                             },
                             borderStyle: {
                                 label: { ko: '스타일' },
@@ -755,19 +837,42 @@ export const INSPECTOR_STYLE: InspectorStyle = {
                     borderRadius: {
                         label: { ko: '모서리' },
                         control: 'chips',
-                        options: [{ value: '0' }, { value: '2px' }, { value: '4px' }, { value: '8px' }, { value: '16px' }],
-                        ui: { size: 'xs', extraInput: { enabled: true, size: 'xs' } },
+                        options: [{ value: '0' }, { value: '2' }, { value: '4' }, { value: '8' }],
+                        ui: { size: 'xs', extraInput: { enabled: true, size: 'xs' , placeholder: '0'}},
                         detailProperties: {
-                            borderTopLeftRadius: { label: { ko: '좌상' }, control: 'input', ui: { size: 'xs' } },
-                            borderTopRightRadius: { label: { ko: '우상' }, control: 'input', ui: { size: 'xs' } },
-                            borderBottomRightRadius: { label: { ko: '우하' }, control: 'input', ui: { size: 'xs' } },
-                            borderBottomLeftRadius: { label: { ko: '좌하' }, control: 'input', ui: { size: 'xs' } },
+                            borderTopLeftRadius: {
+                                label: { ko: '좌상' },
+                                control: 'chips',
+                                options: [{ value: '0' }, { value: '1' }, { value: '2' }, { value: '4' }],
+                                ui: { size: 'xs', extraInput: { enabled: true, size: 'xs' , placeholder: '0'} }
+                            },
+                            borderTopRightRadius: {
+                                label: { ko: '우상' },
+                                control: 'chips',
+                                options: [{ value: '0' }, { value: '1' }, { value: '2' }, { value: '4' }],
+                                ui: { size: 'xs', extraInput: { enabled: true, size: 'xs' , placeholder: '0'} }
+                            },
+                            borderBottomRightRadius: {
+                                label: { ko: '우하' },
+                                control: 'chips',
+                                options: [{ value: '0' }, { value: '1' }, { value: '2' }, { value: '4' }],
+                                ui: { size: 'xs', extraInput: { enabled: true, size: 'xs' , placeholder: '0'} }
+                            },
+                            borderBottomLeftRadius: {
+                                label: { ko: '좌하' },
+                                control: 'chips',
+                                options: [{ value: '0' }, { value: '1' }, { value: '2' }, { value: '4' }],
+                                ui: { size: 'xs', extraInput: { enabled: true, size: 'xs' , placeholder: '0'} }
+                            },
                         },
                     },
                     outline: {
                         label: { ko: '외곽선' },
                         control: 'chips',
-                        options: [{ value: '1px solid currentColor' }],
+                        placeholder: '1px solid currentColor',
+                        ui: {
+                            size: 'xs', extraInput: { enabled: true, size: 'xs', placeholder: '1px solid black' },
+                        },
                         shorthand: {
                             enabled: true,
                             syntax: '<outline-width> || <outline-style> || <outline-color>',
@@ -778,7 +883,7 @@ export const INSPECTOR_STYLE: InspectorStyle = {
                             outlineWidth: {
                                 label: { ko: '두께' },
                                 control: 'chips',
-                                options: [{ value: '0' }, { value: '2px' }, { value: '4px' }, { value: '8px' }, { value: '16px' }],
+                                options: [{ value: '0' }, { value: '1' }, { value: '2' }, { value: '4' }],
                                 ui: { size: 'xs', extraInput: { enabled: true, size: 'xs' } },
                             },
                             outlineStyle: {
@@ -790,38 +895,36 @@ export const INSPECTOR_STYLE: InspectorStyle = {
                             outlineColor: { label: { ko: '색상' }, control: 'color', ui: { size: 'sm' } },
                         },
                     },
-                    opacity: {
-                        label: { ko: '투명도' },
-                        control: 'chips',
-                        options: [{ value: '0' }, { value: '0.25' }, { value: '0.75' }, { value: '1' }],
-                        ui: { size: 'xs', extraInput: { enabled: true, size: 'xs', placeholder: '0~1' } },
-                    },
                 },
             },
         },
     },
 
+    //----------------------------------------------------------------------------------------------------------
+    //  Appearance > Effects
+    //----------------------------------------------------------------------------------------------------------
     Effects: {
         label: { ko: '효과', en: 'Effects' },
         groups: {
+            //----------------------------------------------------------------------------------------------------------
+            //  Appearance > Effects > Visual
+            //----------------------------------------------------------------------------------------------------------
             Visual: {
                 properties: {
                     opacity: {
                         label: { ko: '투명도' },
                         control: 'chips',
-                        options: [{ value: '0' }, { value: '0.25' }, { value: '0.5' }, { value: '0.75' }, { value: '1' }],
+                        placeholder: '0~1',
+                        options: [{ value: '1' }, { value: '0.5' }, { value: '0' }],
                         ui: { size: 'xs', extraInput: { enabled: true, size: 'xs', placeholder: '0~1' } },
                     },
                     filter: {
                         label: { ko: '그래픽 효과' },
-                        control: 'chips',
-                        options: [
-                            { value: 'none' },
-                            { value: 'blur(4px)' },
-                            { value: 'brightness(0.9)' },
-                            { value: 'contrast(1.2)' },
-                            { value: 'grayscale(1)' },
-                        ],
+                        control: 'input',
+                        placeholder: 'blur(4px) brightness(0.9)',
+                        ui:{
+                            size: 'xl', extraInput: { enabled: true, size: 'xl', placeholder: 'blur(4px) brightness(0.9)' }
+                        },
                         shorthand: {
                             enabled: true,
                             layered: true,
@@ -902,12 +1005,18 @@ export const INSPECTOR_STYLE: InspectorStyle = {
                 },
             },
 
+            //----------------------------------------------------------------------------------------------------------
+            //  Appearance > Effects > Transform
+            //----------------------------------------------------------------------------------------------------------
             Transform: {
                 properties: {
                     transform: {
                         label: { ko: '변형' },
-                        control: 'chips',
-                        options: [{ value: 'none' }, { value: 'scale(1.05)' }, { value: 'rotate(5deg)' }, { value: 'translate(0, 4px)' }],
+                        control: 'input',
+                        placeholder: 'scale(1.05) rotate(5deg) translate(0, 4px)',
+                        ui:{
+                            size: 'xl', extraInput: { enabled: true, size: 'xl', placeholder: 'scale(1.05) rotate(5deg) translate(0, 4px)' }
+                        },
                         shorthand: {
                             enabled: true,
                             layered: true,
@@ -915,8 +1024,8 @@ export const INSPECTOR_STYLE: InspectorStyle = {
                             syntax: '<transform-function>+',
                             longhandKeys: [
                                 'translate',
-                                'translateX',
-                                'translateY',
+                            //    'translateX',
+                            //    'translateY',
                                 'scale',
                                 'scaleX',
                                 'scaleY',
@@ -928,8 +1037,8 @@ export const INSPECTOR_STYLE: InspectorStyle = {
                         },
                         detailProperties: {
                             translate: { label: { ko: '이동' }, control: 'input', ui: { size: 'xs' }, placeholder: 'translate(10px, 0)' },
-                            translateX: { label: { ko: '이동 X' }, control: 'input', ui: { size: 'xs' }, placeholder: 'translateX(8px)' },
-                            translateY: { label: { ko: '이동 Y' }, control: 'input', ui: { size: 'xs' }, placeholder: 'translateY(8px)' },
+                        //    translateX: { label: { ko: '이동 X' }, control: 'input', ui: { size: 'xs' }, placeholder: 'translateX(8px)' },
+                        //    translateY: { label: { ko: '이동 Y' }, control: 'input', ui: { size: 'xs' }, placeholder: 'translateY(8px)' },
                             scale: { label: { ko: '스케일' }, control: 'input', ui: { size: 'xs' }, placeholder: 'scale(1.1)' },
                             rotate: { label: { ko: '회전' }, control: 'input', ui: { size: 'xs' }, placeholder: 'rotate(10deg)' },
                             skew: { label: { ko: '기울임' }, control: 'input', ui: { size: 'xs' }, placeholder: 'skew(5deg, 0)' },
@@ -949,13 +1058,16 @@ export const INSPECTOR_STYLE: InspectorStyle = {
                     },
                 },
             },
-
+            //----------------------------------------------------------------------------------------------------------
+            //  Appearance > Effects > Transition
+            //----------------------------------------------------------------------------------------------------------
             Transition: {
                 properties: {
                     transition: {
                         label: { ko: '전환 효과' },
-                        control: 'chips',
-                        options: [{ value: 'all 150ms ease-out' }, { value: 'opacity 200ms ease-in' }],
+                        control: 'input',
+                        placeholder: 'all 150ms ease-out',
+                        ui: { size: 'xs', extraInput: { enabled: true, size: 'xs', placeholder: 'opacity 200ms ease-in' } },
                         shorthand: {
                             enabled: true,
                             layered: true,
@@ -1005,10 +1117,15 @@ export const INSPECTOR_STYLE: InspectorStyle = {
             },
         },
     },
-
+    //------------------------------------------------------------------------------------------------------------------
+    //  Interaction
+    //------------------------------------------------------------------------------------------------------------------
     Interactivity: {
         label: { ko: '상호작용', en: 'Interactivity' },
         groups: {
+            //----------------------------------------------------------------------------------------------------------
+            //  Interaction > User Interaction
+            //----------------------------------------------------------------------------------------------------------
             'User Interaction': {
                 properties: {
                     cursor: {
