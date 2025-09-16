@@ -42,6 +42,82 @@ export const RightCell: React.FC<{
     </div>
 );
 
+// --- 추가: 3:7 행 레이아웃 (좌측 3, 우측 7) ---
+export const RowShell3x7: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <div className="grid grid-cols-10 gap-[4px] py-[4px] px-[6px] border-b border-neutral-100 items-center overflow-x-hidden">
+        {children}
+    </div>
+);
+
+// --- 추가: 좌측 셀(제목/부제 + 우측 끝 Lock 버튼 고정) ---
+export const LeftLockCell: React.FC<{
+    title: string;
+    subtitle?: string;
+    tooltip?: string;
+    locked?: boolean;
+    onToggleLock?: () => void;
+}> = ({ title, subtitle, tooltip, locked, onToggleLock }) => (
+    <div className="col-span-3 min-w-0">
+        <div className="flex items-start">
+            <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-medium leading-[14px] text-neutral-800 truncate" title={tooltip || title}>
+                    {title}
+                </div>
+                {subtitle ? (
+                    <div className="text-[10px] text-neutral-500 ml-[8px] leading-[12px] truncate">{subtitle}</div>
+                ) : null}
+            </div>
+            <div className="ml-2 shrink-0">
+                {onToggleLock ? (
+                    <button
+                        className="p-1 rounded hover:bg-neutral-100"
+                        title={locked ? 'Unlock' : 'Lock'}
+                        onClick={onToggleLock}
+                        type="button"
+                    >
+                        {locked ? <Lock size={14} /> : <Unlock size={14} />}
+                    </button>
+                ) : null}
+            </div>
+        </div>
+    </div>
+);
+
+// --- 추가: 우측 셀(7) → 9:1 분할 + 9 내부 6등분 그리드 + 상세 버튼 ---
+export const RightControlsWithDetail: React.FC<{
+    // 6등분 그리드에 들어갈 컨트롤 아이템들(라벨/셀렉트/인풋/칩 등)
+    children: React.ReactNode;
+    onToggleDetail?: () => void;
+    detailActive?: boolean;
+}> = ({ children, onToggleDetail, detailActive }) => (
+    <div className="col-span-7 grid grid-cols-10 items-center gap-[4px] min-w-0">
+        {/* 9 : 컨트롤 영역(내부 6칸 균등) */}
+        <div className="col-span-9 min-w-0">
+            <div className="grid grid-cols-6 gap-[6px] min-w-0 items-center">
+                {children}
+            </div>
+        </div>
+        {/* 1 : 상세 버튼 */}
+        <div className="col-span-1 flex justify-center">
+            {onToggleDetail ? (
+                <button
+                    className={`p-1 rounded hover:bg-neutral-100 ${detailActive ? 'text-blue-600' : ''}`}
+                    title="상세"
+                    onClick={onToggleDetail}
+                    type="button"
+                >
+                    {detailActive ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+            ) : null}
+        </div>
+    </div>
+);
+
+// --- 선택: 6칸 그리드 안에서 각 셀(컨트롤)의 최소/최대폭을 일관되게 ---
+export const ControlCell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <div className="min-w-0 overflow-hidden">{children}</div>
+);
+
 export const SectionFrame: React.FC<{
     title: string;
     Icon?: React.ComponentType<{ size?: number; className?: string }>;

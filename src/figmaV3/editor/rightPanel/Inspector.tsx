@@ -13,6 +13,7 @@ import {SaveAsComponentDialog} from './sections/SaveAsComponentDialog';
 import {RightDomain, useRightControllerFactory} from '../../controllers/right/RightControllerFactory';
 import {InspectorStatusPanel} from "@/figmaV3/editor/rightPanel/sections/InspectorStatusPanel";
 import StyleInspector from "@/figmaV3/editor/rightPanel/StyleInspector";
+import CommonInspector from "@/figmaV3/editor/rightPanel/CommonInspector";
 
 function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     // def는 필요 시 참조만, propsSchema 유무와 무관하게 PropsAutoSection을 항상 렌더
@@ -21,12 +22,16 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     return (
         <>
             {/* Common: 헤더와 바로 붙도록 첫 섹션은 여백 제거 */}
+            {/*
             <CommonSection nodeId={nodeId} defId={defId} />
-
+            */}
             {/* Props — ✅ 항상 렌더: 스키마 없어도 내부에서 As(Tag)/Tag Attrs UI 표시 */}
+            {/*
             <div className="mt-4">
                 <PropsAutoSection nodeId={nodeId} defId={defId} />
             </div>
+            */}
+            <CommonInspector nodeId={nodeId} defId={defId} />
             {/* Styles — 베이스 시그니처는 props 없음 */}
             {/*
             <div className="mt-4">
