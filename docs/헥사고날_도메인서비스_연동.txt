@@ -1,0 +1,55 @@
+전체 관계(최종 아키텍처)
+
+[View 컴포넌트]
+   ↑  읽기: Reader 훅(useStoreSelector 기반)
+   ↓  쓰기: Writer(Controller.writer)
+[Controllers (도메인별)]
+   ↕  Engine API(파사드)만 사용 (getState/update/subscribe, domain ops)
+[Engine (파사드)]
+   ↕  editStore(zustand 내부 구현) ← 내부로 숨김
+
+
+•   editStore: 상태의 실제 저장소(내부 구현). 외부 직접 접근 금지(점진 차단).
+•   EditorEngine: editStore를 감싼 단일 창구. getState / update / subscribe 와 도메인 오퍼레이션(예: pages, nodes 등)을 제공.
+•   Controllers: 도메인별 Reader/Writer. 오직 Engine API만 사용해 읽고/쓴다. View는 Controller만 의존.   
+
+
+권장 계약(재확인)
+    •   Engine(파사드)
+    •   getState(): State
+    •   update(mutator: (draft: State) => void): void
+    •   subscribe(listener: () => void): Unsubscribe
+    •   (+) 도메인 오퍼레이션(선택): pages.getAll(), nodes.move(), 등
+    •   Writer: 엔진의 update만 호출해서 상태 변경. 리렌더는 구독으로만 일어난다.
+    •   Reader(셀렉터 훅): useStoreSelector(selector)로 필요한 조각만 구독.
+    •   View: const { reader, writer } = useXxxController();
+
+
+
+UI / View
+   │  (오직 Controller만 호출)
+   ▼
+Controller (Application Layer)
+   ├─ Reader hooks: Engine.getState/subscribe → selectors(State → Result)
+   └─ Writer methods: Engine.update / domain operations
+   │
+   ├───────────── uses (read) ───────────► Selectors (Domain Logic, pure)
+   │                                       - 순수 함수: State → Result
+   │                                       - I/O, 상태 변경 없음
+   │
+   └────────────── calls (read/write) ───► EditorEngine (Facade)
+                                           - getState / update / subscribe
+                                           - 도메인 오퍼레이션
+                                           │
+                                           ▼
+                                  Store / Repository / I/O
+                                  (Zustand editStore, 영속/외부 연동)
+
+Ports / Adapters ◄──────────────► Domain Services / Entities
+(HTTP, 파일 등 경계)              (비즈니스 규칙/검증/명령)
+
+다이어그램은 우리가 정리한 개념 그대로 반영합니다:
+	•	View ↔ Controller만 직접 통신
+	•	Controller는 읽기 시 Engine에서 state를 가져와 **selectors(순수 함수)**로 파생값 계산
+	•	Controller는 쓰기 시 Engine.update/도메인 오퍼레이션 호출
+	•	Engine은 저장소를 은닉하고 파사드 역할을 수행

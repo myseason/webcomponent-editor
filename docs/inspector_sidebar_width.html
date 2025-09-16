@@ -1,0 +1,496 @@
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Inspector Sidebar Prototype (3:7 • 6:2:2 • 7-cols)</title>
+<style>
+  :root{
+    /* 여기 값을 현재 Inspector의 실제 너비와 동일하게 맞춰 쓰세요. */
+    --inspector-width: 360px;
+    --bg:#0f1115; --panel:#151923; --panel-2:#1b2130; --text:#e6e8ef; --muted:#9aa4b2;
+    --accent:#5b8cff; --border:#2a3245; --chip:#20283a; --danger:#ff5d5d;
+  }
+  html,body{background:var(--bg); color:var(--text); font-family:ui-sans-serif,system-ui,Pretendard,Apple SD Gothic Neo,Segoe UI,Roboto,Helvetica,Arial; margin:0;}
+  .dock{position:relative; height:100vh; display:flex; justify-content:flex-end;}
+  .inspector{width:var(--inspector-width); height:100%; background:var(--panel); border-left:1px solid var(--border); overflow:auto;}
+  .headbar{position:sticky; top:0; z-index:1; background:var(--panel-2); border-bottom:1px solid var(--border); padding:8px 10px; font-size:12px; letter-spacing:.2px}
+  .section-title{margin:10px 0 0; padding:8px 10px; font-size:12px; color:#c6d1e4; border-top:1px solid var(--border); background:rgba(255,255,255,0.02)}
+  .rows{padding:6px 8px}
+  /* row: 3:7 columns */
+  .row{display:grid; grid-template-columns:3fr 7fr; gap:8px; align-items:center; padding:6px; border-bottom:1px dashed rgba(255,255,255,0.06)}
+  .row:last-child{border-bottom:0}
+  /* left cell: 6:2:2 */
+  .left{display:grid; grid-template-columns:6fr 2fr 2fr; gap:6px; align-items:center}
+  .style-name{font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .icon-btn{display:inline-grid; place-items:center; width:24px; height:24px; border:1px solid var(--border); border-radius:8px; background:var(--chip); cursor:pointer}
+  .icon-btn:hover{border-color:#3a4a6a}
+  .icon{width:16px; height:16px; display:block; fill:#c9d4e5}
+  .lock[data-state="on"]{background:var(--danger); border-color:#ff8080}
+  .lock[data-state="on"] .icon{fill:#fff}
+  /* right cell: 7 equal cols */
+  .right{display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:6px; align-items:center}
+  .right > .label{font-size:10.5px; color:var(--muted); align-self:center; white-space:nowrap}
+  .input, select{width:100%; background:#0e1320; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 8px; font-size:12px}
+  .chip{display:inline-flex; align-items:center; justify-content:center; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:var(--chip); font-size:12px; cursor:pointer; user-select:none}
+  .chip[data-active="true"]{background:var(--accent); color:white; border-color:transparent}
+  .btn{padding:6px 8px; border:1px solid var(--border); background:var(--chip); color:var(--text); border-radius:8px; font-size:12px; cursor:pointer}
+  .spacer{height:1px}
+  .col-span-2{grid-column: span 2}
+  .col-span-3{grid-column: span 3}
+  .col-span-4{grid-column: span 4}
+</style>
+</head>
+<body>
+<div class="dock">
+  <aside class="inspector" role="complementary" aria-label="Inspector Sidebar">
+
+    <div class="headbar">Inspector</div>
+
+    <div class="section-title">Layout</div>
+    <div class="rows">
+
+      <!-- Row: display -->
+      <div class="row">
+        <div class="left">
+          <div class="style-name">display</div>
+          <!-- Detail icon (sliders) -->
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="display" aria-label="Detail">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <!-- Lock icon (closed/open) -->
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="display" aria-label="Lock display">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">block</div><div class="chip" data-radio="display" data-value="block">block</div>
+          <div class="label">inline</div><div class="chip" data-radio="display" data-value="inline">inline</div>
+          <div class="label">flex</div><div class="chip" data-radio="display" data-value="flex">flex</div>
+          <div class="label">grid</div><div class="chip" data-radio="display" data-value="grid">grid</div>
+        </div>
+      </div>
+
+      <!-- Row: size (width/height + 상세 토글) -->
+      <div class="row">
+        <div class="left">
+          <div class="style-name">size</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-target="#row-size-detail" aria-label="Detail size">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="width" aria-label="Lock size">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">width</div><input class="input" placeholder="100% / 320px"/>
+          <div class="label">height</div><input class="input" placeholder="auto / 48px"/>
+          <div class="spacer"></div><button class="btn" data-toggle="#row-size-detail">상세</button>
+        </div>
+      </div>
+
+      <!-- Row: size detail (min/max 4종) -->
+      <div class="row" id="row-size-detail" style="display:none">
+        <div class="left">
+          <div class="style-name">size detail</div>
+          <div></div><div></div>
+        </div>
+        <div class="right">
+          <div class="label">minW</div><input class="input" placeholder="0"/>
+          <div class="label">maxW</div><input class="input" placeholder="none"/>
+          <div class="label">minH</div><input class="input" placeholder="0"/>
+          <div class="label">maxH</div><input class="input" placeholder="none"/>
+        </div>
+      </div>
+
+      <!-- Row: overflow / visibility -->
+      <div class="row">
+        <div class="left">
+          <div class="style-name">overflow</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="overflow" aria-label="Detail overflow">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="overflow" aria-label="Lock overflow">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">overflow</div>
+          <select class="input">
+            <option>inherit</option><option>visible</option><option>hidden</option><option>scroll</option><option>auto</option>
+          </select>
+          <div class="label">visibility</div>
+          <select class="input">
+            <option>inherit</option><option>visible</option><option>hidden</option>
+          </select>
+          <div class="col-span-3"></div>
+        </div>
+      </div>
+
+      <!-- Row: flex (조건부) -->
+      <div class="row" data-conditional="display:flex" id="row-flex" style="display:none">
+        <div class="left">
+          <div class="style-name">flex</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="flex" aria-label="Detail flex">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="flexDirection" aria-label="Lock flex">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">direction</div>
+          <select class="input">
+            <option>row</option><option>row-reverse</option><option>column</option><option>column-reverse</option>
+          </select>
+          <div class="label">wrap</div>
+          <select class="input">
+            <option>nowrap</option><option>wrap</option><option>wrap-reverse</option>
+          </select>
+          <div class="label">justify</div>
+          <select class="input">
+            <option>flex-start</option><option>center</option><option>flex-end</option>
+            <option>space-between</option><option>space-around</option><option>space-evenly</option>
+          </select>
+          <div class="label">align-items</div>
+          <select class="input">
+            <option>stretch</option><option>flex-start</option><option>center</option><option>flex-end</option><option>baseline</option>
+          </select>
+          <div class="label">align-content</div>
+          <select class="input">
+            <option>stretch</option><option>flex-start</option><option>center</option><option>flex-end</option>
+            <option>space-between</option><option>space-around</option>
+          </select>
+          <div class="label">gap</div><input class="input" placeholder="8px"/>
+        </div>
+      </div>
+
+      <!-- Row: grid (조건부) -->
+      <div class="row" data-conditional="display:grid" id="row-grid" style="display:none">
+        <div class="left">
+          <div class="style-name">grid</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="grid" aria-label="Detail grid">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="gridTemplateColumns" aria-label="Lock grid">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">columns</div><input class="input" placeholder="repeat(3,1fr)"/>
+          <div class="label">rows</div><input class="input" placeholder="auto 1fr auto"/>
+          <div class="label">auto-flow</div>
+          <select class="input"><option></option><option>row</option><option>column</option><option>dense</option><option>row dense</option><option>column dense</option></select>
+          <div class="label">gap</div><input class="input" placeholder="8px"/>
+          <div class="col-span-1"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="section-title">Position</div>
+    <div class="rows">
+
+      <div class="row">
+        <div class="left">
+          <div class="style-name">position</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="position" aria-label="Detail position">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="position" aria-label="Lock position">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">mode</div>
+          <div class="chip" data-radio="position" data-value="">static</div>
+          <div class="chip" data-radio="position" data-value="relative">relative</div>
+          <div class="chip" data-radio="position" data-value="absolute">absolute</div>
+          <div class="chip" data-radio="position" data-value="fixed">fixed</div>
+          <div class="chip" data-radio="position" data-value="sticky">sticky</div>
+          <div></div>
+        </div>
+      </div>
+
+      <div class="row" id="row-offsets" style="display:none">
+        <div class="left">
+          <div class="style-name">offsets</div>
+          <div></div><div></div>
+        </div>
+        <div class="right">
+          <div class="label">top</div><input class="input" placeholder="auto / 8px"/>
+          <div class="label">right</div><input class="input" placeholder="auto / 8px"/>
+          <div class="label">bottom</div><input class="input" placeholder="auto / 8px"/>
+          <div class="label">left</div><input class="input" placeholder="auto / 8px"/>
+          <div></div><div></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="left">
+          <div class="style-name">z-index</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="zIndex" aria-label="Detail zIndex">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="zIndex" aria-label="Lock zIndex">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">z-index</div><input class="input" placeholder="auto / 10"/>
+          <div class="col-span-4"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="section-title">Typography</div>
+    <div class="rows">
+
+      <div class="row">
+        <div class="left">
+          <div class="style-name">font-family</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="fontFamily" aria-label="Detail font-family">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="fontFamily" aria-label="Lock font-family">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">family</div><input class="input" placeholder="'Inter', system-ui"/>
+          <div class="col-span-4"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="left">
+          <div class="style-name">size/weight</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="fontSize" aria-label="Detail font-size">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="fontSize" aria-label="Lock size/weight">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">font-size</div><input class="input" placeholder="16px"/>
+          <div class="label">weight</div>
+          <select class="input"><option></option><option>400</option><option>500</option><option>600</option><option>700</option><option>800</option><option>bold</option></select>
+          <div class="col-span-3"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="left">
+          <div class="style-name">line/letter</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="lineHeight" aria-label="Detail line/letter">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="lineHeight" aria-label="Lock line/letter">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">line-height</div><input class="input" placeholder="1.5 / 24px"/>
+          <div class="label">letter-spacing</div><input class="input" placeholder="0 / 0.02em"/>
+          <div class="col-span-3"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="left">
+          <div class="style-name">color</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="color" aria-label="Detail color">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="color" aria-label="Lock color">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">color</div><input class="input" type="color" value="#333333"/>
+          <div class="col-span-4"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="left">
+          <div class="style-name">text-align</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="textAlign" aria-label="Detail text-align">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="textAlign" aria-label="Lock text-align">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">align</div>
+          <div class="chip" data-radio="textAlign" data-value="left">left</div>
+          <div class="chip" data-radio="textAlign" data-value="center">center</div>
+          <div class="chip" data-radio="textAlign" data-value="right">right</div>
+          <div class="chip" data-radio="textAlign" data-value="justify">justify</div>
+          <div></div><div></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="left">
+          <div class="style-name">text meta</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="textTransform" aria-label="Detail text meta">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="textTransform" aria-label="Lock text meta">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">transform</div>
+          <select class="input"><option></option><option>capitalize</option><option>uppercase</option><option>lowercase</option></select>
+          <div class="label">decoration</div>
+          <select class="input"><option></option><option>underline</option><option>line-through</option><option>overline</option></select>
+          <div class="label">white-space</div>
+          <select class="input"><option></option><option>nowrap</option><option>pre</option><option>pre-wrap</option><option>pre-line</option><option>break-spaces</option></select>
+          <div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="section-title">Background</div>
+    <div class="rows">
+
+      <div class="row">
+        <div class="left">
+          <div class="style-name">background</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="background" aria-label="Detail background">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="background" aria-label="Lock background">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">shorthand</div><input class="input" placeholder="color image repeat position / size" class="col-span-3"/>
+          <div class="col-span-3"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="left">
+          <div class="style-name">bg-color</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="backgroundColor" aria-label="Detail bg-color">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="backgroundColor" aria-label="Lock bg-color">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">color</div><input class="input" type="color" value="#ffffff"/>
+          <div class="col-span-4"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="left">
+          <div class="style-name">bg-image</div>
+          <button class="icon-btn" title="Detail" data-role="detail" data-key="backgroundImage" aria-label="Detail bg-image">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg>
+          </button>
+          <button class="icon-btn lock" title="Lock" data-role="lock" data-key="backgroundImage" aria-label="Lock bg-image">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg>
+          </button>
+        </div>
+        <div class="right">
+          <div class="label">image</div><input class="input" placeholder="url(...) or gradient(...)"/>
+          <div class="label">use</div><button class="btn" id="btn-use-bg">ON</button>
+          <div class="col-span-3"></div>
+        </div>
+      </div>
+
+      <div class="row" id="row-bg-psr" style="display:none">
+        <div class="left">
+          <div class="style-name">bg pos/size/repeat</div>
+          <div></div><div></div>
+        </div>
+        <div class="right">
+          <div class="label">position</div><input class="input" placeholder="center"/>
+          <div class="label">size</div><select class="input"><option></option><option>cover</option><option>contain</option></select>
+          <div class="label">repeat</div><select class="input"><option></option><option>no-repeat</option><option>repeat</option><option>repeat-x</option><option>repeat-y</option><option>space</option><option>round</option></select>
+          <div></div>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+</div>
+
+<script>
+(function(){
+  const $$ = (sel, root=document)=>Array.from(root.querySelectorAll(sel));
+
+  // chip radios
+  $$('.chip[data-radio="display"]').forEach(ch=>{
+    ch.addEventListener('click', ()=>{
+      const val = ch.getAttribute('data-value');
+      $$('.chip[data-radio="display"]').forEach(c=>c.dataset.active = (c===ch ? 'true':'false'));
+      document.getElementById('row-flex').style.display = (val==='flex') ? '' : 'none';
+      document.getElementById('row-grid').style.display = (val==='grid') ? '' : 'none';
+    });
+  });
+  $$('.chip[data-radio="display"]').find(c=>c.getAttribute('data-value')==='block')?.click();
+
+  // position offsets conditional
+  $$('.chip[data-radio="position"]').forEach(ch=>{
+    ch.addEventListener('click', ()=>{
+      const val = ch.getAttribute('data-value');
+      $$('.chip[data-radio="position"]').forEach(c=>c.dataset.active = (c===ch ? 'true':'false'));
+      document.getElementById('row-offsets').style.display = (val ? '' : 'none');
+    });
+  });
+  $$('.chip[data-radio="position"]').find(c=>c.textContent==='static')?.click();
+
+  // size detail toggle
+  document.querySelectorAll('[data-toggle="#row-size-detail"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const r = document.querySelector('#row-size-detail');
+      const show = r.style.display === 'none';
+      r.style.display = show ? '' : 'none';
+      btn.textContent = show ? '상세 닫기' : '상세';
+    });
+  });
+
+  // detail icon can also toggle detail target if present
+  document.querySelectorAll('[data-role="detail"][data-target]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const target = document.querySelector(btn.getAttribute('data-target'));
+      if(!target) return;
+      const show = target.style.display === 'none';
+      target.style.display = show ? '' : 'none';
+    });
+  });
+
+  // bg image use toggle
+  const useBgBtn = document.getElementById('btn-use-bg');
+  useBgBtn.addEventListener('click', ()=>{
+    const r = document.getElementById('row-bg-psr');
+    const show = r.style.display === 'none';
+    r.style.display = show ? '' : 'none';
+    useBgBtn.textContent = show ? 'OFF' : 'ON';
+  });
+
+  // lock button visual toggle (state only)
+  document.querySelectorAll('[data-role="lock"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const on = btn.getAttribute('data-state') === 'on';
+      btn.setAttribute('data-state', on ? 'off' : 'on');
+      btn.classList.toggle('lock', true);
+      // icon stays the same (closed lock). If needed, we could swap to open-lock path.
+    });
+  });
+})();
+</script>
+</body>
+</html>

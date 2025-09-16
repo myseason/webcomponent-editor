@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" />
+    </marker>
+    <style>
+      .box { fill: #ffffff; stroke: #111111; stroke-width: 2; rx: 10; ry: 10; }
+      .title { font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; }
+      .text { font-family: Arial, sans-serif; font-size: 14px; }
+      .arrow { stroke: #111111; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .note { font-family: Arial, sans-serif; font-size: 12px; fill: #333333; }
+      .section { font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; }
+    </style>
+  </defs>
+
+  <!-- Sections -->
+  <text x="120" y="40" class="section">UI Layer</text>
+  <text x="470" y="40" class="section">Application Layer</text>
+  <text x="820" y="40" class="section">Domain & Integration</text>
+  <text x="1080" y="40" class="section">Persistence</text>
+
+  <!-- View -->
+  <rect x="60" y="80" width="200" height="90" class="box"/>
+  <text x="80" y="110" class="title">View (UI)</text>
+  <text x="80" y="135" class="text">React components</text>
+  <text x="80" y="155" class="text">Only calls Controller</text>
+
+  <!-- Controller -->
+  <rect x="380" y="80" width="240" height="140" class="box"/>
+  <text x="400" y="110" class="title">Controller</text>
+  <text x="400" y="135" class="text">Reader hooks (read)</text>
+  <text x="400" y="155" class="text">Writer methods (write)</text>
+  <text x="400" y="175" class="text">Orchestrates use-cases</text>
+
+  <!-- Selectors -->
+  <rect x="360" y="260" width="280" height="150" class="box"/>
+  <text x="380" y="290" class="title">Selectors (Domain Logic)</text>
+  <text x="380" y="315" class="text">Pure functions: State → Result</text>
+  <text x="380" y="335" class="text">No I/O, no mutations</text>
+  <text x="380" y="355" class="text">Reusable across Controllers</text>
+
+  <!-- EditorEngine (Facade) -->
+  <rect x="700" y="80" width="260" height="150" class="box"/>
+  <text x="720" y="110" class="title">EditorEngine (Facade)</text>
+  <text x="720" y="135" class="text">getState / update / subscribe</text>
+  <text x="720" y="155" class="text">Domain operations</text>
+  <text x="720" y="175" class="text">Hides internal store</text>
+
+  <!-- Ports / Adapters -->
+  <rect x="700" y="260" width="260" height="150" class="box"/>
+  <text x="720" y="290" class="title">Ports / Adapters</text>
+  <text x="720" y="315" class="text">HTTP, files, integrations</text>
+  <text x="720" y="335" class="text">Outbound & inbound edges</text>
+
+  <!-- Domain Services / Entities -->
+  <rect x="700" y="460" width="260" height="150" class="box"/>
+  <text x="720" y="490" class="title">Domain Services / Entities</text>
+  <text x="720" y="515" class="text">Business rules & validation</text>
+  <text x="720" y="535" class="text">Called by Controller/Engine</text>
+
+  <!-- Store / Repository / I/O -->
+  <rect x="1000" y="260" width="220" height="350" class="box"/>
+  <text x="1020" y="290" class="title">Store / Repository / I/O</text>
+  <text x="1020" y="315" class="text">Zustand editStore</text>
+  <text x="1020" y="335" class="text">Persistence & side effects</text>
+
+  <!-- Arrows -->
+  <!-- View <-> Controller -->
+  <path d="M 260 125 L 380 125" class="arrow"/>
+  <path d="M 380 165 L 260 165" class="arrow"/>
+  <text x="270" y="118" class="note">UI events</text>
+  <text x="270" y="178" class="note">ViewModels</text>
+
+  <!-- Controller -> Engine (write) -->
+  <path d="M 620 140 L 700 140" class="arrow"/>
+  <text x="630" y="130" class="note">update / ops</text>
+
+  <!-- Controller -> Selectors (read) -->
+  <path d="M 500 220 L 500 260" class="arrow"/>
+  <text x="510" y="245" class="note">State → Result</text>
+
+  <!-- Controller (read) -> Engine (getState/subscribe) -->
+  <path d="M 620 100 L 700 100" class="arrow"/>
+  <text x="630" y="90" class="note">getState/subscribe</text>
+
+  <!-- Engine -> Store -->
+  <path d="M 960 155 L 1000 310" class="arrow"/>
+  <text x="965" y="200" class="note">facade over store</text>
+
+  <!-- Ports/Adapters <-> Domain Services -->
+  <path d="M 830 410 L 830 460" class="arrow"/>
+  <path d="M 830 460 L 830 410" class="arrow"/>
+
+  <!-- Domain Services -> Store -->
+  <path d="M 960 520 L 1000 520" class="arrow"/>
+  <text x="965" y="510" class="note">persist, query</text>
+
+  <!-- Legend -->
+  <text x="60" y="710" class="note">
+    Notes:
+    1) View talks only to Controller. 
+    2) Controller reads via Engine (getState/subscribe) and computes via Selectors.
+    3) Controller writes via Engine.update/domain ops.
+    4) Selectors are pure (no I/O), reusable domain logic.
+    5) Engine hides the store (Zustand editStore).
+  </text>
+</svg>

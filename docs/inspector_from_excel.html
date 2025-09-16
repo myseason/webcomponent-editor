@@ -1,0 +1,834 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Inspector (from Excel spec)</title>
+<style>
+:root{--inspector-width:400px; --bg:#0f1115; --panel:#151923; --panel-2:#1b2130; --text:#e6e8ef; --muted:#9aa4b2; --accent:#5b8cff; --border:#2a3245; --chip:#20283a; --danger:#ff5d5d;}
+html,body{background:var(--bg); color:var(--text); font-family:ui-sans-serif,system-ui,Pretendard,Apple SD Gothic Neo,Segoe UI,Roboto,Helvetica,Arial; margin:0;}
+.dock{position:relative; height:100vh; display:flex; justify-content:flex-end;}
+.inspector{width:var(--inspector-width); height:100%; background:var(--panel); border-left:1px solid var(--border); overflow:auto;}
+.section-title{margin:10px 0 0; padding:8px 10px; font-size:12px; color:#c6d1e4; border-top:1px solid var(--border); background:rgba(255,255,255,0.02)}
+.rows{padding:6px 8px}
+.row{display:grid; grid-template-columns:3.5fr 6.5fr; gap:8px; align-items:center; padding:6px; border-bottom:1px dashed rgba(255,255,255,0.06)}
+.left{display:grid; grid-template-columns:4fr 4fr 2fr; gap:6px; align-items:center}
+.style-name{font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.icon-btn{display:inline-grid; place-items:center; width:24px; height:24px; border:1px solid var(--border); border-radius:8px; background:var(--chip); cursor:pointer}
+.icon{width:16px; height:16px; display:block; fill:#c9d4e5}
+.right{display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:6px; align-items:center}
+.right > .label{font-size:10.5px; color:var(--muted); align-self:center; white-space:nowrap}
+.input, select{width:100%; background:#0e1320; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 8px; font-size:12px}
+.chip{display:inline-flex; align-items:center; justify-content:center; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:var(--chip); font-size:12px; cursor:pointer; user-select:none}
+.btn{padding:6px 8px; border:1px solid var(--border); background:var(--chip); color:var(--text); border-radius:8px; font-size:12px; cursor:pointer}
+</style></head><body><div class="dock"><aside class="inspector"><div class="rows">
+    <div class="row">
+      <div class="left">
+        <div class="style-name">display</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <div class="chip">block</div><div class="chip">inline</div><div class="chip">flex</div><div class="chip">grid</div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">display</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <div class="chip">block</div><div class="chip">inline</div><div class="chip">flex</div><div class="chip">grid</div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">display</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <div class="chip">block</div><div class="chip">inline</div><div class="chip">flex</div><div class="chip">grid</div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">display</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <div class="chip">block</div><div class="chip">inline</div><div class="chip">flex</div><div class="chip">grid</div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="A"/><input class="input" placeholder="1"/><input class="input" placeholder="2"/><input class="input" placeholder="3"/><input class="input" placeholder="4"/><input class="input" placeholder="입력(text field)"/><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="A"/><input class="input" placeholder="1"/><input class="input" placeholder="2"/><input class="input" placeholder="3"/><input class="input" placeholder="4"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">size</div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <div class="label">width</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="label">height</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">size</div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <div class="label">width</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="label">height</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="label">minW</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="label">minH</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="label">maxW</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="label">maxH</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">overflow</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">Typography</div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">color</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" type="color" value="#666666"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">fontSize</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="size (preset, select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">fontWeight</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="size (preset, select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">fontStyle</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="fontStyle (preset, select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">fontFamily</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="fontFamily (preset, select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">textAlign</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="unset"/><div class="chip">left</div><div class="chip">center</div><div class="chip">right</div><div class="chip">justify</div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="기타 속성 (select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="속성 값 (text field)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">Position</div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">position</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="position (select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">offset</div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="offset (text field)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">offset</div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="offset (text field)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="top"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="chip">right</div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="bottom"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="chip">left</div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">z-index</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="preset (select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">Spacing</div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">margin</div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="0"/><input class="input" placeholder="2"/><input class="input" placeholder="4"/><input class="input" placeholder="8"/><input class="input" placeholder="12"/><input class="input" placeholder="textfield"/><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="top"/><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="chip">right</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="bottom"/><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="chip">left</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">padding</div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="0"/><input class="input" placeholder="2"/><input class="input" placeholder="4"/><input class="input" placeholder="8"/><input class="input" placeholder="12"/><input class="input" placeholder="textfield"/><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="top"/><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="chip">right</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="bottom"/><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="chip">left</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">Border</div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">border</div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="label">color</div><input class="input" type="color" value="#666666"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="type"/><input class="input" placeholder="select box"/><div class="col-span-1"></div><div class="label">weight</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">radius</div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="0"/><input class="input" placeholder="4"/><input class="input" placeholder="8"/><input class="input" placeholder="12"/><input class="input" placeholder="16"/><input class="input" placeholder="text field"/><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="top"/><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="chip">right</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="bottom"/><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="chip">left</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">Background</div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">background</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="select box (mode)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" type="color" value="#666666"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="label">size</div><input class="input" placeholder="select box"/><div class="col-span-1"></div><div class="label">repeat</div><input class="input" placeholder="select box"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="label">position</div><input class="input" placeholder="select box"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">Effects</div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">opacicy</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="0"/><input class="input" placeholder="0.25"/><input class="input" placeholder="0.5"/><input class="input" placeholder="0.75"/><input class="input" placeholder="1"/><input class="input" placeholder="select box"/><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">gradient</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="select box"/><div class="col-span-1"></div><input class="input" placeholder="select box"/><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="stops"/><input class="input" type="color" value="#666666"/><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><input class="input" placeholder="add 버튼"/><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="col-span-1"></div><input class="input" type="color" value="#666666"/><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><input class="input" placeholder="x 버튼"/><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">shadow</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="select box (preset)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="add shadow 버튼"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" type="color" value="#666666"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="x 버튼"/><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="select box"/><div class="col-span-1"></div><input class="input" placeholder="text field"/><input class="input" placeholder="text field"/><input class="input" placeholder="text field"/><input class="input" placeholder="text field"/><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">filter</div>
+        <div></div>
+        <button class="icon-btn" title="Lock" aria-label="Lock"><svg class="icon" viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="select box (preset)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="add fitler 버튼"/><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <button class="icon-btn" title="Detail" aria-label="Detail"><svg class="icon" viewBox="0 0 24 24"><path d="M10 6h10v2H10V6zm-6 0h2v2H4V6zm4 5h12v2H8v-2zm-4 0h2v2H4v-2zm6 5h8v2h-8v-2zm-6 0h2v2H4v-2z"/></svg></button>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="select box"/><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><input class="input" placeholder="x 버튼"/><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">Custom</div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name">items</div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="add items 버튼"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      <div class="left">
+        <div class="style-name"></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="right">
+        <input class="input" placeholder="text field"/><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="x 버튼"/><div class="col-span-1"></div>
+      </div>
+    </div>
+    </div></aside></div></body></html>
