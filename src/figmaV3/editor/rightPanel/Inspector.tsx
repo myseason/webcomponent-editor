@@ -4,14 +4,11 @@ import React, {useState} from 'react';
 import {getDefinition} from '../../core/registry';
 import type {Fragment, NodeId} from '../../core/types';
 
-import {CommonSection} from './sections/CommonSection';
-import {PropsAutoSection} from './sections/PropsAutoSection';
-import {StylesSection} from './sections/StylesSection';
 //import {SchemaEditor} from './sections/SchemaEditor';
 import {SaveAsComponentDialog} from './sections/SaveAsComponentDialog';
 
 import {RightDomain, useRightControllerFactory} from '../../controllers/right/RightControllerFactory';
-import {InspectorStatusPanel} from "@/figmaV3/editor/rightPanel/sections/InspectorStatusPanel";
+import {InspectorStatusPanel} from "./sections/InspectorStatusPanel";
 import StyleInspector from "./StyleInspector";
 import CommonInspector from "@/figmaV3/editor/rightPanel/CommonInspector";
 import OldStyleInspector from "@/figmaV3/editor/rightPanel/OldStyleInspector";
@@ -22,34 +19,9 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
 
     return (
         <>
-            {/* Common: 헤더와 바로 붙도록 첫 섹션은 여백 제거 */}
-            {/*
-            <CommonSection nodeId={nodeId} defId={defId} />
-            */}
-            {/* Props — ✅ 항상 렌더: 스키마 없어도 내부에서 As(Tag)/Tag Attrs UI 표시 */}
-            {/*
-            <div className="mt-4">
-                <PropsAutoSection nodeId={nodeId} defId={defId} />
-            </div>
-            */}
             <CommonInspector nodeId={nodeId} defId={defId} width={320} />
-            {/* Styles — 베이스 시그니처는 props 없음 */}
-            {/*
-            <div className="mt-4">
-                <StylesSection />
-            </div>
-            */}
             <StyleInspector nodeId={nodeId} defId={defId} width={320} />
-            {/*
-            <div className="mt-4">
-                <StyleInspector nodeId={nodeId} defId={defId} width={320} />
-            </div>
-            */}
-            {/*
-            <div className="mt-4">
-                <OldStyleInspector nodeId={nodeId} defId={defId} width={320} />
-            </div>
-            */}
+
             {/* Schema — 베이스 시그니처는 { nodeId }
             <div className="mt-4">
                 <SchemaEditor nodeId={nodeId} />
@@ -62,15 +34,8 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
 function ComponentInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     return (
         <>
-            <CommonSection nodeId={nodeId} defId={defId} />
-            <div className="mt-4">
-                <PropsAutoSection nodeId={nodeId} defId={defId} />
-            </div>
-
-            {/* StyleSection */}
-            <div className="mt-4">
-                <StylesSection />
-            </div>
+            <CommonInspector nodeId={nodeId} defId={defId} width={320} />
+            <StyleInspector nodeId={nodeId} defId={defId} width={320} />
             {/*
             <div className="mt-4">
                 <SchemaEditor nodeId={nodeId} />

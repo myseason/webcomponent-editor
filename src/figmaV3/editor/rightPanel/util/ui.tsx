@@ -2,8 +2,11 @@
 
 import React from 'react';
 import {
-    Lock, Unlock, ChevronDown, ChevronRight, Info,
+    Lock, Unlock, ChevronDown, ChevronRight, Info, Wand2,
 } from 'lucide-react';
+
+import { PropertySpec, StyleValues, SetStyleValue } from "./types";
+import {renderValueControl} from "./controls";
 
 export const RowShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div className="grid grid-cols-9 gap-[4px] py-[4px] px-[6px] border-b border-neutral-100 items-center overflow-x-hidden">
@@ -215,5 +218,90 @@ export const FileUploadButton: React.FC<{
                 <Icon size={14} />
             </label>
         </>
+    );
+};
+
+// ── 섹션 공통 블록 컴포넌트 ────────────────────────────────
+const DependentBlock: React.FC<{
+    title?: string;
+    propsMap: Record<string, PropertySpec>;
+    values: StyleValues;
+    setValue: SetStyleValue;
+    sectionKey: string;
+    disabled?: boolean;
+}> = ({ title, propsMap, values, setValue, sectionKey, disabled }) => {
+    const entries = Object.entries(propsMap);
+    if (entries.length === 0) return null;
+
+    return (
+        <div className="ml-4 border-l border-neutral-200 pl-3 mt-1">
+            {title ? <InlineInfo>{title}</InlineInfo> : null}
+            {entries.map(([k, p]) => {
+                const v = values[k];
+                return (
+                    <RowShell key={`dep:${sectionKey}:${k}`}>
+                        <LeftCell title={p.label?.ko ?? p.label?.en ?? k} tooltip={p.ui?.tooltip} />
+                        <RightCell>
+                            {renderValueControl(sectionKey, k, p, String(v ?? ''), (nv) => setValue(k, nv), disabled)}
+                        </RightCell>
+                    </RowShell>
+                );
+            })}
+        </div>
+    );
+};
+
+//----------------------------------------------------------------------
+// DetailBlock
+//---------------------------------------------------------------------
+export const DetailBlock: React.FC<{
+    propsMap?: Record<string, PropertySpec>;
+    values: StyleValues;
+    setValue: SetStyleValue;
+    sectionKey: string;
+    disabled?: boolean;
+    getDependentsFor?: (propKey: string, curVal?: string) => Array<{ title?: string; properties: Record<string, PropertySpec> }>;
+    variant?: 'plain' | 'smart'; // ★ 추가
+}> = ({ propsMap, values, setValue, sectionKey, disabled, getDependentsFor, variant = 'plain' }) => {
+    if (!propsMap) return null;
+    const entries = Object.entries(propsMap);
+    if (entries.length === 0) return null;
+
+    return (
+        <div className="ml-4 border-l border-dashed border-neutral-200 pl-3 mt-2">
+            {variant === 'smart' && (
+                <div className="text-[10px] text-neutral-500 mb-1 flex items-center gap-1">
+                    <Wand2 size={12} />
+                    상세
+                </div>
+            )}
+
+            {entries.map(([k, p]) => {
+                const v = values[k];
+                return (
+                    <div key={`detail:${sectionKey}:${k}`}>
+                        <RowShell>
+                            <LeftCell title={p.label?.ko ?? p.label?.en ?? k} tooltip={p.ui?.tooltip} />
+                            <RightCell>
+                                {renderValueControl(sectionKey, k, p, String(v ?? ''), (nv) => setValue(k, nv), disabled)}
+                            </RightCell>
+                        </RowShell>
+
+                        {getDependentsFor &&
+                            getDependentsFor(k, String(v ?? ''))?.map((dg, idx) => (
+                                <DependentBlock
+                                    key={`detail-dep:${sectionKey}:${k}:${idx}`}
+                                    title={dg.title}
+                                    propsMap={dg.properties}
+                                    values={values}
+                                    setValue={setValue}
+                                    sectionKey={sectionKey}
+                                    disabled={disabled}
+                                />
+                            ))}
+                    </div>
+                );
+            })}
+        </div>
     );
 };

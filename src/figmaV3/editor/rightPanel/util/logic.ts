@@ -1,6 +1,6 @@
 'use client';
 
-import type { LocaleLabel, Option, PropertySpec, WhenExpr } from './InspectorStyle';
+import type { LocaleLabel, Option, PropertySpec, WhenExpr } from './types';
 
 export type Context = { isContainer?: boolean; parentDisplay?: string | number | boolean };
 

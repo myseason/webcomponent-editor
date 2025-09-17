@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
-import type { PropertySpec } from './InspectorStyle';
 import { ImageUp } from 'lucide-react';
-import { getIconFor } from './InspectorStyleIcons';
+
+import type { PropertySpec } from './types';
+import { getIconFor } from '../util/inspectorIcons';
 import { freeInputClass, getOptions, normalizeColor } from './logic';
 import { FileUploadButton } from './ui';
 
@@ -28,6 +29,117 @@ function resolveIconByKey(
     // value-only 힌트로 처리
     return getIconFor(fallbackGroup, propKey, h);
 }
+
+type RatioSpec = {
+    control: 'ratio';
+    placeholder?: string;
+    presets?: Array<{ value: string; label?: string }>;
+    ui?: { size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' };
+};
+
+// ─────────────────────────────────────────────────────────────
+// RatioControl: "width/height" 형태 전용 UI
+// ─────────────────────────────────────────────────────────────
+const RatioControl: React.FC<{
+    value: string;
+    onChange: (v: string) => void;
+    spec: RatioSpec;
+    disabled?: boolean;
+}> = ({ value, onChange, spec, disabled }) => {
+    // value 예: "16/9" | "1/1" | "" 등
+    const parse = React.useCallback((raw: string) => {
+        const t = (raw || '').trim();
+        if (!t) return { a: '', b: '' };
+        const m = t.split('/');
+        return { a: m[0] ?? '', b: m[1] ?? '' };
+    }, []);
+
+    const { a: initA, b: initB } = React.useMemo(() => parse(value), [value, parse]);
+    const [a, setA] = React.useState(initA);
+    const [b, setB] = React.useState(initB);
+
+    // 외부 value 변화에 동기화
+    React.useEffect(() => {
+        const { a: na, b: nb } = parse(value);
+        setA(na);
+        setB(nb);
+    }, [value, parse]);
+
+    const commit = React.useCallback(
+        (na: string, nb: string) => {
+            const sa = String(na ?? '').trim();
+            const sb = String(nb ?? '').trim();
+            if (!sa && !sb) {
+                onChange('');
+                return;
+            }
+            if (sa && !sb) {
+                onChange(`${sa}/`); // 미완성도 반영(원하면 '' 처리로 바꿔도 됨)
+                return;
+            }
+            if (!sa && sb) {
+                onChange(`/${sb}`);
+                return;
+            }
+            onChange(`${sa}/${sb}`);
+        },
+        [onChange]
+    );
+
+    const size = spec.ui?.size ?? 'xs';
+    const sizeCls =
+        size === 'xs' ? 'h-6 text-[11px]' :
+            size === 'sm' ? 'h-7 text-[12px]' :
+                size === 'md' ? 'h-8 text-[13px]' :
+                    size === 'lg' ? 'h-9 text-[14px]' : 'h-10 text-[14px]';
+
+    return (
+        <div className="flex items-center gap-1">
+            {/* 프리셋 칩(선택) */}
+            {Array.isArray(spec.presets) && spec.presets.length > 0 && (
+                <div className="ml-1 flex flex-wrap gap-1">
+                    {spec.presets.map((p, idx) => (
+                        <button
+                            key={`ratio:preset:${idx}:${p.value}`}
+                            type="button"
+                            className={`px-1.5 ${sizeCls} leading-none border border-neutral-200 rounded hover:bg-neutral-50 disabled:opacity-50`}
+                            onClick={() => onChange(p.value)}
+                            disabled={disabled}
+                            title={p.value}
+                        >
+                            {p.label ?? p.value}
+                        </button>
+                    ))}
+                </div>
+            )}
+            <input
+                className={`${sizeCls} px-1 border border-neutral-200 rounded w-10 min-w-0`}
+                inputMode="numeric"
+                placeholder="W"
+                value={a}
+                onChange={(e) => {
+                    const nv = e.currentTarget.value.replace(/[^\d.]/g, '');
+                    setA(nv);
+                    commit(nv, b);
+                }}
+                disabled={disabled}
+            />
+            <div className="px-1 text-neutral-500">/</div>
+            <input
+                className={`${sizeCls} px-1 border border-neutral-200 rounded w-10 min-w-0`}
+                inputMode="numeric"
+                placeholder="H"
+                value={b}
+                onChange={(e) => {
+                    const nv = e.currentTarget.value.replace(/[^\d.]/g, '');
+                    setB(nv);
+                    commit(a, nv);
+                }}
+                disabled={disabled}
+            />
+        </div>
+    );
+};
 
 /** 값 컨트롤 렌더러 */
 export function renderValueControl(
@@ -207,6 +319,18 @@ export function renderValueControl(
                     disabled={disabled}
                 />
             </div>
+        );
+    }
+
+    // RATIO
+    if(spec.control === 'ratio') {
+        return (
+            <RatioControl
+                value={value ?? ''}
+                onChange={onChange}
+                spec={spec as RatioSpec}
+                disabled={disabled}
+            />
         );
     }
 

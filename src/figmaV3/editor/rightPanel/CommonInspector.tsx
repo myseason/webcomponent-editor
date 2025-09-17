@@ -21,7 +21,7 @@ import {
     RowShell,
     LeftCell,
     RightCell,
-} from './styleInspector/ui';
+} from './util/ui';
 
 type AttrMap = Record<string, string>;
 
