@@ -39,11 +39,16 @@ export const NoticeRow: React.FC<{
     );
 };
 
-export const WarningRow: React.FC<{ message: string }> = ({ message }) => (
-    <div className="my-1 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800">
-        {message}
-    </div>
-);
+export const WarningRow: React.FC<{ message: string, withIcon?: boolean }> = ({ message, withIcon = false}) => {
+    return (
+        <div className="my-2 rounded border border-amber-200 bg-amber-50 text-amber-800 px-2 py-1.5 text-[11px] flex items-start gap-2">
+            {withIcon && (
+            <AlertTriangle size={14} className="mt-[1px]" />
+            )}
+            <div className="leading-4">{message}</div>
+        </div>
+    );
+};
 //----------------------------------------------------------------------------------------------------------------------
 // Inspector Row / Column 등등
 //----------------------------------------------------------------------------------------------------------------------

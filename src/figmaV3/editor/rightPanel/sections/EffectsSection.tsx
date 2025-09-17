@@ -302,8 +302,9 @@ const EffectsSection: React.FC<EffectsSectionProps> = ({
                         {renderValueControl(
                             'Effects',
                             'transformOrigin',
-                            makeInput('50% 50% / center'),
-                            String(values['transformOrigin'] ?? ''),
+                            makeInput('ex) 50% 50% / center'),
+                            //String(values['transformOrigin'] ?? ''),
+                            String(''),
                             (v) => setValue('transformOrigin', v),
                             locks['effects.transform']
                         )}
