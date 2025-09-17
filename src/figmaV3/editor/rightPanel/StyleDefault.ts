@@ -1,5 +1,5 @@
 // StyleInspector.tsx 상단 근처에 있는 INITIAL_DEFAULTS 를 아래로 교체하세요.
-export const INITIAL_DEFAULTS: Record<string, string> = {
+export const INITIAL_STYLE_DEFAULTS: Record<string, string> = {
     // ── Layout: Display & Flow
     display: 'block',
     overflow: 'visible',

@@ -37,7 +37,7 @@ import {
     Wand2,
 } from 'lucide-react';
 
-import { INITIAL_DEFAULTS } from './StyleDefault';
+import { INITIAL_STYLE_DEFAULTS } from './StyleDefault';
 
 // ─────────────────────────────────────────────────────────────
 // 공통 타입/유틸
@@ -1470,8 +1470,8 @@ export default function StyleInspector({
     React.useEffect(() => {
         setValues((prev) => {
             const next = { ...prev };
-            for (const k of Object.keys(INITIAL_DEFAULTS)) {
-                if (next[k] == null || next[k] === '') next[k] = INITIAL_DEFAULTS[k];
+            for (const k of Object.keys(INITIAL_STYLE_DEFAULTS)) {
+                if (next[k] == null || next[k] === '') next[k] = INITIAL_STYLE_DEFAULTS[k];
             }
             // select/chips 몇 가지 안전 기본
             if (!next.boxSizing) next.boxSizing = 'content-box';
