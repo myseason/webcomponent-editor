@@ -22,6 +22,8 @@ import {
     // Size
     Maximize, Minimize,
 
+    // Typography font-style
+    ItalicIcon as ItalicFontStyle, Type as NormalFontStyle,
     // Typography text-align
     AlignLeft, AlignCenter, AlignRight, AlignJustify,
     CaseLower, CaseSensitive, CaseUpper,
@@ -166,6 +168,14 @@ const ICONS: Record<string, IconCmp> = {
     [key('typography', 'fontSize')]: Type,
     [key('typography', 'font-weight')]: Type,
     [key('typography', 'fontWeight')]: Type,
+
+    // font-style
+    [key('typography', 'font-style')]: Type,
+    [key('typography', 'fontStyle')]: Type,
+    [key('typography', 'font-style', 'normal')]: NormalFontStyle,
+    [key('typography', 'font-style', 'italic')]: ItalicFontStyle,
+    [key('typography', 'fontStyle', 'normal')]: NormalFontStyle,
+    [key('typography', 'fontStyle', 'italic')]: ItalicFontStyle,
 
     // text-align (핵심 보강)
     [key('typography', 'textAlign', 'left')]: AlignLeft,

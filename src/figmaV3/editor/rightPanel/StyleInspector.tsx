@@ -36,8 +36,8 @@ import {
 import { INITIAL_STYLE_DEFAULTS } from './StyleDefault';
 
 
-type Values = Record<string, string | undefined>;
-type SetValue = (k: string, v: string | undefined) => void;
+type StyleValues = Record<string, string | undefined>;
+type SetStyleValue = (k: string, v: string | undefined) => void;
 // ─────────────────────────────────────────────────────────────
 // 공통 타입/유틸
 // ─────────────────────────────────────────────────────────────
@@ -58,19 +58,72 @@ const SECTION_ICONS: Record<string, React.ComponentType<{ size?: number; classNa
     Interactivity: Hand,
 };
 
-// border/outline: "<width> <style> <color>"
-const STYLE_TOKENS = new Set([
-    'none','hidden','solid','dashed','dotted','double','groove','ridge','inset','outset',
-]);
+// ── 커스텀 CSS 유틸 ─────────────────────────────────────────
+// 문자열 "a:b; c:d" → { a:'b', c:'d' }
+function parseCssDeclarations(input?: string): Record<string, string> {
+    const out: Record<string, string> = {};
+    const s = (input || '').trim();
+    if (!s) return out;
+    s.split(';').forEach(line => {
+        const t = line.trim();
+        if (!t) return;
+        const idx = t.indexOf(':');
+        if (idx < 0) return;
+        const k = t.slice(0, idx).trim();
+        const v = t.slice(idx + 1).trim();
+        if (k) out[k] = v;
+    });
+    return out;
+}
 
-// transition: "<prop> <duration> <timing>? <delay>?"
-const TIMINGS = new Set(['ease','linear','ease-in','ease-out','ease-in-out','step-start','step-end']);
+// "--a:1; --b:2" → { '--a':'1', '--b':'2' }
+function parseCssVars(input?: string): Record<string, string> {
+    const obj = parseCssDeclarations(input);
+    const out: Record<string,string> = {};
+    for (const [k, v] of Object.entries(obj)) {
+        if (k.startsWith('--')) out[k] = v;
+    }
+    return out;
+}
 
+// "data-id: hero; aria-hidden: true" → { 'data-id':'hero', 'aria-hidden':'true' }
+function parseAttrs(input?: string): Record<string, string> {
+    return parseCssDeclarations(input);
+}
+
+// Inspector 바깥(상위 편집기/미리보기)에서 values → 실제 style/className/attrs로 변환할 때
+function buildOutput(values: Record<string,string>) {
+    const mode = values.__ovrMode || 'merge';
+
+    const className = values.__ovrClass || '';
+    const rawCss = parseCssDeclarations(values.__ovrRawCss);
+    const cssVars = parseCssVars(values.__ovrCssVars);
+    const attrs = parseAttrs(values.__ovrAttrs);
+
+    const inspectorStyle = /* 기존 Inspector 로직으로 계산한 style 객체 */ {};
+
+    // CSS 변수는 style에 합치기
+    const varsAsStyle = Object.fromEntries(Object.entries(cssVars).map(([k, v]) => [k, v]));
+
+    let styleOut = {};
+    if (mode === 'override-all') {
+        styleOut = { ...varsAsStyle, ...rawCss }; // 커스텀만
+    } else if (mode === 'merge') {
+        styleOut = { ...inspectorStyle, ...varsAsStyle, ...rawCss }; // 커스텀이 우선
+    } else { // class-only
+        styleOut = inspectorStyle;
+    }
+
+    // 클래스는 항상 append (상위에서 기존 className이 있다면 병합)
+    const classOut = className; // 상위에서 join 처리
+
+    return { style: styleOut, className: classOut, attrs };
+}
 
 // ── 파싱/시드 유틸 ───────────────────────────────────────────
 const isEmpty = (v: unknown) => v == null || String(v).trim() === '';
 
-function setIfEmpty(values: Values, setValue: SetValue, key: string, next?: string) {
+function setIfEmpty(values: StyleValues, setValue: SetStyleValue, key: string, next?: string) {
     //if (!isEmpty(values[key]) || isEmpty(next)) return;
     setValue(key, next);
 }
@@ -78,14 +131,13 @@ function setIfEmpty(values: Values, setValue: SetValue, key: string, next?: stri
 // ─────────────────────────────────────────────────────────────
 //  Longhand 동기화 훅 + 간단 파서 유틸
 // ─────────────────────────────────────────────────────────────
-
 /** 상세가 열려 있는 동안, shorthand가 바뀌면 longhand를 동기화 */
 function useSyncLonghand(opts: {
     expanded: Record<string, boolean>;
     detailKey: string;                 // e.g. "Layout.padding"
-    shorthandKey: keyof Values;        // e.g. "padding"
-    values: Values;
-    setValue: SetValue;
+    shorthandKey: keyof StyleValues;        // e.g. "padding"
+    values: StyleValues;
+    setValue: SetStyleValue;
     parse: (raw?: string) => Record<string, string>;
     map: Record<string, string>;       // derivedKey -> longhandKey
 }) {
@@ -238,8 +290,8 @@ function parseBackground(raw: string) {
 const DependentBlock: React.FC<{
     title?: string;
     propsMap: Record<string, PropertySpec>;
-    values: Values;
-    setValue: SetValue;
+    values: StyleValues;
+    setValue: SetStyleValue;
     sectionKey: string;
     disabled?: boolean;
 }> = ({ title, propsMap, values, setValue, sectionKey, disabled }) => {
@@ -266,8 +318,8 @@ const DependentBlock: React.FC<{
 
 const DetailBlock: React.FC<{
     propsMap?: Record<string, PropertySpec>;
-    values: Values;
-    setValue: SetValue;
+    values: StyleValues;
+    setValue: SetStyleValue;
     sectionKey: string;
     disabled?: boolean;
     getDependentsFor?: (propKey: string, curVal?: string) => Array<{ title?: string; properties: Record<string, PropertySpec> }>;
@@ -386,8 +438,8 @@ const makeRatio = (
 // 섹션: Layout
 // ─────────────────────────────────────────────────────────────
 const LayoutSection: React.FC<{
-    values: Values;
-    setValue: SetValue;
+    values: StyleValues;
+    setValue: SetStyleValue;
     locks: Record<string, boolean>;
     onToggleLock: (k: string) => void;
     expanded: Record<string, boolean>;
@@ -890,8 +942,8 @@ const LayoutSection: React.FC<{
 // 섹션: Typography
 // ─────────────────────────────────────────────────────────────
 const TypographySection: React.FC<{
-    values: Values;
-    setValue: SetValue;
+    values: StyleValues;
+    setValue: SetStyleValue;
     locks: Record<string, boolean>;
     onToggleLock: (k: string) => void;
 }> = ({ values, setValue, locks, onToggleLock }) => {
@@ -921,7 +973,15 @@ const TypographySection: React.FC<{
                 <RowShell>
                     <LeftCell title="스타일" />
                     <RightCell>
-                        {renderValueControl('Typography', 'fontStyle', makeSelect(['normal', 'italic', 'oblique']), String(values['fontStyle'] ?? ''), (v) => setValue('fontStyle', v), locks['typo.font'])}
+                        {renderValueControl(
+                            'Typography',
+                            'fontStyle',
+                            makeIcons([
+                                { value: 'normal', iconKey: 'typography.fontStyle:normal' },
+                                { value: 'italic', iconKey: 'typography.fontStyle:italic' },
+                            ]),
+                            String(values['fontStyle'] ?? ''), (v) => setValue('fontStyle', v),
+                            locks['typo.font'])}
                     </RightCell>
                 </RowShell>
 
@@ -980,14 +1040,34 @@ const TypographySection: React.FC<{
                 <RowShell>
                     <LeftCell title="대소문자" />
                     <RightCell>
-                        {renderValueControl('Typography', 'textTransform', makeChips(['none', 'lowercase', 'uppercase', 'capitalize'], { size: 'sm' }), String(values['textTransform'] ?? ''), (v) => setValue('textTransform', v), locks['typo.text'])}
+                        {renderValueControl(
+                            'Typography',
+                            'textTransform',
+                            makeIcons([
+                                { value: 'none'},
+                                { value: 'inherit'},
+                                { value: 'capitalize', iconKey: 'typography.textTransform:capitalize' },
+                                { value: 'uppercase', iconKey: 'typography.textTransform:uppercase' },
+                                { value: 'lowercase', iconKey: 'typography.textTransform:lowercase' },
+                            ]),
+                            String(values['textTransform'] ?? ''), (v) => setValue('textTransform', v),
+                            locks['typo.text'])}
                     </RightCell>
                 </RowShell>
 
                 <RowShell>
                     <LeftCell title="장식" />
                     <RightCell>
-                        {renderValueControl('Typography', 'textDecoration', makeChips(['none', 'underline', 'line-through'], { size: 'sm' }), String(values['textDecoration'] ?? ''), (v) => setValue('textDecoration', v), locks['typo.text'])}
+                        {renderValueControl(
+                            'Typography',
+                            'textDecoration',
+                            makeIcons([
+                                { value: 'none', iconKey: 'typography.textDecoration:none' },
+                                { value: 'underline', iconKey: 'typography.textDecoration:underline' },
+                                { value: 'line-through', iconKey: 'typography.textDecoration:line-through' },
+                            ]),
+                            String(values['textDecoration'] ?? ''), (v) => setValue('textDecoration', v),
+                            locks['typo.text'])}
                     </RightCell>
                 </RowShell>
 
@@ -1038,8 +1118,8 @@ const TypographySection: React.FC<{
 // 섹션: Appearance
 // ─────────────────────────────────────────────────────────────
 const AppearanceSection: React.FC<{
-    values: Values;
-    setValue: SetValue;
+    values: StyleValues;
+    setValue: SetStyleValue;
     locks: Record<string, boolean>;
     onToggleLock: (k: string) => void;
     expanded: Record<string, boolean>;
@@ -1350,8 +1430,8 @@ const AppearanceSection: React.FC<{
 // 섹션: Effects
 // ─────────────────────────────────────────────────────────────
 const EffectsSection: React.FC<{
-    values: Values;
-    setValue: SetValue;
+    values: StyleValues;
+    setValue: SetStyleValue;
     locks: Record<string, boolean>;
     onToggleLock: (k: string) => void;
     expanded: Record<string, boolean>;
@@ -1660,8 +1740,8 @@ const EffectsSection: React.FC<{
 // 섹션: Interactivity
 // ─────────────────────────────────────────────────────────────
 const InteractivitySection: React.FC<{
-    values: Values;
-    setValue: SetValue;
+    values: StyleValues;
+    setValue: SetStyleValue;
     locks: Record<string, boolean>;
     onToggleLock: (k: string) => void;
 }> = ({ values, setValue, locks, onToggleLock }) => {
@@ -1696,6 +1776,112 @@ const InteractivitySection: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────
+// 커스텀/Advanced 섹선
+// ─────────────────────────────────────────────────────────────
+const AdvancedSection: React.FC<{
+    values: StyleValues;
+    setValue: (k: string, v: string) => void;
+    locks: Record<string, boolean>;
+    onToggleLock: (k: string) => void;
+}> = ({ values, setValue, locks, onToggleLock }) => {
+    const mode = values['__ovrMode'] ?? 'merge';
+    const className = values['__ovrClass'] ?? '';
+    const rawCss = values['__ovrRawCss'] ?? '';
+    const cssVars = values['__ovrCssVars'] ?? '';
+    const attrs = values['__ovrAttrs'] ?? '';
+
+    return (
+        <div className="border-b border-neutral-200">
+            <GroupHeader
+                label="Advanced / Overrides"
+                locked={!!locks['advanced.overrides']}
+                onToggleLock={() => onToggleLock('advanced.overrides')}
+            />
+
+            {/* 모드 선택 */}
+            <RowShell>
+                <LeftCell title="Mode" tooltip="커스텀 값 병합/대체/클래스만 추가" />
+                <RightCell>
+                    {renderValueControl(
+                        'Advanced',
+                        '__ovrMode',
+                        { control: 'select', options: [
+                                { value: 'merge', label: { ko: '병합(권장)' } },
+                                { value: 'override-all', label: { ko: '전면 대체' } },
+                                { value: 'class-only', label: { ko: '클래스만 추가' } },
+                            ], ui: { size: 'sm' } },
+                        mode,
+                        (v) => setValue('__ovrMode', v),
+                        locks['advanced.overrides']
+                    )}
+                </RightCell>
+            </RowShell>
+
+            {/* className */}
+            <RowShell>
+                <LeftCell title="className" tooltip="Tailwind/프로젝트 클래스 등" />
+                <RightCell>
+                    {renderValueControl(
+                        'Advanced',
+                        '__ovrClass',
+                        { control: 'input', placeholder: 'e.g. flex items-center gap-2', ui: { size: 'sm' } },
+                        className,
+                        (v) => setValue('__ovrClass', v),
+                        locks['advanced.overrides']
+                    )}
+                </RightCell>
+            </RowShell>
+
+            {/* Raw CSS */}
+            <RowShell>
+                <LeftCell title="Raw CSS" tooltip="세미콜론(;) 구분으로 선언 입력" />
+                <RightCell>
+                    {/* textarea 지원이 없다면 간단히 native로 처리 */}
+                    <div className="w-full">
+            <textarea
+                className="w-full h-24 px-2 py-1 border rounded outline-none text-[11px]"
+                placeholder="display:flex; gap:8px; background: url(/hero.png) center/cover no-repeat;"
+                value={rawCss}
+                onChange={(e) => setValue('__ovrRawCss', e.currentTarget.value)}
+                disabled={!!locks['advanced.overrides']}
+            />
+                        <div className="text-[10px] text-neutral-500 mt-1">예: <code>display:flex; gap:8px;</code></div>
+                    </div>
+                </RightCell>
+            </RowShell>
+
+            {/* CSS Variables */}
+            <RowShell>
+                <LeftCell title="CSS Vars" tooltip="--변수명: 값; 형식" />
+                <RightCell>
+          <textarea
+              className="w-full h-16 px-2 py-1 border rounded outline-none text-[11px]"
+              placeholder="--brand-color: #6b5cff; --radius: 8px;"
+              value={cssVars}
+              onChange={(e) => setValue('__ovrCssVars', e.currentTarget.value)}
+              disabled={!!locks['advanced.overrides']}
+          />
+                </RightCell>
+            </RowShell>
+
+            {/* data-/aria- Attributes */}
+            <RowShell>
+                <LeftCell title="Attributes" tooltip="data-*, aria-* 형식" />
+                <RightCell>
+          <textarea
+              className="w-full h-16 px-2 py-1 border rounded outline-none text-[11px]"
+              placeholder="data-test-id: hero; aria-hidden: true;"
+              value={attrs}
+              onChange={(e) => setValue('__ovrAttrs', e.currentTarget.value)}
+              disabled={!!locks['advanced.overrides']}
+          />
+                </RightCell>
+            </RowShell>
+        </div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────
 // 메인 컴포넌트
 // ─────────────────────────────────────────────────────────────
 export default function StyleInspector({
@@ -1707,11 +1893,16 @@ export default function StyleInspector({
     defId: string;
     width?: number;
 }) {
-    const [values, setValues] = React.useState<Values>({
+    const [values, setValues] = React.useState<StyleValues>({
         ...INITIAL_STYLE_DEFAULTS,
-        __parentDisplay: undefined,
+        __ovrMode: 'merge',
+        __ovrClass: '',
+        __ovrRawCss: '',
+        __ovrCssVars: '',
+        __ovrAttrs: '',
+        __parentDisplay: undefined as any,
     });
-    const setValue: SetValue = (k, v) => setValues((prev) => ({ ...prev, [k]: v }));
+    const setValue: SetStyleValue = (k, v) => setValues((prev) => ({ ...prev, [k]: v }));
 
     const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({
         Layout: false,
@@ -1808,6 +1999,21 @@ export default function StyleInspector({
                 onToggle={() => setCollapsed((p) => ({ ...p, Interactivity: !p.Interactivity }))}
             >
                 <InteractivitySection values={values} setValue={setValue} locks={locks} onToggleLock={toggleLock} />
+            </SectionFrame>
+
+            {/* Advanced */}
+            <SectionFrame
+                title="Advanced"
+                Icon={Sparkles}
+                collapsed={!!collapsed.Advanced}
+                onToggle={() => setCollapsed((p) => ({ ...p, Advanced: !p.Advanced }))}
+            >
+                <AdvancedSection
+                    values={values}
+                    setValue={setValue}
+                    locks={locks}
+                    onToggleLock={toggleLock}
+                />
             </SectionFrame>
         </div>
     );

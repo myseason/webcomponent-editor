@@ -42,9 +42,11 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
             <div className="mt-4">
                 <StyleInspector nodeId={nodeId} defId={defId} width={320} />
             </div>
+            {/*
             <div className="mt-4">
                 <OldStyleInspector nodeId={nodeId} defId={defId} width={320} />
             </div>
+            */}
             {/* Schema — 베이스 시그니처는 { nodeId }
             <div className="mt-4">
                 <SchemaEditor nodeId={nodeId} />
