@@ -7,7 +7,7 @@ import {
     RowShell,
     LeftCell,
     RightCell,
-    DetailBlock,        // 상세 블록 (util/ui)
+    DetailBlock, WarningRow,        // 상세 블록 (util/ui)
 } from '../util/ui';
 
 import { renderValueControl } from '../util/controls';
@@ -45,6 +45,12 @@ const EffectsSection: React.FC<EffectsSectionProps> = ({
                                                            openDetail,
                                                        }) => {
     const dk = (prop: string) => `Effects.${prop}`;
+
+    // transform-origin 안내
+    const noTransform = String(values.transform ?? '').trim() === '';
+    // transition 안내/비활성
+    const transProp = String(values.transitionProperty ?? '').trim();
+    const transitionBlocked = transProp === 'none';
 
     // ── longhand 동기화 훅 ────────────────────────────────────
     // filter: blur/brightness/…/drop-shadow
@@ -239,7 +245,6 @@ const EffectsSection: React.FC<EffectsSectionProps> = ({
                     locked={!!locks['effects.transform']}
                     onToggleLock={() => onToggleLock('effects.transform')}
                 />
-
                 {/* transform (메인 + 상세) */}
                 <RowShell>
                     <LeftCell title="변형" />
@@ -327,6 +332,9 @@ const EffectsSection: React.FC<EffectsSectionProps> = ({
                     locked={!!locks['effects.transition']}
                     onToggleLock={() => onToggleLock('effects.transition')}
                 />
+                {transitionBlocked && (
+                    <WarningRow message="transitionProperty가 none이면 전환 효과가 적용되지 않습니다." />
+                )}
 
                 {/* transition (메인 + 상세) */}
                 <RowShell>

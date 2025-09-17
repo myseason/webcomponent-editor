@@ -151,3 +151,61 @@ export function parseBackground(raw: string) {
 
     return out;
 }
+
+/** 공통 제약(비활성/숨김) 규칙들 */
+export const StyleGuards = {
+    // ── Layout / Sizing
+    isInline(values: StyleValues) {
+        return (values.display ?? '') === 'inline';
+    },
+    sizingDisabled(values: StyleValues) {
+        return StyleGuards.isInline(values);
+    },
+    sizingReason(values: StyleValues) {
+        if (StyleGuards.isInline(values)) {
+            return 'display: inline 상태에서는 너비/높이 및 최소/최대 크기, aspect-ratio 등이 적용되지 않습니다.';
+        }
+        return '';
+    },
+
+    // ── Position (예: position이 static이면 top/right/bottom/left 비활성)
+    positionStatic(values: StyleValues) {
+        return (values.position ?? 'static') === 'static';
+    },
+    positionOffsetsDisabled(values: StyleValues) {
+        return StyleGuards.positionStatic(values);
+    },
+    positionOffsetsReason(values: StyleValues) {
+        if (StyleGuards.positionStatic(values)) {
+            return 'position: static 상태에서는 top/right/bottom/left가 적용되지 않습니다.';
+        }
+        return '';
+    },
+
+    // ── Flex/Grid 아이템 표시 여부 (섹션에 이미 조건부 렌더가 있으면 사용 안 해도 무방)
+    isFlexItem(values: StyleValues) {
+        return (values.__parentDisplay ?? '') === 'flex';
+    },
+    isGridItem(values: StyleValues) {
+        return (values.__parentDisplay ?? '') === 'grid';
+    },
+};
+
+/** 도움: disabled 플래그 + 사유를 한 번에 계산 */
+export function disabledWithReason(
+    kind: 'sizing' | 'positionOffsets',
+    values: StyleValues,
+    locked?: boolean,
+) {
+    if (kind === 'sizing') {
+        const disabled = !!locked || StyleGuards.sizingDisabled(values);
+        const reason = StyleGuards.sizingReason(values);
+        return { disabled, reason: disabled && !locked ? reason : '' };
+    }
+    if (kind === 'positionOffsets') {
+        const disabled = !!locked || StyleGuards.positionOffsetsDisabled(values);
+        const reason = StyleGuards.positionOffsetsReason(values);
+        return { disabled, reason: disabled && !locked ? reason : '' };
+    }
+    return { disabled: !!locked, reason: '' };
+}

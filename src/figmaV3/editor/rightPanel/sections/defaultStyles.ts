@@ -24,6 +24,9 @@ export const INITIAL_STYLE_DEFAULTS: Record<string, string> = {
     gridRow: 'auto',
     justifySelf: 'auto',
 
+    // ── Layout: Position
+    position: 'relative',
+
     // ── Layout: Sizing
     width: 'auto',
     minWidth: '',

@@ -18,7 +18,7 @@ API_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${BRA
 
 # GitHub 토큰 (선택 사항, 환경 변수로 설정)
 # 90일 유효 : 2025.09.01 생성"
-GITHUB_TOKEN="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"
+GITHUB_TOKEN="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"
 
 # 출력 파일 초기화
 > "$OUTPUT_FILE"

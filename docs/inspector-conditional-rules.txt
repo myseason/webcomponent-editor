@@ -1,0 +1,141 @@
+INSPECTOR — CONDITIONAL RULES & WARNINGS
+=======================================
+
+This document lists UI rules for enabling/disabling/hiding style controls and the warning messages to surface when user-selected options limit other options. All keys are illustrative; wire them to your actual control keys.
+
+────────────────────────────────────────────────────────
+GLOBAL PRINCIPLES
+────────────────────────────────────────────────────────
+- When a control becomes inapplicable due to another selection, prefer DISABLE (keep visible) with a clear reason.
+- If a whole group is inapplicable (e.g., display:inline → width/height), hide the group and show one WarningRow above the group that explains.
+- Shorthand/Detail policy: when detail is opened, seed longhands from current shorthand; while detail is open, keep longhands in sync with shorthand (unless user edits the longhand).
+- Use a single guard utility to compute each control’s state: { visible: boolean, disabled: boolean, reason?: string }.
+- Reasons should be short, neutral, and actionable. Keep the same phrasing across sections.
+
+────────────────────────────────────────────────────────
+WARNING ROW (UI SPEC)
+────────────────────────────────────────────────────────
+- Container: class: bg-amber-50 border border-amber-200 text-amber-800 rounded p-2 text-[11px]
+- Icon (left): info/warning icon (e.g., lucide AlertTriangle 14px) in amber-700
+- Optional title (bold, 11px), then one line or two lines of body.
+- Example JSX:
+  <div className="rounded border bg-amber-50 border-amber-200 text-amber-800 p-2 flex gap-2 items-start">
+    <AlertTriangle size={14} className="mt-[2px]" />
+    <div>
+      <div className="font-semibold">이 설정은 현재 사용할 수 없습니다.</div>
+      <div className="opacity-80">display:inline 상태에선 width/height를 지정할 수 없어요.</div>
+    </div>
+  </div>
+
+────────────────────────────────────────────────────────
+LAYOUT
+────────────────────────────────────────────────────────
+1) Display: inline
+   - Disable: width, height, minWidth, maxWidth, minHeight, maxHeight, overflow, alignSelf (most browsers ignore sizing on inline elements; overflow applies to block/inline-block).
+   - Hide: aspectRatio (optional)
+   - Warn (ko): "display:inline 상태에선 크기 관련 속성(width/height 등)을 적용할 수 없어요."
+   - Hint (ko): "필요하다면 display:inline-block 또는 block으로 전환해 보세요."
+
+2) Display: flex (container)
+   - Enable: flexDirection, justifyContent, alignItems, alignContent, flexWrap, gap
+   - Hide: grid-only: gridTemplateColumns/Rows, justifyItems (container), alignItems (grid container variant), gridColumn/Row (item), justifySelf/alignSelf(grid item)
+   - Warn: when toggling from grid→flex: "그리드 관련 속성은 플렉스 컨테이너에서 사용할 수 없어요."
+
+3) Display: grid (container)
+   - Enable: gridTemplateColumns, gridTemplateRows, gap, justifyItems, alignItems
+   - Hide: flex-only: flexDirection, justifyContent, alignItems(flex), flexWrap
+   - Warn: "플렉스 관련 속성은 그리드 컨테이너에서 사용할 수 없어요."
+
+4) Parent display: flex (item)
+   - Enable: order, flex, alignSelf
+   - Warn: when parent is not flex: "현재 요소의 부모가 flex가 아니므로 flex 항목 속성은 동작하지 않아요." (disable or hide flex item controls)
+
+5) Parent display: grid (item)
+   - Enable: gridColumn, gridRow, justifySelf, alignSelf(grid)
+   - Warn: "현재 요소의 부모가 grid가 아니므로 grid 항목 속성은 동작하지 않아요."
+
+6) Position
+   - If position: static
+     - Disable: top/right/bottom/left/inset/insetBlock/inline, zIndex
+     - Warn: "position:static 상태에선 위치값(top/right/...)을 적용할 수 없어요."
+   - If position: sticky
+     - Require at least one offset (top/right/bottom/left/inset-*) for effect.
+     - Info (non-blocking): "sticky는 상하/좌우 오프셋 중 하나 이상이 필요합니다."
+
+7) Aspect Ratio
+   - If height is fixed and width is auto (or vice versa), aspectRatio can conflict.
+   - Info: "aspect-ratio는 width/height 중 하나가 auto일 때 더 일관되게 동작해요."
+
+────────────────────────────────────────────────────────
+TYPOGRAPHY
+────────────────────────────────────────────────────────
+1) textOverflow
+   - Requires: overflow hidden/clip AND whiteSpace nowrap (most common case).
+   - Warn: "text-overflow는 보통 overflow:hidden과 white-space:nowrap과 함께 사용됩니다."
+
+2) textDecoration
+   - None.
+
+3) fontStyle/fontWeight
+   - Some fonts lack certain weights/styles.
+   - Info: "선택한 글꼴이 해당 굵기/스타일을 지원하지 않을 수 있어요." (non-blocking)
+
+4) letterSpacing/lineHeight
+   - No hard constraints; suggest numeric parsing if needed.
+
+────────────────────────────────────────────────────────
+APPEARANCE
+────────────────────────────────────────────────────────
+1) background & backgroundImage
+   - If backgroundImage is set to none or unset → Dependent controls (size/repeat/position/clip/origin/attachment) can be disabled until an image is provided.
+   - Warn: "배경 이미지를 지정해야 관련 세부 설정을 사용할 수 있어요."
+   - If using background shorthand with layered images, only first layer is mapped in detail UI (document this).
+
+2) border/outline
+   - If borderStyle is none → borderWidth/Color disabled (optional).
+   - Warn: "border-style이 none이면 너비/색상은 의미가 없어요." (soft)
+
+3) mixBlendMode
+   - If parent/background is transparent or stacking context is unusual, effect might not be visible.
+   - Info: "배경 대비가 없으면 블렌드 모드 효과가 눈에 띄지 않을 수 있어요." (non-blocking)
+
+────────────────────────────────────────────────────────
+EFFECTS
+────────────────────────────────────────────────────────
+1) filter functions
+   - Each function input must be a valid functional token (e.g., blur(4px)).
+   - Warn on invalid tokens: "유효한 필터 형식이 아니에요. 예: blur(4px) brightness(0.9)"
+
+2) transform
+   - transform-origin applies only when transform is present (optional disable).
+   - Warn: "transform이 설정되어야 transform-origin이 의미가 있어요." (soft)
+
+3) transition
+   - If property is none or duration missing → warn.
+   - Warn: "transition-duration이 없으면 전환이 보이지 않아요."
+
+4) perspective
+   - Applies to transformed children (3D). Info-only.
+
+────────────────────────────────────────────────────────
+INTERACTIVITY
+────────────────────────────────────────────────────────
+1) pointer-events
+   - If none → interactivity controls may appear disabled but that is expected.
+   - Info: "pointer-events:none이면 요소에 마우스 이벤트가 전달되지 않습니다."
+
+2) user-select
+   - If none → text selection disabled. Info-only.
+
+3) cursor
+   - No structural constraints.
+
+────────────────────────────────────────────────────────
+IMPLEMENTATION NOTES
+────────────────────────────────────────────────────────
+- Implement a guard util: getControlState(values, key): {visible, disabled, reason?}
+- Insert WarningRow just above the affected RowShell (single control) or above the group (multiple controls).
+- Keep warnings stateless; derive purely from current values.
+- Localize strings via a small map: ko/en. Default to ko.
+- Shorthand/Detail sync already handled in sections; ensure guards run after seeding.
+

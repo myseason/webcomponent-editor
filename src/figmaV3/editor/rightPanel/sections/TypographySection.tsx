@@ -8,7 +8,7 @@ import {
     GroupHeader,
     RowShell,
     LeftCell,
-    RightCell,
+    RightCell, WarningRow,
 } from '../util/ui';
 import { renderValueControl } from '../util/controls';
 import { makeSelect, makeIcons, makeChips, makeColor, makeInput, makeRatio } from "@/figmaV3/editor/rightPanel/util/spec";
@@ -33,6 +33,12 @@ const TypographySection: React.FC<TypographySectionProps> = ({
                                                                  locks,
                                                                  onToggleLock,
                                                              }) => {
+
+    const needsEllipsis = values.textOverflow === 'ellipsis';
+    const overflowOK = /^(hidden|clip)$/.test(String(values.overflow ?? ''));
+    const singleLine = String(values.whiteSpace ?? 'normal') === 'nowrap';
+    const ellipsisBlocked = needsEllipsis && (!overflowOK || !singleLine);
+
     return (
         <>
             {/* Font */}
@@ -43,7 +49,6 @@ const TypographySection: React.FC<TypographySectionProps> = ({
                     locked={locks['typo.font']}
                     onToggleLock={() => onToggleLock('typo.font')}
                 />
-
                 <RowShell>
                     <LeftCell title="글꼴" />
                     <RightCell>
@@ -223,7 +228,9 @@ const TypographySection: React.FC<TypographySectionProps> = ({
                     locked={locks['typo.flow']}
                     onToggleLock={() => onToggleLock('typo.flow')}
                 />
-
+                {ellipsisBlocked && (
+                    <WarningRow message="‘ellipsis’가 보이려면 Layout의 overflow를 hidden/clip으로, Typography의 whiteSpace를 nowrap으로 설정하세요." />
+                )}
                 <RowShell>
                     <LeftCell title="공백 처리" />
                     <RightCell>

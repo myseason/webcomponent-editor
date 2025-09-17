@@ -1,21 +1,21 @@
 'use client';
 
 import * as React from 'react';
-import { Maximize, MoveHorizontal, Grid2x2 } from 'lucide-react';
+import {Maximize, MoveHorizontal, Grid2x2, Crosshair} from 'lucide-react';
 
 import type { StyleValues, SetStyleValue } from '../util/types';
 import {
     GroupHeader,
     RowShell,
     LeftCell,
-    RightCell, DetailBlock,
+    RightCell, DetailBlock, InlineInfo, NoticeRow,
 } from '../util/ui';
 import { renderValueControl } from '../util/controls';
 import { makeSelect, makeIcons, makeChips, makeColor, makeInput, makeRatio } from "@/figmaV3/editor/rightPanel/util/spec";
 import {
     useSyncLonghand,
     expandBoxShorthand,
-    setIfEmpty,
+    setIfEmpty, disabledWithReason,
 } from '../util/longhand';
 
 // 그룹 아이콘 매핑 (원본과 동일)
@@ -23,6 +23,7 @@ const GROUP_ICONS: Record<string, React.ComponentType<{ size?: number; className
     'Display & Flow': Grid2x2,
     Sizing: Maximize,
     Spacing: MoveHorizontal,
+    Position: Crosshair,
 };
 
 export interface LayoutSectionProps {
@@ -52,7 +53,29 @@ export const LayoutSection: React.FC<LayoutSectionProps> = ({
     const showFlexItem = parentDisplay === 'flex';
     const showGridItem = parentDisplay === 'grid';
 
+    const sizingState = disabledWithReason('sizing', values, locks['layout.sizing']); // { disabled, reason }
+    const sizingDisabled = sizingState.disabled;
+
     const dk = (prop: string) => `Layout.${prop}`;
+
+    // position
+    useSyncLonghand({
+        expanded,
+        detailKey: dk('inset'),
+        shorthandKey: 'inset',
+        values,
+        setValue,
+        parse: (raw) => {
+            const b = expandBoxShorthand(String(raw ?? ''));
+            return { top: b.top, right: b.right, bottom: b.bottom, left: b.left };
+        },
+        map: {
+            top: 'top',
+            right: 'right',
+            bottom: 'bottom',
+            left: 'left',
+        },
+    });
 
     // padding longhand 동기화
     useSyncLonghand({
@@ -389,6 +412,102 @@ export const LayoutSection: React.FC<LayoutSectionProps> = ({
                 </RowShell>
             </div>
 
+            {/* position */}
+            <div className="border-b border-neutral-200">
+                <GroupHeader
+                    label="위치"
+                    Icon={GROUP_ICONS?.Position ?? Crosshair}
+                    locked={!!locks['layout.position']}
+                    onToggleLock={() => onToggleLock('layout.position')}
+                />
+                {/* position: static이면 offsets 비활성 + 안내 배너 */}
+                {(() => {
+                    const state = disabledWithReason('positionOffsets', values, locks['layout.position']);
+                    return (!locks['layout.position'] && state.reason) ? (
+                        <NoticeRow tone="warning">{state.reason}</NoticeRow>
+                    ) : null;
+                })()}
+                <RowShell>
+                    <LeftCell title="Position" />
+                    <RightCell>
+                        {renderValueControl(
+                            'Layout',
+                            'position',
+                            // select: static / relative / absolute / fixed / sticky
+                            { control: 'select', options: [
+                                    { value: 'static',   label: { ko: 'static' } },
+                                    { value: 'relative', label: { ko: 'relative' } },
+                                    { value: 'absolute', label: { ko: 'absolute' } },
+                                    { value: 'fixed',    label: { ko: 'fixed' } },
+                                    { value: 'sticky',   label: { ko: 'sticky' } },
+                                ], ui: { size: 'sm' } },
+                            String(values['position'] ?? ''),
+                            (v) => setValue('position', v),
+                            locks['layout.position']
+                        )}
+                    </RightCell>
+                </RowShell>
+
+                {/* inset (top/right/bottom/left 의 shorthand) */}
+                <RowShell>
+                    <LeftCell title="오프셋" />
+                    <RightCell
+                        onToggleDetail={() => openDetail(dk('inset'))}
+                        detailActive={!!expanded[dk('inset')]}
+                    >
+                        {renderValueControl(
+                            'Layout',
+                            'inset',
+                            {
+                                control: 'input',
+                                placeholder: 'ex) 0 | 10px 20px',
+                                ui: { size: 'xs' },
+                                shorthand: {
+                                    enabled: true,
+                                    syntax: '<top> <right> <bottom> <left> (1~4값)',
+                                    longhandKeys: ['top', 'right', 'bottom', 'left'],
+                                },
+                            },
+                            String(values['inset'] ?? ''),
+                            (v) => setValue('inset', v),
+                            // disabled: position: static 이거나 잠금일 때
+                            disabledWithReason('positionOffsets', values, locks['layout.position']).disabled
+                        )}
+                    </RightCell>
+                </RowShell>
+                {/* 상세: top/right/bottom/left */}
+                {expanded[dk('inset')] && (
+                    <DetailBlock
+                        propsMap={{
+                            top:    makeInput('예) 0 / 10px', 'text', 'xs'),
+                            right:  makeInput('예) 0 / 10px', 'text', 'xs'),
+                            bottom: makeInput('예) 0 / 10px', 'text', 'xs'),
+                            left:   makeInput('예) 0 / 10px', 'text', 'xs'),
+                        }}
+                        values={values}
+                        setValue={setValue}
+                        sectionKey="Layout"
+                        disabled={(() => disabledWithReason('positionOffsets', values, locks['layout.position']))().disabled}
+                        variant='smart'
+                    />
+                )}
+
+                {/* z-index */}
+                <RowShell>
+                    <LeftCell title="z-index" />
+                    <RightCell>
+                        {renderValueControl(
+                            'Layout',
+                            'zIndex',
+                            makeInput('ex) 1', 'number', 'xs'),
+                            String(values['zIndex'] ?? ''),
+                            (v) => setValue('zIndex', v),
+                            locks['layout.position']
+                        )}
+                    </RightCell>
+                </RowShell>
+            </div>
+
             {/* Sizing */}
             <div className="border-b border-neutral-200">
                 <GroupHeader
@@ -397,7 +516,10 @@ export const LayoutSection: React.FC<LayoutSectionProps> = ({
                     locked={locks['layout.sizing']}
                     onToggleLock={() => onToggleLock('layout.sizing')}
                 />
-
+                {/* 새 전용 메시지 Row (RowShell 바깥에서 한 줄 전체 사용) */}
+                {!locks['layout.sizing'] && sizingState.reason && (
+                    <NoticeRow tone="warning">{sizingState.reason}</NoticeRow>
+                )}
                 {/* width */}
                 <RowShell>
                     <LeftCell title="너비" />
@@ -411,7 +533,7 @@ export const LayoutSection: React.FC<LayoutSectionProps> = ({
                             makeChips([{ value: 'auto' }], { size: 'xs', free: true, placeholder: 'ex) 320px / 50%' }),
                             String(values['width'] ?? ''),
                             (v) => setValue('width', v),
-                            locks['layout.sizing']
+                            sizingDisabled  // 인라인이면 비활성
                         )}
                     </RightCell>
                 </RowShell>
@@ -431,7 +553,7 @@ export const LayoutSection: React.FC<LayoutSectionProps> = ({
                         values={values}
                         setValue={setValue}
                         sectionKey="Layout"
-                        disabled={locks['layout.sizing']}
+                        disabled={sizingDisabled}  // 인라인이면 비활성
                     />
                 )}
 
@@ -448,7 +570,7 @@ export const LayoutSection: React.FC<LayoutSectionProps> = ({
                             makeChips([{ value: 'auto' }], { size: 'xs', free: true, placeholder: 'ex) 200px / 50%' }),
                             String(values['height'] ?? ''),
                             (v) => setValue('height', v),
-                            locks['layout.sizing']
+                            sizingDisabled  // 인라인이면 비활성
                         )}
                     </RightCell>
                 </RowShell>
@@ -468,7 +590,7 @@ export const LayoutSection: React.FC<LayoutSectionProps> = ({
                         values={values}
                         setValue={setValue}
                         sectionKey="Layout"
-                        disabled={locks['layout.sizing']}
+                        disabled={sizingDisabled} // 인라인이면 비활성}
                     />
                 )}
 
@@ -483,7 +605,7 @@ export const LayoutSection: React.FC<LayoutSectionProps> = ({
                                 'xs'),
                             String(values['aspectRatio'] ?? ''),
                             (v) => setValue('aspectRatio', v),
-                            locks['layout.sizing']
+                            sizingDisabled
                         )}
                     </RightCell>
                 </RowShell>

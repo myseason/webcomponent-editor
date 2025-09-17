@@ -11,7 +11,6 @@ import {RightDomain, useRightControllerFactory} from '../../controllers/right/Ri
 import {InspectorStatusPanel} from "./sections/InspectorStatusPanel";
 import StyleInspector from "./StyleInspector";
 import CommonInspector from "@/figmaV3/editor/rightPanel/CommonInspector";
-import OldStyleInspector from "@/figmaV3/editor/rightPanel/OldStyleInspector";
 
 function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     // def는 필요 시 참조만, propsSchema 유무와 무관하게 PropsAutoSection을 항상 렌더

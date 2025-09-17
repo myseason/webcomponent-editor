@@ -2,12 +2,51 @@
 
 import React from 'react';
 import {
-    Lock, Unlock, ChevronDown, ChevronRight, Info, Wand2,
+    Lock, Unlock, ChevronDown, ChevronRight, Info, Wand2, AlertTriangle
 } from 'lucide-react';
 
 import { PropertySpec, StyleValues, SetStyleValue } from "./types";
 import {renderValueControl} from "./controls";
 
+//----------------------------------------------------------------------------------------------------------------------
+// 알림 관련
+//----------------------------------------------------------------------------------------------------------------------
+type Tone = 'warning' | 'info' | 'danger' | 'success';
+const toneClass: Record<Tone, { bg: string; border: string; text: string }> = {
+    warning: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-900' },
+    info:    { bg: 'bg-blue-50',  border: 'border-blue-200',  text: 'text-blue-900'  },
+    danger:  { bg: 'bg-red-50',   border: 'border-red-200',   text: 'text-red-900'   },
+    success: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-900' },
+};
+
+/** 섹션 전체 폭을 사용하는 알림 Row (RowShell 바깥에서 독립적으로 사용) */
+export const NoticeRow: React.FC<{
+    tone?: Tone;
+    icon?: React.ReactNode;
+    className?: string;
+    children: React.ReactNode;
+}> = ({ tone = 'warning', icon, className, children }) => {
+    const t = toneClass[tone];
+    return (
+        <div className={`my-1 px-2 py-1.5 border rounded ${t.bg} ${t.border} ${t.text} text-[11px] ${className ?? ''}`}>
+            <div className="flex items-start gap-1.5">
+                <div className="mt-[1px]">
+                    {icon ?? (tone === 'warning' ? <AlertTriangle size={12} /> : <Info size={12} />)}
+                </div>
+                <div className="leading-[1.2]">{children}</div>
+            </div>
+        </div>
+    );
+};
+
+export const WarningRow: React.FC<{ message: string }> = ({ message }) => (
+    <div className="my-1 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800">
+        {message}
+    </div>
+);
+//----------------------------------------------------------------------------------------------------------------------
+// Inspector Row / Column 등등
+//----------------------------------------------------------------------------------------------------------------------
 export const RowShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div className="grid grid-cols-9 gap-[4px] py-[4px] px-[6px] border-b border-neutral-100 items-center overflow-x-hidden">
         {children}
@@ -128,7 +167,7 @@ export const SectionFrame: React.FC<{
     onToggle?: () => void;
     children: React.ReactNode;
 }> = ({ title, Icon, collapsed, onToggle, children }) => (
-    <section className="mb-5">
+    <section className="mb-2">
         <div className="rounded-lg bg-neutral-50 border border-neutral-200">
             <div className="px-3 py-1.5">
                 <div className="flex items-center">
@@ -147,7 +186,7 @@ export const SectionFrame: React.FC<{
                 </div>
             </div>
             {!collapsed && (
-                <div className="p-2">
+                <div className="p-1">
                     <div className="rounded-lg border border-neutral-200 bg-white overflow-x-hidden">{children}</div>
                 </div>
             )}
