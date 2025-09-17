@@ -37,6 +37,8 @@ import {
     Wand2,
 } from 'lucide-react';
 
+import { INITIAL_DEFAULTS } from './StyleDefault';
+
 // ─────────────────────────────────────────────────────────────
 // 공통 타입/유틸
 // ─────────────────────────────────────────────────────────────
@@ -60,21 +62,7 @@ const SECTION_ICONS: Record<string, React.ComponentType<{ size?: number; classNa
     Interactivity: Hand,
 };
 
-// StyleInspector.tsx (상단 util)
-const INITIAL_DEFAULTS: Record<string, string> = {
-    display: 'block',
-    overflow: 'visible',
-    fontFamily: 'Inter',
-    textAlign: 'left',
-};
-
-// select/chips: 첫 옵션이 있으면 그걸 기본으로 쓰는 보조
-function firstOption(spec?: { options?: Array<{ value: any }> }) {
-    const v = spec?.options?.[0]?.value;
-    return v != null ? String(v) : undefined;
-}
-
-// 상세/종속 블록 (스키마 없이 inline spec으로도 쓰기 쉽게 독립 구성)
+// 상세/종속 블록
 const DependentBlock: React.FC<{
     title?: string;
     propsMap: Record<string, PropertySpec>;
@@ -110,7 +98,7 @@ const DetailBlock: React.FC<{
     setValue: SetValue;
     sectionKey: string;
     disabled?: boolean;
-    // detail 하위에도 종속 그룹이 있는 경우를 위해, propKey → dependentSpec 생성기를 받음
+    // detail 하위에도 종속 그룹이 있는 경우를 위해, propKey → dependentSpec 생성기
     getDependentsFor?: (propKey: string, curVal?: string) => Array<{ title?: string; properties: Record<string, PropertySpec> }>;
 }> = ({ propsMap, values, setValue, sectionKey, disabled, getDependentsFor }) => {
     if (!propsMap) return null;
@@ -126,7 +114,6 @@ const DetailBlock: React.FC<{
 
             {entries.map(([k, p]) => {
                 const v = values[k];
-
                 return (
                     <div key={`detail:${sectionKey}:${k}`}>
                         <RowShell>
@@ -137,7 +124,7 @@ const DetailBlock: React.FC<{
                         </RowShell>
 
                         {/* 상세 속성의 종속 그룹 처리(예: backgroundImage 선택 시 이미지 관련 하위) */}
-                        {getDependentsFor && (
+                        {getDependentsFor &&
                             getDependentsFor(k, v)?.map((dg, idx) => (
                                 <DependentBlock
                                     key={`detail-dep:${sectionKey}:${k}:${idx}`}
@@ -148,8 +135,7 @@ const DetailBlock: React.FC<{
                                     sectionKey={sectionKey}
                                     disabled={disabled}
                                 />
-                            ))
-                        )}
+                            ))}
                     </div>
                 );
             })}
@@ -157,13 +143,15 @@ const DetailBlock: React.FC<{
     );
 };
 
-// 간단한 spec maker 유틸들 (스키마 없이 inline 작성 편하게)
+// 간단한 spec maker 유틸들
 const makeChips = (
     opts: Array<string | { value: string; label?: string }>,
-    extra?: { placeholder?: string; free?: boolean; size?: 'xs'|'sm'|'md'|'lg'|'xl' }
+    extra?: { placeholder?: string; free?: boolean; size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' }
 ): PropertySpec => ({
     control: 'chips',
-    options: opts.map((o) => (typeof o === 'string' ? { value: o } : { value: o.value, label: o.label ? { ko: o.label } : undefined })),
+    options: opts.map((o) =>
+        typeof o === 'string' ? { value: o } : { value: o.value, label: o.label ? { ko: o.label } : undefined }
+    ),
     placeholder: extra?.placeholder,
     ui: {
         size: extra?.size ?? 'xs',
@@ -173,7 +161,7 @@ const makeChips = (
 
 const makeIcons = (
     opts: Array<{ value: string; iconKey?: string; label?: string }>,
-    size: 'xs'|'sm'|'md'|'lg'|'xl' = 'xs'
+    size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' = 'xs'
 ): PropertySpec => ({
     control: 'icons',
     options: opts.map((o) => ({
@@ -184,25 +172,38 @@ const makeIcons = (
     ui: { size },
 });
 
-const makeSelect = (opts: Array<string | { value: string; label?: string }>, size: 'xs'|'sm'|'md'|'lg'|'xl' = 'sm'): PropertySpec => ({
+const makeSelect = (
+    opts: Array<string | { value: string; label?: string }>,
+    size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' = 'sm'
+): PropertySpec => ({
     control: 'select',
-    options: opts.map((o) => (typeof o === 'string' ? { value: o } : { value: o.value, label: o.label ? { ko: o.label } : undefined })),
+    options: opts.map((o) =>
+        typeof o === 'string' ? { value: o } : { value: o.value, label: o.label ? { ko: o.label } : undefined }
+    ),
     ui: { size },
 });
 
-const makeInput = (placeholder?: string, inputType: 'text'|'number'|'url'|'time' = 'text', size: 'xs'|'sm'|'md'|'lg'|'xl' = 'xs'): PropertySpec => ({
+const makeInput = (
+    placeholder?: string,
+    inputType: 'text' | 'number' | 'url' | 'time' = 'text',
+    size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' = 'xs'
+): PropertySpec => ({
     control: 'input',
     placeholder,
     ui: { inputType, size },
 });
 
-const makeColor = (placeholder?: string, size: 'xs'|'sm'|'md'|'lg'|'xl' = 'sm'): PropertySpec => ({
+const makeColor = (placeholder?: string, size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' = 'sm'): PropertySpec => ({
     control: 'color',
     placeholder,
     ui: { size },
 });
 
-const makeRatio = (placeholder?: string, presets?: Array<{ value: string; label?: string }>, size: 'xs'|'sm'|'md'|'lg'|'xl' = 'xs'): PropertySpec => ({
+const makeRatio = (
+    placeholder?: string,
+    presets?: Array<{ value: string; label?: string }>,
+    size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' = 'xs'
+): PropertySpec => ({
     control: 'ratio',
     presets: presets?.map((p) => ({ value: p.value, label: p.label })),
     placeholder,
@@ -218,7 +219,7 @@ const LayoutSection: React.FC<{
     locks: Record<string, boolean>;
     onToggleLock: (k: string) => void;
     expanded: Record<string, boolean>;
-    toggleDetail: (k: string) => void;
+    toggleDetail: (k: string, propKey?: string) => void;
 }> = ({ values, setValue, locks, onToggleLock, expanded, toggleDetail }) => {
     const display = values['display'];
     const isContainer = display === 'flex' || display === 'grid';
@@ -228,7 +229,6 @@ const LayoutSection: React.FC<{
     const showFlexItem = parentDisplay === 'flex';
     const showGridItem = parentDisplay === 'grid';
 
-    // 상세 키
     const dk = (prop: string) => `Layout.${prop}`;
 
     return (
@@ -249,15 +249,7 @@ const LayoutSection: React.FC<{
                         {renderValueControl(
                             'Layout',
                             'display',
-                            makeChips(
-                                [
-                                    { value: 'block' },
-                                    { value: 'inline' },
-                                    { value: 'flex' },
-                                    { value: 'grid' },
-                                ],
-                                { size: 'xs' }
-                            ),
+                            makeChips([{ value: 'block' }, { value: 'inline' }, { value: 'flex' }, { value: 'grid' }], { size: 'xs' }),
                             values['display'],
                             (v) => setValue('display', v),
                             locks['layout.display']
@@ -438,28 +430,14 @@ const LayoutSection: React.FC<{
                         <RowShell>
                             <LeftCell title="순서" />
                             <RightCell>
-                                {renderValueControl(
-                                    'Layout',
-                                    'order',
-                                    makeInput('0', 'number'),
-                                    values['order'],
-                                    (v) => setValue('order', v),
-                                    locks['layout.display']
-                                )}
+                                {renderValueControl('Layout', 'order', makeInput('0', 'number'), values['order'], (v) => setValue('order', v), locks['layout.display'])}
                             </RightCell>
                         </RowShell>
 
                         <RowShell>
                             <LeftCell title="성장/축소/기준" />
                             <RightCell>
-                                {renderValueControl(
-                                    'Layout',
-                                    'flex',
-                                    makeInput('1 1 auto'),
-                                    values['flex'],
-                                    (v) => setValue('flex', v),
-                                    locks['layout.display']
-                                )}
+                                {renderValueControl('Layout', 'flex', makeInput('1 1 auto'), values['flex'], (v) => setValue('flex', v), locks['layout.display'])}
                             </RightCell>
                         </RowShell>
                     </>
@@ -471,56 +449,28 @@ const LayoutSection: React.FC<{
                         <RowShell>
                             <LeftCell title="열 범위" />
                             <RightCell>
-                                {renderValueControl(
-                                    'Layout',
-                                    'gridColumn',
-                                    makeInput('1 / 3'),
-                                    values['gridColumn'],
-                                    (v) => setValue('gridColumn', v),
-                                    locks['layout.display']
-                                )}
+                                {renderValueControl('Layout', 'gridColumn', makeInput('1 / 3'), values['gridColumn'], (v) => setValue('gridColumn', v), locks['layout.display'])}
                             </RightCell>
                         </RowShell>
 
                         <RowShell>
                             <LeftCell title="행 범위" />
                             <RightCell>
-                                {renderValueControl(
-                                    'Layout',
-                                    'gridRow',
-                                    makeInput('1 / 2'),
-                                    values['gridRow'],
-                                    (v) => setValue('gridRow', v),
-                                    locks['layout.display']
-                                )}
+                                {renderValueControl('Layout', 'gridRow', makeInput('1 / 2'), values['gridRow'], (v) => setValue('gridRow', v), locks['layout.display'])}
                             </RightCell>
                         </RowShell>
 
                         <RowShell>
                             <LeftCell title="가로 정렬(개별)" />
                             <RightCell>
-                                {renderValueControl(
-                                    'Layout',
-                                    'justifySelf',
-                                    makeSelect(['start', 'center', 'end', 'stretch']),
-                                    values['justifySelf'],
-                                    (v) => setValue('justifySelf', v),
-                                    locks['layout.display']
-                                )}
+                                {renderValueControl('Layout', 'justifySelf', makeSelect(['start', 'center', 'end', 'stretch']), values['justifySelf'], (v) => setValue('justifySelf', v), locks['layout.display'])}
                             </RightCell>
                         </RowShell>
 
                         <RowShell>
                             <LeftCell title="세로 정렬(개별)" />
                             <RightCell>
-                                {renderValueControl(
-                                    'Layout',
-                                    'alignSelf',
-                                    makeSelect(['start', 'center', 'end', 'stretch']),
-                                    values['alignSelf'],
-                                    (v) => setValue('alignSelf', v),
-                                    locks['layout.display']
-                                )}
+                                {renderValueControl('Layout', 'alignSelf', makeSelect(['start', 'center', 'end', 'stretch']), values['alignSelf'], (v) => setValue('alignSelf', v), locks['layout.display'])}
                             </RightCell>
                         </RowShell>
                     </>
@@ -530,14 +480,7 @@ const LayoutSection: React.FC<{
                 <RowShell>
                     <LeftCell title="오버플로우" />
                     <RightCell>
-                        {renderValueControl(
-                            'Layout',
-                            'overflow',
-                            makeSelect(['visible', 'hidden', 'scroll', 'auto']),
-                            values['overflow'],
-                            (v) => setValue('overflow', v),
-                            locks['layout.display']
-                        )}
+                        {renderValueControl('Layout', 'overflow', makeSelect(['visible', 'hidden', 'scroll', 'auto']), values['overflow'], (v) => setValue('overflow', v), locks['layout.display'])}
                     </RightCell>
                 </RowShell>
             </div>
@@ -554,10 +497,7 @@ const LayoutSection: React.FC<{
                 {/* width (+ 상세: minWidth/maxWidth) */}
                 <RowShell>
                     <LeftCell title="너비" />
-                    <RightCell
-                        onToggleDetail={() => toggleDetail(dk('width'))}
-                        detailActive={!!expanded[dk('width')]}
-                    >
+                    <RightCell onToggleDetail={() => toggleDetail(dk('width'), 'width')} detailActive={!!expanded[dk('width')]}>
                         {renderValueControl(
                             'Layout',
                             'width',
@@ -576,10 +516,7 @@ const LayoutSection: React.FC<{
                 </RowShell>
                 {!!expanded[dk('width')] && (
                     <DetailBlock
-                        propsMap={{
-                            minWidth: makeInput('ex) 100'),
-                            maxWidth: makeInput('ex) 100'),
-                        }}
+                        propsMap={{ minWidth: makeInput('ex) 100'), maxWidth: makeInput('ex) 100') }}
                         values={values}
                         setValue={setValue}
                         sectionKey="Layout"
@@ -590,10 +527,7 @@ const LayoutSection: React.FC<{
                 {/* height (+ 상세: minHeight/maxHeight) */}
                 <RowShell>
                     <LeftCell title="높이" />
-                    <RightCell
-                        onToggleDetail={() => toggleDetail(dk('height'))}
-                        detailActive={!!expanded[dk('height')]}
-                    >
+                    <RightCell onToggleDetail={() => toggleDetail(dk('height'), 'height')} detailActive={!!expanded[dk('height')]}>
                         {renderValueControl(
                             'Layout',
                             'height',
@@ -612,10 +546,7 @@ const LayoutSection: React.FC<{
                 </RowShell>
                 {!!expanded[dk('height')] && (
                     <DetailBlock
-                        propsMap={{
-                            minHeight: makeInput('ex) 100'),
-                            maxHeight: makeInput('ex) 100'),
-                        }}
+                        propsMap={{ minHeight: makeInput('ex) 100'), maxHeight: makeInput('ex) 100') }}
                         values={values}
                         setValue={setValue}
                         sectionKey="Layout"
@@ -630,7 +561,10 @@ const LayoutSection: React.FC<{
                         {renderValueControl(
                             'Layout',
                             'aspectRatio',
-                            makeRatio('ex) 4/3', [{ value: '1/1', label: '1:1' }, { value: '16/9', label: '16:9' }]),
+                            makeRatio('ex) 4/3', [
+                                { value: '1/1', label: '1:1' },
+                                { value: '16/9', label: '16:9' },
+                            ]),
                             values['aspectRatio'],
                             (v) => setValue('aspectRatio', v),
                             locks['layout.sizing']
@@ -642,14 +576,7 @@ const LayoutSection: React.FC<{
                 <RowShell>
                     <LeftCell title="크기 계산" />
                     <RightCell>
-                        {renderValueControl(
-                            'Layout',
-                            'boxSizing',
-                            makeSelect(['content-box', 'border-box']),
-                            values['boxSizing'],
-                            (v) => setValue('boxSizing', v),
-                            locks['layout.sizing']
-                        )}
+                        {renderValueControl('Layout', 'boxSizing', makeSelect(['content-box', 'border-box']), values['boxSizing'], (v) => setValue('boxSizing', v), locks['layout.sizing'])}
                     </RightCell>
                 </RowShell>
             </div>
@@ -666,10 +593,7 @@ const LayoutSection: React.FC<{
                 {/* padding (+ 상세: 4방향) */}
                 <RowShell>
                     <LeftCell title="패딩" />
-                    <RightCell
-                        onToggleDetail={() => toggleDetail(dk('padding'))}
-                        detailActive={!!expanded[dk('padding')]}
-                    >
+                    <RightCell onToggleDetail={() => toggleDetail(dk('padding'), 'padding')} detailActive={!!expanded[dk('padding')]}>
                         {renderValueControl(
                             'Layout',
                             'padding',
@@ -706,10 +630,7 @@ const LayoutSection: React.FC<{
                 {/* margin (+ 상세: 4방향) */}
                 <RowShell>
                     <LeftCell title="마진" />
-                    <RightCell
-                        onToggleDetail={() => toggleDetail(dk('margin'))}
-                        detailActive={!!expanded[dk('margin')]}
-                    >
+                    <RightCell onToggleDetail={() => toggleDetail(dk('margin'), 'margin')} detailActive={!!expanded[dk('margin')]}>
                         {renderValueControl(
                             'Layout',
                             'margin',
@@ -829,10 +750,10 @@ const TypographySection: React.FC<{
                         {renderValueControl(
                             'Typography',
                             'fontWeight',
-                            makeSelect([
-                                '100','200','300','400','500','600','700','800','900',
-                                'normal','bold','bolder','lighter',
-                            ]),
+                            makeSelect(
+                                ['100', '200', '300', '400', '500', '600', '700', '800', '900', 'normal', 'bold', 'bolder', 'lighter'],
+                                'sm'
+                            ),
                             values['fontWeight'],
                             (v) => setValue('fontWeight', v),
                             locks['typo.font']
@@ -843,14 +764,7 @@ const TypographySection: React.FC<{
                 <RowShell>
                     <LeftCell title="글자색" />
                     <RightCell>
-                        {renderValueControl(
-                            'Typography',
-                            'color',
-                            makeColor(),
-                            values['color'],
-                            (v) => setValue('color', v),
-                            locks['typo.font']
-                        )}
+                        {renderValueControl('Typography', 'color', makeColor(), values['color'], (v) => setValue('color', v), locks['typo.font'])}
                     </RightCell>
                 </RowShell>
             </div>
@@ -870,12 +784,15 @@ const TypographySection: React.FC<{
                         {renderValueControl(
                             'Typography',
                             'textAlign',
-                            makeIcons([
-                                { value: 'left',    iconKey: 'typography.textAlign:left' },
-                                { value: 'center',  iconKey: 'typography.textAlign:center' },
-                                { value: 'right',   iconKey: 'typography.textAlign:right' },
-                                { value: 'justify', iconKey: 'typography.textAlign:justify' },
-                            ], 'sm'),
+                            makeIcons(
+                                [
+                                    { value: 'left', iconKey: 'typography.textAlign:left' },
+                                    { value: 'center', iconKey: 'typography.textAlign:center' },
+                                    { value: 'right', iconKey: 'typography.textAlign:right' },
+                                    { value: 'justify', iconKey: 'typography.textAlign:justify' },
+                                ],
+                                'sm'
+                            ),
                             values['textAlign'],
                             (v) => setValue('textAlign', v),
                             locks['typo.text']
@@ -889,7 +806,7 @@ const TypographySection: React.FC<{
                         {renderValueControl(
                             'Typography',
                             'textTransform',
-                            makeChips(['none', 'lowercase', 'uppercase', 'capitalize'], { size: 'sm' }),
+                            makeChips(['none', 'lowercase', 'uppercase', 'capitalize'], 'sm' as any),
                             values['textTransform'],
                             (v) => setValue('textTransform', v),
                             locks['typo.text']
@@ -903,7 +820,7 @@ const TypographySection: React.FC<{
                         {renderValueControl(
                             'Typography',
                             'textDecoration',
-                            makeChips(['none', 'underline', 'line-through'], { size: 'sm' }),
+                            makeChips(['none', 'underline', 'line-through'], 'sm' as any),
                             values['textDecoration'],
                             (v) => setValue('textDecoration', v),
                             locks['typo.text']
@@ -951,42 +868,21 @@ const TypographySection: React.FC<{
                 <RowShell>
                     <LeftCell title="공백 처리" />
                     <RightCell>
-                        {renderValueControl(
-                            'Typography',
-                            'whiteSpace',
-                            makeSelect(['normal', 'nowrap', 'pre', 'pre-wrap']),
-                            values['whiteSpace'],
-                            (v) => setValue('whiteSpace', v),
-                            locks['typo.flow']
-                        )}
+                        {renderValueControl('Typography', 'whiteSpace', makeSelect(['normal', 'nowrap', 'pre', 'pre-wrap']), values['whiteSpace'], (v) => setValue('whiteSpace', v), locks['typo.flow'])}
                     </RightCell>
                 </RowShell>
 
                 <RowShell>
                     <LeftCell title="줄바꿈" />
                     <RightCell>
-                        {renderValueControl(
-                            'Typography',
-                            'wordBreak',
-                            makeSelect(['normal', 'break-all', 'keep-all']),
-                            values['wordBreak'],
-                            (v) => setValue('wordBreak', v),
-                            locks['typo.flow']
-                        )}
+                        {renderValueControl('Typography', 'wordBreak', makeSelect(['normal', 'break-all', 'keep-all']), values['wordBreak'], (v) => setValue('wordBreak', v), locks['typo.flow'])}
                     </RightCell>
                 </RowShell>
 
                 <RowShell>
                     <LeftCell title="넘침 표시" />
                     <RightCell>
-                        {renderValueControl(
-                            'Typography',
-                            'textOverflow',
-                            makeSelect(['clip', 'ellipsis']),
-                            values['textOverflow'],
-                            (v) => setValue('textOverflow', v),
-                            locks['typo.flow']
-                        )}
+                        {renderValueControl('Typography', 'textOverflow', makeSelect(['clip', 'ellipsis']), values['textOverflow'], (v) => setValue('textOverflow', v), locks['typo.flow'])}
                     </RightCell>
                 </RowShell>
             </div>
@@ -1003,7 +899,7 @@ const AppearanceSection: React.FC<{
     locks: Record<string, boolean>;
     onToggleLock: (k: string) => void;
     expanded: Record<string, boolean>;
-    toggleDetail: (k: string) => void;
+    toggleDetail: (k: string, propKey?: string) => void;
 }> = ({ values, setValue, locks, onToggleLock, expanded, toggleDetail }) => {
     const dk = (prop: string) => `Appearance.${prop}`;
     return (
@@ -1019,24 +915,14 @@ const AppearanceSection: React.FC<{
                 <RowShell>
                     <LeftCell title="배경색" />
                     <RightCell>
-                        {renderValueControl(
-                            'Appearance',
-                            'backgroundColor',
-                            makeColor(),
-                            values['backgroundColor'],
-                            (v) => setValue('backgroundColor', v),
-                            locks['appearance.fill']
-                        )}
+                        {renderValueControl('Appearance', 'backgroundColor', makeColor(), values['backgroundColor'], (v) => setValue('backgroundColor', v), locks['appearance.fill'])}
                     </RightCell>
                 </RowShell>
 
-                {/* background (shorthand + upload + detail: backgroundImage + dependents) */}
+                {/* background (shorthand + upload + detail: backgroundImage) */}
                 <RowShell>
                     <LeftCell title="배경 상세" />
-                    <RightCell
-                        onToggleDetail={() => toggleDetail(dk('background'))}
-                        detailActive={!!expanded[dk('background')]}
-                    >
+                    <RightCell onToggleDetail={() => toggleDetail(dk('background'), 'background')} detailActive={!!expanded[dk('background')]}>
                         {renderValueControl(
                             'Appearance',
                             'background',
@@ -1044,11 +930,7 @@ const AppearanceSection: React.FC<{
                                 ...makeInput('<color> | <image> <position> / <size> repeat | ...', 'text', 'sm'),
                                 ui: {
                                     size: 'sm',
-                                    uploadButton: {
-                                        enabled: true,
-                                        accept: 'image/*',
-                                        toValue: 'url()',
-                                    },
+                                    uploadButton: { enabled: true, accept: 'image/*', toValue: 'url()' },
                                 },
                                 shorthand: {
                                     enabled: true,
@@ -1068,58 +950,7 @@ const AppearanceSection: React.FC<{
                                 detailProperties: {
                                     backgroundImage: {
                                         ...makeInput('url(...) / none', 'text', 'sm'),
-                                        ui: {
-                                            size: 'sm',
-                                            uploadButton: { enabled: true, accept: 'image/*', toValue: 'url()' },
-                                        },
-                                        label: { ko: '이미지' },
-                                    },
-                                    backgroundPosition: {
-                                        ...makeInput('url(...) / none', 'text', 'sm'),
-                                        ui: {
-                                            size: 'sm',
-                                            uploadButton: { enabled: true, accept: 'image/*', toValue: 'url()' },
-                                        },
-                                        label: { ko: '이미지' },
-                                    },
-                                    backgroundSize: {
-                                        ...makeInput('url(...) / none', 'text', 'sm'),
-                                        ui: {
-                                            size: 'sm',
-                                            uploadButton: { enabled: true, accept: 'image/*', toValue: 'url()' },
-                                        },
-                                        label: { ko: '이미지' },
-                                    },
-                                    backgroundRepeat: {
-                                        ...makeInput('url(...) / none', 'text', 'sm'),
-                                        ui: {
-                                            size: 'sm',
-                                            uploadButton: { enabled: true, accept: 'image/*', toValue: 'url()' },
-                                        },
-                                        label: { ko: '이미지' },
-                                    },
-                                    backgroundClip: {
-                                        ...makeInput('url(...) / none', 'text', 'sm'),
-                                        ui: {
-                                            size: 'sm',
-                                            uploadButton: { enabled: true, accept: 'image/*', toValue: 'url()' },
-                                        },
-                                        label: { ko: '이미지' },
-                                    },
-                                    backgroundOrigin: {
-                                        ...makeInput('url(...) / none', 'text', 'sm'),
-                                        ui: {
-                                            size: 'sm',
-                                            uploadButton: { enabled: true, accept: 'image/*', toValue: 'url()' },
-                                        },
-                                        label: { ko: '이미지' },
-                                    },
-                                    backgroundAttachment: {
-                                        ...makeInput('url(...) / none', 'text', 'sm'),
-                                        ui: {
-                                            size: 'sm',
-                                            uploadButton: { enabled: true, accept: 'image/*', toValue: 'url()' },
-                                        },
+                                        ui: { size: 'sm', uploadButton: { enabled: true, accept: 'image/*', toValue: 'url()' } },
                                         label: { ko: '이미지' },
                                     },
                                 },
@@ -1179,10 +1010,7 @@ const AppearanceSection: React.FC<{
                 {/* border (shorthand + detail: width/style/color) */}
                 <RowShell>
                     <LeftCell title="테두리" />
-                    <RightCell
-                        onToggleDetail={() => toggleDetail(dk('border'))}
-                        detailActive={!!expanded[dk('border')]}
-                    >
+                    <RightCell onToggleDetail={() => toggleDetail(dk('border'), 'border')} detailActive={!!expanded[dk('border')]}>
                         {renderValueControl(
                             'Appearance',
                             'border',
@@ -1195,10 +1023,7 @@ const AppearanceSection: React.FC<{
                                     examples: ['1px solid #000'],
                                     longhandKeys: ['borderWidth', 'borderStyle', 'borderColor'],
                                 },
-                                ui: {
-                                    size: 'xs',
-                                    extraInput: { enabled: true, size: 'xs', placeholder: '1px solid black' },
-                                },
+                                ui: { size: 'xs', extraInput: { enabled: true, size: 'xs', placeholder: '1px solid black' } },
                                 detailProperties: {
                                     borderWidth: makeChips(['0', '1', '2', '4'], { size: 'xs', free: true, placeholder: '0' }),
                                     borderStyle: makeSelect(['none', 'solid', 'dashed', 'dotted']),
@@ -1228,10 +1053,7 @@ const AppearanceSection: React.FC<{
                 {/* border-radius (상세: 4코너) */}
                 <RowShell>
                     <LeftCell title="모서리" />
-                    <RightCell
-                        onToggleDetail={() => toggleDetail(dk('borderRadius'))}
-                        detailActive={!!expanded[dk('borderRadius')]}
-                    >
+                    <RightCell onToggleDetail={() => toggleDetail(dk('borderRadius'), 'borderRadius')} detailActive={!!expanded[dk('borderRadius')]}>
                         {renderValueControl(
                             'Appearance',
                             'borderRadius',
@@ -1268,10 +1090,7 @@ const AppearanceSection: React.FC<{
                 {/* outline (shorthand + detail) */}
                 <RowShell>
                     <LeftCell title="외곽선" />
-                    <RightCell
-                        onToggleDetail={() => toggleDetail(dk('outline'))}
-                        detailActive={!!expanded[dk('outline')]}
-                    >
+                    <RightCell onToggleDetail={() => toggleDetail(dk('outline'), 'outline')} detailActive={!!expanded[dk('outline')]}>
                         {renderValueControl(
                             'Appearance',
                             'outline',
@@ -1323,7 +1142,7 @@ const EffectsSection: React.FC<{
     locks: Record<string, boolean>;
     onToggleLock: (k: string) => void;
     expanded: Record<string, boolean>;
-    toggleDetail: (k: string) => void;
+    toggleDetail: (k: string, propKey?: string) => void;
 }> = ({ values, setValue, locks, onToggleLock, expanded, toggleDetail }) => {
     const dk = (prop: string) => `Effects.${prop}`;
     return (
@@ -1339,24 +1158,14 @@ const EffectsSection: React.FC<{
                 <RowShell>
                     <LeftCell title="투명도" />
                     <RightCell>
-                        {renderValueControl(
-                            'Effects',
-                            'opacity',
-                            makeChips(['1', '0.5', '0'], { size: 'xs', free: true, placeholder: '0~1' }),
-                            values['opacity'],
-                            (v) => setValue('opacity', v),
-                            locks['effects.visual']
-                        )}
+                        {renderValueControl('Effects', 'opacity', makeChips(['1', '0.5', '0'], { size: 'xs', free: true, placeholder: '0~1' }), values['opacity'], (v) => setValue('opacity', v), locks['effects.visual'])}
                     </RightCell>
                 </RowShell>
 
                 {/* filter (shorthand + detail) */}
                 <RowShell>
                     <LeftCell title="그래픽 효과" />
-                    <RightCell
-                        onToggleDetail={() => toggleDetail(dk('filter'))}
-                        detailActive={!!expanded[dk('filter')]}
-                    >
+                    <RightCell onToggleDetail={() => toggleDetail(dk('filter'), 'filter')} detailActive={!!expanded[dk('filter')]}>
                         {renderValueControl(
                             'Effects',
                             'filter',
@@ -1423,11 +1232,27 @@ const EffectsSection: React.FC<{
                         {renderValueControl(
                             'Effects',
                             'mixBlendMode',
-                            makeSelect([
-                                'normal','multiply','screen','overlay','darken','lighten',
-                                'color-dodge','color-burn','hard-light','soft-light','difference','exclusion',
-                                'hue','saturation','color','luminosity',
-                            ]),
+                            makeSelect(
+                                [
+                                    'normal',
+                                    'multiply',
+                                    'screen',
+                                    'overlay',
+                                    'darken',
+                                    'lighten',
+                                    'color-dodge',
+                                    'color-burn',
+                                    'hard-light',
+                                    'soft-light',
+                                    'difference',
+                                    'exclusion',
+                                    'hue',
+                                    'saturation',
+                                    'color',
+                                    'luminosity',
+                                ],
+                                'sm'
+                            ),
                             values['mixBlendMode'],
                             (v) => setValue('mixBlendMode', v),
                             locks['effects.visual']
@@ -1447,10 +1272,7 @@ const EffectsSection: React.FC<{
                 {/* transform (shorthand + detail) */}
                 <RowShell>
                     <LeftCell title="변형" />
-                    <RightCell
-                        onToggleDetail={() => toggleDetail(dk('transform'))}
-                        detailActive={!!expanded[dk('transform')]}
-                    >
+                    <RightCell onToggleDetail={() => toggleDetail(dk('transform'), 'transform')} detailActive={!!expanded[dk('transform')]}>
                         {renderValueControl(
                             'Effects',
                             'transform',
@@ -1494,28 +1316,14 @@ const EffectsSection: React.FC<{
                 <RowShell>
                     <LeftCell title="기준점" />
                     <RightCell>
-                        {renderValueControl(
-                            'Effects',
-                            'transformOrigin',
-                            makeInput('50% 50% / center'),
-                            values['transformOrigin'],
-                            (v) => setValue('transformOrigin', v),
-                            locks['effects.transform']
-                        )}
+                        {renderValueControl('Effects', 'transformOrigin', makeInput('50% 50% / center'), values['transformOrigin'], (v) => setValue('transformOrigin', v), locks['effects.transform'])}
                     </RightCell>
                 </RowShell>
 
                 <RowShell>
                     <LeftCell title="원근" />
                     <RightCell>
-                        {renderValueControl(
-                            'Effects',
-                            'perspective',
-                            makeInput('600px'),
-                            values['perspective'],
-                            (v) => setValue('perspective', v),
-                            locks['effects.transform']
-                        )}
+                        {renderValueControl('Effects', 'perspective', makeInput('600px'), values['perspective'], (v) => setValue('perspective', v), locks['effects.transform'])}
                     </RightCell>
                 </RowShell>
             </div>
@@ -1531,10 +1339,7 @@ const EffectsSection: React.FC<{
                 {/* transition (shorthand + detail) */}
                 <RowShell>
                     <LeftCell title="전환 효과" />
-                    <RightCell
-                        onToggleDetail={() => toggleDetail(dk('transition'))}
-                        detailActive={!!expanded[dk('transition')]}
-                    >
+                    <RightCell onToggleDetail={() => toggleDetail(dk('transition'), 'transition')} detailActive={!!expanded[dk('transition')]}>
                         {renderValueControl(
                             'Effects',
                             'transition',
@@ -1545,12 +1350,7 @@ const EffectsSection: React.FC<{
                                     layered: true,
                                     layerLimit: 1,
                                     syntax: '<property> <duration> <timing-function>? <delay>?',
-                                    longhandKeys: [
-                                        'transitionProperty',
-                                        'transitionDuration',
-                                        'transitionTimingFunction',
-                                        'transitionDelay',
-                                    ],
+                                    longhandKeys: ['transitionProperty', 'transitionDuration', 'transitionTimingFunction', 'transitionDelay'],
                                 },
                                 ui: { size: 'xs', extraInput: { enabled: true, size: 'xs', placeholder: 'opacity 200ms ease-in' } },
                                 detailProperties: {
@@ -1606,42 +1406,21 @@ const InteractivitySection: React.FC<{
                 <RowShell>
                     <LeftCell title="커서" />
                     <RightCell>
-                        {renderValueControl(
-                            'Interactivity',
-                            'cursor',
-                            makeSelect(['auto', 'default', 'pointer', 'text', 'move']),
-                            values['cursor'],
-                            (v) => setValue('cursor', v),
-                            locks['interact.user']
-                        )}
+                        {renderValueControl('Interactivity', 'cursor', makeSelect(['auto', 'default', 'pointer', 'text', 'move']), values['cursor'], (v) => setValue('cursor', v), locks['interact.user'])}
                     </RightCell>
                 </RowShell>
 
                 <RowShell>
                     <LeftCell title="포인터 이벤트" />
                     <RightCell>
-                        {renderValueControl(
-                            'Interactivity',
-                            'pointerEvents',
-                            makeSelect(['auto', 'none']),
-                            values['pointerEvents'],
-                            (v) => setValue('pointerEvents', v),
-                            locks['interact.user']
-                        )}
+                        {renderValueControl('Interactivity', 'pointerEvents', makeSelect(['auto', 'none']), values['pointerEvents'], (v) => setValue('pointerEvents', v), locks['interact.user'])}
                     </RightCell>
                 </RowShell>
 
                 <RowShell>
                     <LeftCell title="텍스트 선택" />
                     <RightCell>
-                        {renderValueControl(
-                            'Interactivity',
-                            'userSelect',
-                            makeSelect(['auto', 'text', 'none']),
-                            values['userSelect'],
-                            (v) => setValue('userSelect', v),
-                            locks['interact.user']
-                        )}
+                        {renderValueControl('Interactivity', 'userSelect', makeSelect(['auto', 'text', 'none']), values['userSelect'], (v) => setValue('userSelect', v), locks['interact.user'])}
                     </RightCell>
                 </RowShell>
             </div>
@@ -1649,6 +1428,8 @@ const InteractivitySection: React.FC<{
     );
 };
 
+// ─────────────────────────────────────────────────────────────
+// 메인 컴포넌트
 // ─────────────────────────────────────────────────────────────
 export default function StyleInspector({
                                            nodeId,
@@ -1684,9 +1465,92 @@ export default function StyleInspector({
 
     // 상세 토글 (prop별)
     const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
-    const toggleDetail = (k: string) => setExpanded((p) => ({ ...p, [k]: !p[k] }));
 
+    // ① 최초 1회: 기본값 주입 (비어있는 key만 채움)
+    React.useEffect(() => {
+        setValues((prev) => {
+            const next = { ...prev };
+            for (const k of Object.keys(INITIAL_DEFAULTS)) {
+                if (next[k] == null || next[k] === '') next[k] = INITIAL_DEFAULTS[k];
+            }
+            // select/chips 몇 가지 안전 기본
+            if (!next.boxSizing) next.boxSizing = 'content-box';
+            if (!next.justifyContent) next.justifyContent = 'flex-start';
+            if (!next.alignItems) next.alignItems = 'stretch';
+            if (!next.cursor) next.cursor = 'auto';
+            return next;
+        });
+    }, []);
 
+    // ② 상세 열 때 롱핸드 기본 채우기
+    const ensureLonghandDefaults = React.useCallback((propKey?: string) => {
+        if (!propKey) return;
+
+        const safeSet = (k: string, v: string) => {
+            setValues((prev) => (prev[k] == null || prev[k] === '' ? { ...prev, [k]: v } : prev));
+        };
+
+        // border (shorthand)
+        if (propKey === 'border') {
+            const raw = (values.border ?? '').trim();
+            const px = (() => {
+                const m = raw.match(/^(\d+(\.\d+)?)(px)?/);
+                return m ? `${m[1]}px` : undefined;
+            })();
+            if (px) safeSet('borderWidth', px);
+            safeSet('borderStyle', 'solid');
+            safeSet('borderColor', 'currentColor');
+            return;
+        }
+
+        // outline (shorthand)
+        if (propKey === 'outline') {
+            safeSet('outlineWidth', '1px');
+            safeSet('outlineStyle', 'solid');
+            safeSet('outlineColor', 'currentColor');
+            return;
+        }
+
+        // padding / margin -> 4방향
+        if (propKey === 'padding' || propKey === 'margin') {
+            const base = (values[propKey] ?? '').trim();
+            const targets =
+                propKey === 'padding'
+                    ? ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']
+                    : ['marginTop', 'marginRight', 'marginBottom', 'marginLeft'];
+            for (const t of targets) safeSet(t, base || '0');
+            return;
+        }
+
+        // borderRadius -> 4코너
+        if (propKey === 'borderRadius') {
+            const base = (values.borderRadius ?? '').trim() || '0';
+            const targets = ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'];
+            for (const t of targets) safeSet(t, base);
+            return;
+        }
+
+        // background / backgroundImage -> 이미지 상세 기본
+        if (propKey === 'background' || propKey === 'backgroundImage') {
+            if ((values.backgroundImage ?? values.background)?.includes('url(')) {
+                safeSet('backgroundSize', 'cover');
+                safeSet('backgroundRepeat', 'no-repeat');
+                safeSet('backgroundPosition', '50% 50%');
+                safeSet('backgroundClip', 'border-box');
+                safeSet('backgroundOrigin', 'padding-box');
+                safeSet('backgroundAttachment', 'scroll');
+            }
+            return;
+        }
+    }, [values]);
+
+    const toggleDetail = (k: string, propKey?: string) =>
+        setExpanded((p) => {
+            const opening = !p[k];
+            const next = { ...p, [k]: opening };
+            if (opening) ensureLonghandDefaults(propKey);
+            return next;
+        });
 
     return (
         <div style={{ width }} className="text-[11px] text-neutral-800 overflow-x-hidden">
