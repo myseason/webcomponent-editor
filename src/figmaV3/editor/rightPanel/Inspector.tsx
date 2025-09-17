@@ -32,16 +32,19 @@ function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
                 <PropsAutoSection nodeId={nodeId} defId={defId} />
             </div>
             */}
-            <CommonInspector nodeId={nodeId} defId={defId} />
+            <CommonInspector nodeId={nodeId} defId={defId} width={320} />
             {/* Styles — 베이스 시그니처는 props 없음 */}
             {/*
             <div className="mt-4">
                 <StylesSection />
             </div>
             */}
+            <StyleInspector nodeId={nodeId} defId={defId} width={320} />
+            {/*
             <div className="mt-4">
                 <StyleInspector nodeId={nodeId} defId={defId} width={320} />
             </div>
+            */}
             {/*
             <div className="mt-4">
                 <OldStyleInspector nodeId={nodeId} defId={defId} width={320} />

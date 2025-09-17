@@ -1,7 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { Database, Plus } from 'lucide-react';
+import {
+    Database,
+    Plus,
+    Hash,
+    Tag as TagIcon,
+    Settings2,
+} from 'lucide-react';
 
 import { getDefinition } from '../../core/registry';
 import type { NodeId, ComponentDefinition } from '../../core/types';
@@ -48,17 +54,40 @@ function normOpt(op: unknown): { value: string; label: string } {
     return { value: v, label: v };
 }
 
+/** StyleInspector와 동일한 그리드 레이아웃을 유지하면서
+ *  우측에 바인딩 버튼을 배치하는 래퍼(UI 변경만, 기능 변경 없음) */
+const FieldWithBind: React.FC<{
+    children: React.ReactNode;
+    bindButton?: React.ReactNode;
+}> = ({ children, bindButton }) => {
+    return (
+        <div className="grid grid-cols-10 gap-2 items-center w-full">
+            <div className="col-span-9">{children}</div>
+            <div className="col-span-1 flex justify-center">{bindButton}</div>
+        </div>
+    );
+};
+
 export function CommonInspector(props: {
     nodeId: NodeId;
     defId: string;
     open?: boolean;
     onToggle?: () => void;
+    /** StyleInspector처럼 섹션 패널의 고정 너비(px). 기본 360 */
+    width?: number;
 }) {
-    const { nodeId, defId } = props;
+    const {
+        nodeId,
+        defId,
+        width = 360,            // ← 추가: 폭 주입(기본 360)
+    } = props;
+
     const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
 
-    // SectionFrame은 collapsed 플래그 사용
-    const [collapsed, setCollapsed] = React.useState<boolean>(props.open === undefined ? false : !props.open);
+    // SectionFrame은 collapsed 플래그 사용 (StyleInspector와 동일 UX)
+    const [collapsed, setCollapsed] = React.useState<boolean>(
+        props.open === undefined ? false : !props.open,
+    );
     const notifyToggle = props.onToggle ?? (() => {});
 
     const project = reader.getProject();
@@ -69,14 +98,14 @@ export function CommonInspector(props: {
     const propsObj = (node.props ?? {}) as Record<string, unknown>;
 
     // ─────────────────────────────────────────────────────────────
-    // 일반(공통) 입력 상태 (id/name/slotId)
+    // 일반(공통) 입력 상태 (id/name/slotId) — 기존 동작 그대로 유지
     // ─────────────────────────────────────────────────────────────
     const initialAttrs = (propsObj.__tagAttrs as AttrMap | undefined) ?? {};
     const [elemId, setElemId] = React.useState(String(initialAttrs.id ?? node.id));
-    const [name, setName] = React.useState(String(propsObj.name ?? ''));
-    const [slotId, setSlotId] = React.useState(String(propsObj.slotId ?? ''));
+    const [name, setName] = React.useState(String((propsObj as any).name ?? ''));
+    const [slotId, setSlotId] = React.useState(String((propsObj as any).slotId ?? ''));
 
-    // nodeId 변경 시 동기화
+    // nodeId 변경 시 동기화 (기존 로직 유지)
     React.useEffect(() => {
         const pj = reader.getProject();
         const n = pj.nodes[nodeId];
@@ -94,7 +123,7 @@ export function CommonInspector(props: {
         setSlotId((prev) => (Object.is(prev, nextSlotId) ? prev : nextSlotId));
     }, [nodeId, reader]);
 
-    // 저장(일반)
+    // 저장(일반) — 기존 동작 그대로
     const saveBasic = React.useCallback(() => {
         // name/slotId
         writer.updateNodeProps(nodeId, { name, slotId });
@@ -133,7 +162,7 @@ export function CommonInspector(props: {
         ((node.props ?? {}) as any).__tag ?? (defaultTagFromDef ?? (selectableTags[0] ?? 'div')),
     );
 
-    // 자동 schema 엔트리(기존 PropsAutoSection 로직 호환)
+    // 자동 schema 엔트리(기존 PropsAutoSection 로직 호환) — 기존 그대로
     const schema = (def?.propsSchema ?? []) as any[];
     const baseEntries = React.useMemo(() => {
         const entries: Entry[] = [];
@@ -201,9 +230,11 @@ export function CommonInspector(props: {
     };
 
     return (
-        <div className="mt-4">
+        // ← StyleInspector와 동일하게 width 적용
+        <div style={{ width }} className="mt-4 text-[11px] text-neutral-800 overflow-x-hidden">
             <SectionFrame
                 title="공통"
+                Icon={Settings2}
                 collapsed={collapsed}
                 onToggle={() => {
                     setCollapsed((c) => !c);
@@ -212,7 +243,7 @@ export function CommonInspector(props: {
             >
                 {/* ───────────────────── 서브 그룹: 일반 ───────────────────── */}
                 <div className="border-b border-neutral-200">
-                    <GroupHeader label="일반" />
+                    <GroupHeader label="일반" Icon={Hash} />
 
                     {/* id */}
                     <RowShell>
@@ -264,6 +295,7 @@ export function CommonInspector(props: {
                 <div className="border-b border-neutral-200">
                     <GroupHeader
                         label="태그 & 속성"
+                        Icon={TagIcon}
                         locked={lockedTagGroup}
                         onToggleLock={toggleTagGroupLock}
                     />
@@ -314,19 +346,16 @@ export function CommonInspector(props: {
                                     <RowShell key={`auto:text:${entry.key}`}>
                                         <LeftCell title={entry.label ?? entry.key} />
                                         <RightCell>
-                                            <div className="grid grid-cols-10 gap-2 items-center w-full">
-                                                <div className="col-span-9">
-                                                    <input
-                                                        className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
-                                                        value={(value as string) ?? ''}
-                                                        onChange={(e) => writer.updateNodeProps(nodeId, { [entry.key]: e.target.value })}
-                                                        placeholder=""
-                                                        title={entry.key}
-                                                        disabled={lockedTagGroup}
-                                                    />
-                                                </div>
-                                                <div className="col-span-1 flex justify-center">{bindingBtn}</div>
-                                            </div>
+                                            <FieldWithBind bindButton={bindingBtn}>
+                                                <input
+                                                    className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
+                                                    value={(value as string) ?? ''}
+                                                    onChange={(e) => writer.updateNodeProps(nodeId, { [entry.key]: e.target.value })}
+                                                    placeholder=""
+                                                    title={entry.key}
+                                                    disabled={lockedTagGroup}
+                                                />
+                                            </FieldWithBind>
                                         </RightCell>
                                     </RowShell>
                                 );
@@ -337,27 +366,24 @@ export function CommonInspector(props: {
                                     <RowShell key={`auto:select:${entry.key}`}>
                                         <LeftCell title={entry.label ?? entry.key} />
                                         <RightCell>
-                                            <div className="grid grid-cols-10 gap-2 items-center w-full">
-                                                <div className="col-span-9">
-                                                    <select
-                                                        className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
-                                                        value={(value as string) ?? ''}
-                                                        onChange={(e) => writer.updateNodeProps(nodeId, { [entry.key]: e.target.value })}
-                                                        title={entry.key}
-                                                        disabled={lockedTagGroup}
-                                                    >
-                                                        {(entry.options ?? []).map((op, i) => {
-                                                            const { value: ov, label: ol } = normOpt(op);
-                                                            return (
-                                                                <option key={`${entry.key}:opt:${ov}:${i}`} value={ov}>
-                                                                    {ol}
-                                                                </option>
-                                                            );
-                                                        })}
-                                                    </select>
-                                                </div>
-                                                <div className="col-span-1 flex justify-center">{bindingBtn}</div>
-                                            </div>
+                                            <FieldWithBind bindButton={bindingBtn}>
+                                                <select
+                                                    className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
+                                                    value={(value as string) ?? ''}
+                                                    onChange={(e) => writer.updateNodeProps(nodeId, { [entry.key]: e.target.value })}
+                                                    title={entry.key}
+                                                    disabled={lockedTagGroup}
+                                                >
+                                                    {(entry.options ?? []).map((op, i) => {
+                                                        const { value: ov, label: ol } = normOpt(op);
+                                                        return (
+                                                            <option key={`${entry.key}:opt:${ov}:${i}`} value={ov}>
+                                                                {ol}
+                                                            </option>
+                                                        );
+                                                    })}
+                                                </select>
+                                            </FieldWithBind>
                                         </RightCell>
                                     </RowShell>
                                 );
@@ -367,9 +393,9 @@ export function CommonInspector(props: {
                         })}
                     </div>
 
-                    {/* Attrs 입력행: 왼쪽 비우고 오른쪽만 사용 (key/value/+) */}
+                    {/* Attrs 입력행 */}
                     <RowShell>
-                        <div className="col-span-2" />
+                        <LeftCell title="Attr" />
                         <RightCell>
                             <div className="grid grid-cols-10 gap-2 items-center w-full">
                                 <div className="col-span-4">
@@ -405,7 +431,7 @@ export function CommonInspector(props: {
                         </RightCell>
                     </RowShell>
 
-                    {/* 기존 Attrs 리스트: 왼쪽 비움, 오른쪽에 key input / value input / 삭제 버튼 */}
+                    {/* 기존 Attrs 리스트 */}
                     <div className="mt-1">
                         {attrsList.map(({ k, v }) => (
                             <RowShell key={`attr:${k}`}>
