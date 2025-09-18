@@ -1,3 +1,5 @@
+import {StyleGroupKey} from "@/figmaV3/core/types";
+
 export type StyleValues = Record<string, string | undefined>;
 export type SetStyleValue = (k: string, v: string | undefined) => void;
 
@@ -126,3 +128,15 @@ export type SectionSpec = {
     label?: LocaleLabel;
     groups: Record<string, GroupSpec>;
 };
+
+export interface SectionProps {
+    values: StyleValues;
+    setValue: SetStyleValue;
+    locks: Record<string, boolean>;
+    onToggleLock: (k: string) => void;
+    expanded: Record<string, boolean>;
+    /** 상세를 펼칠 때 호출(원본처럼 시드 가능) */
+    openDetail: (detailKey: string, seed?: () => void) => void;
+    canLock?: boolean; // ★ 추가
+    getCpVisible?: (g: StyleGroupKey) => boolean | undefined;
+}

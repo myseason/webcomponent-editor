@@ -12,7 +12,7 @@ import {
     type Node, ComponentCapabilities,
 } from '../../core/types';
 import { getDefinition } from '../../core/registry';
-import { GLOBAL_TAG_POLICIES, CONTAINER_TAGS, INLINE_OR_SIMPLE_TAGS, isContainerTag } from '../../policy/globalTagPolicy';
+import { GLOBAL_TAG_POLICY } from '../../policy/globalTagPolicy';
 
 /* ===================== BottomDock / 공통 파생 util (기존 유지) ===================== */
 type PanelsT = NonNullable<EditorUI['panels']>;
@@ -77,7 +77,7 @@ function getNodeTag(state: EditorState, node: Node<any, any> | undefined): strin
 }
 
 function computeTagAllowedStyleKeys(tag: string): Set<string> {
-    const tp = (GLOBAL_TAG_POLICIES as any)[tag] as
+    const tp = (GLOBAL_TAG_POLICY as any)[tag] as
         | {
         styles?: {
             allow?: string[];
@@ -202,7 +202,7 @@ export function selectorsDomain() {
             const node = s.project.nodes?.[nodeId];
             const tag = getNodeTag(s, node);
 
-            const tp = (GLOBAL_TAG_POLICIES as any)[tag] as
+            const tp = (GLOBAL_TAG_POLICY as any)[tag] as
                 | { attributes?: { allow?: string[]; deny?: string[] } }
                 | undefined;
 
@@ -219,37 +219,6 @@ export function selectorsDomain() {
             const defId = node?.componentId ?? '';
             const filter = (s.project.inspectorFilters?.[defId] as InspectorFilter | undefined);
             return applyInspectorFilter(allow, filter, 'props');
-        },
-
-        /** ✅ Tag 선택 옵션 계산
-         * - 컴포넌트가 비컨테이너(canHaveChildren=false) → 컨테이너 태그는 disabled+upgradeToContainer
-         * - 컴포넌트가 컨테이너 → allowedTags 그대로 사용
-         */
-        selectAllowedTagOptions(nodeId: NodeId): TagOption[] {
-            const s = EditorCore.getState();
-            const node = s.project.nodes[nodeId];
-            if (!node) return [];
-
-            const def = getDefinition(node.componentId);
-            const canHaveChildren = !!def?.capabilities?.canHaveChildren;
-
-            const allowed = getAllowedTagsByComponent(node.componentId); // 컴포넌트가 허용한 태그만
-            // 현재 태그가 allowed에 없으면(과거 데이터 등), 맨 앞에 붙여 표시
-            const curTag = getNodeTag(s, node);
-            const list = allowed.includes(curTag) ? allowed : [curTag, ...allowed];
-
-            return list.map<TagOption>((tag) => {
-                const isContainer = isContainerTag(tag);
-                if (!canHaveChildren && isContainer) {
-                    return {
-                        value: tag,
-                        label: tag,
-                        disabled: true,
-                        upgradeToContainer: true,
-                    };
-                }
-                return { value: tag, label: tag };
-            });
         },
     };
 

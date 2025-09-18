@@ -3,9 +3,6 @@
    1. Core Data Models
    프로젝트의 핵심 데이터(노드, 페이지, 스타일)를 정의합니다.
 ============================================================================= */
-
-import {deprecate} from "node:util";
-
 export type NodeId = string;
 export type PageId = string;
 export type CSSDict = Record<string, unknown>;
@@ -95,69 +92,109 @@ export interface Project {
    2. Policy Definitions (정책 시스템)
    Inspector, 런타임, Export의 동작을 제어하는 정책을 정의합니다.
 ============================================================================= */
+/** Inspector의 서브그룹(= StyleGroup) 키 — UI에 보이는 그룹과 1:1 매칭 */
+export type StyleGroupKey =
+    | 'displayFlow'   // Display & Flow
+    | 'position'      // Position
+    | 'sizing'        // Sizing
+    | 'spacing'       // Spacing
+    | 'typography'    // Typography
+    | 'border'        // Border
+    | 'background'    // Background
+    | 'effects'       // Effects
+    | 'interactivity' // Interactivity
+    | 'advanced';     // Advanced
 
-export type PolicyVersion = `${number}.${number}`;
+export type StyleKey = string; // 정규화된 CSS 키(flat)
+export type TagName = 'div'|'span'|'img'|'button'|'a'|'p'|'h1'|'h2'|'h3'|'ul'|'li'; // 최소 셋
 
-export interface TagPolicy {
-    version: PolicyVersion;
-    tag: string;
-    attributes?: { allow?: string[]; deny?: string[] };
-    events?:     { allow?: string[]; deny?: string[] };
-    styles?: {
-        allow?: string[]; deny?: string[];
-        groups?: Record<string, string[]>;
-    };
-}
+/** 그룹/컨트롤 가시성 오버레이(Inspector에서 보이기/숨기기 제어) */
+export type StylePolicy = Partial<Record<StyleGroupKey,
+    {
+        /** 그룹(섹션) 자체의 노출 여부 */
+        visible?: boolean;
+        /** 그룹 내 개별 컨트롤의 노출 여부 (flat style key 기준) */
+        controls?: Record<StyleKey, { visible?: boolean }>;
+    }
+ >>;
+/** 전역 태그 정책 */
+export type TagPolicy = {
+    /** 전체 허용 태그 + 기본 태그 */
+    allowedTags: TagName[];
+    defaultTag: TagName;
 
-export type PolicyControlVis = { visible?: boolean };
-export type PolicyGroupVis = { visible?: boolean; controls?: Record<string, PolicyControlVis> };
+    /** 태그별 허용 서브그룹(Inspector 그룹) */
+    allowedSectionsByTag: Record<TagName, StyleGroupKey[]>;
 
-export interface StylePolicy {
-    version: PolicyVersion;
-    tokens?: Record<string, Record<string, string | number>>;
-    defaults?: Record<string, string | number>;
-    allow?: string[];
-    deny?: string[];
-    constraints?: Record<string, { min?: number; max?: number; step?: number }>;
-    valueSources?: Record<string, ('token' | 'raw' | 'css-var')[]>;
+    /** 태그별 허용/금지 스타일 키 (deny 우선) */
+    styleAllowByTag?: Partial<Record<TagName, StyleKey[]>>;
+    styleDenyByTag?: Partial<Record<TagName, StyleKey[]>>;
 
-    // (선택) Inspector 오버레이 허용
-    layout?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
-    spacing?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
-    typography?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
-    background?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
-    border?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
-    effects?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
-    position?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
-    custom?: { visible?: boolean; controls?: Record<string, {visible?: boolean}> };
+    /** 속성/이벤트 화이트리스트 (선택) */
+    attrsByTag?: Partial<Record<TagName, string[]>>;
+    eventsByTag?: Partial<Record<TagName, string[]>>;
 
-    // (선택) 프리셋/팔레트 등 선택지 (이미 사용하는 코드가 있으면 충돌 방지용으로 optional)
-    shadows?: { presets: Array<{ id?: string; name?: string; value: string } | string> };
-    filters?: { presets: Array<{ id?: string; name?: string; value: string } | string> };
-    gradients?: Record<string, unknown>;
-    colors?: { palette: Array<{ name?: string; value: string } | string> };
-}
-
-// ===== (추가) 컴포넌트 오버레이 타입 =====
-// 기존 코드가 기대하는 "flat controls" + "그룹 오버레이"를 모두 허용합니다.
-// flat controls 맵: 기존 코드가 직접 사용하는 구조
-export type ComponentInspectorControls = Record<string, PolicyControlVis>;
-
-// 그룹 오버레이(선택) + flat controls(선택)를 모두 허용
-export type InspectorOverlay = Partial<StylePolicy> & {
-    controls?: ComponentInspectorControls;
+    /** 컨테이너 태그 (이 프로젝트는 div로 고정) */
+    containerTag: 'div';
 };
 
-export interface ComponentPolicy {
-    version: PolicyVersion;
-    component: string;
-    tag: string;
-    // 실제 사용 방식에 맞춤: 최상위에 그룹 오버레이가 온다
-    inspector?: InspectorOverlay;
-    defaults?: { props?: Record<string, unknown>; styles?: Record<string, string | number> };
-    runtime?: { strict?: boolean };
-    savePolicy?: { allowPrivate?: boolean; allowPublic?: boolean };
-}
+/** 전역 스타일 정책 (검증/메타/프리셋 연결) */
+export type GlobalStylePolicy = {
+    /** 글로벌 허용/금지 (deny 우선) */
+    allow?: StyleKey[];
+    deny?: StyleKey[];
+
+    /** 태그별 허용/금지 */
+    byTag?: { [tag in TagName]?: { allow?: StyleKey[]; deny?: StyleKey[] } };
+
+    /** 스타일 키 메타 (타입/단위/토큰/프리셋/클램프 등) */
+    meta?: Record<StyleKey, {
+        type: 'length'|'number'|'enum'|'color'|'string'|'ratio';
+        enum?: string[];
+        min?: number; max?: number; step?: number;
+        unit?: Array<'px'|'%'|'em'|'rem'|'vh'|'vw'>;
+        tokens?: string[];   // 디자인 토큰 키
+        preset?: string[];   // 프리셋 이름(그림자/필터 등)
+    }>;
+};
+
+/** 컴포넌트별 정책 (컴포넌트 개발자가 Inspector 노출 범위를 제한) */
+export type ComponentPolicy = {
+    version: '1.1';
+    component: string;   // 컴포넌트 정의 ID
+    tag: TagName;        // 기본 태그
+    inspector?: StylePolicy;                 // 그룹/컨트롤 가시성
+    defaults?: Record<string, any>;          // 기본 값 (선택)
+    runtime?: Record<string, any>;           // 런타임 파라미터 (선택)
+    savePolicy?: Record<string, any>;        // 영속화용 추가 메타 (선택)
+};
+
+/** NodeLike — 런타임 판단에 필요한 최소 필드 */
+export type NodeLike = {
+    id: string;
+    componentId?: string;
+    props?: Record<string, any>;
+    styles?: Record<string, any>;
+};
+
+/** Project/UI 최소 스텁 — runtime(capabilities)에서 사용 */
+export type ProjectLike = {
+    nodes?: Record<string, NodeLike>;
+    policies?: {
+        components?: Record<string, ComponentPolicy>;
+        tag?: TagPolicy;
+        style?: GlobalStylePolicy;
+    };
+};
+
+export type UIStateLike = {
+    /** 'page' | 'component' */
+    mode: 'page' | 'component';
+    /** 페이지 모드에서 '고급'인지 여부 (고급이면 ComponentPolicy 무시) */
+    expertMode?: boolean;
+    /** 현재 선택된 노드 ID(선택) */
+    selectedId?: string | null;
+};
 
 export interface EffectivePolicies {
     tag: Record<string, TagPolicy>;

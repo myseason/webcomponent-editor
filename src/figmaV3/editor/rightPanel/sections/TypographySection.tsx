@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Type as TypeIcon, Text as TextIcon } from 'lucide-react';
 
-import type { StyleValues, SetStyleValue } from '../util/types';
+import type {StyleValues, SetStyleValue, SectionProps} from '../util/types';
 import {
     GroupHeader,
     RowShell,
@@ -12,6 +12,7 @@ import {
 } from '../util/ui';
 import { renderValueControl } from '../util/controls';
 import { makeSelect, makeIcons, makeChips, makeColor, makeInput, makeRatio } from "@/figmaV3/editor/rightPanel/util/spec";
+import {StyleGroupKey} from "@/figmaV3/core/types";
 
 // 그룹 아이콘 매핑(원본과 동일한 의도)
 const GROUP_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -19,20 +20,17 @@ const GROUP_ICONS: Record<string, React.ComponentType<{ size?: number; className
     Text: TextIcon,
 };
 
-export interface TypographySectionProps {
-    values: StyleValues;
-    setValue: SetStyleValue;
-    locks: Record<string, boolean>;
-    onToggleLock: (k: string) => void;
-}
-
 /** Typography 섹션 (원본 UI/UX & 동작 유지) */
-const TypographySection: React.FC<TypographySectionProps> = ({
-                                                                 values,
-                                                                 setValue,
-                                                                 locks,
-                                                                 onToggleLock,
-                                                             }) => {
+const TypographySection: React.FC<SectionProps> = ({
+                                                       values,
+                                                       setValue,
+                                                       locks,
+                                                       onToggleLock,
+                                                       expanded,
+                                                       openDetail,
+                                                       canLock,
+                                                       getCpVisible,
+                                                   }) => {
 
     const needsEllipsis = values.textOverflow === 'ellipsis';
     const overflowOK = /^(hidden|clip)$/.test(String(values.overflow ?? ''));

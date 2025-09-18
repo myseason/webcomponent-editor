@@ -1,24 +1,13 @@
+// engine/domains/policy.ts
+// - store 접근은 EditorCore.store 내부 메서드로만 수행 (컨트롤러는 호출 금지)
+// - 기존 패턴 유지: reader / writer 쌍 반환
+
 import { EditorCore } from '../EditorCore';
-import type { NodeId } from '../../core/types';
+import type { NodeId, ComponentPolicy, StyleGroupKey } from '../../core/types';
 import { getDefinition } from '../../core/registry';
 import { deepMerge } from '../../runtime/deepMerge';
-import type { ComponentPolicy } from '../../core/types';
-
-import {
-    getAllowedStyleKeysForNode,
-    isControlVisibleForNode,
-    buildOverlayFromComponentPolicy,
-} from '../../runtime/capabilities';
-
-function normalizeKey(k: string): { group: string; control: string } | null {
-    const path = k.replace(/:/g, '.');
-    const parts = path.split('.');
-    if (parts.length < 2) return null;
-    const group = parts[0];
-    const control = parts.slice(1).join('.');
-    if (!group || !control) return null;
-    return { group, control };
-}
+import { isControlVisibleForNode, getAllowedStyleKeysForNode } from '../../runtime/capabilities';
+import { KEY_TO_STYLEGROUP, normalizeControlPathToKey } from '../../policy/StyleGroupKeys';
 
 function ensureComponentPolicyBase(componentId: string): ComponentPolicy {
     const def = getDefinition(componentId);
@@ -26,7 +15,7 @@ function ensureComponentPolicyBase(componentId: string): ComponentPolicy {
         version: '1.1',
         component: componentId,
         tag: def?.capabilities?.defaultTag ?? 'div',
-        inspector: { groups: {}, controls: {} },
+        inspector: {},
         defaults: {},
         runtime: {},
         savePolicy: {},
@@ -39,28 +28,33 @@ export function policyDomain() {
             const state = EditorCore.store.getState();
             return state.project?.policies?.components?.[componentId];
         },
+
         getComponentPolicyForNode(nodeId: NodeId) {
             const state = EditorCore.store.getState();
             const node: any = state.project?.nodes?.[nodeId];
             const compId = node?.componentId;
             return compId ? state.project?.policies?.components?.[compId] : undefined;
         },
+
         getAllowedKeys(nodeId: NodeId): Set<string> {
-            const project = EditorCore.store.getState().project;
-            const ui = EditorCore.store.getState().ui;
-            return getAllowedStyleKeysForNode(project, nodeId, {
-                expertMode: ui?.expertMode,
-                withSizeAlias: true,
-            });
+            const state = EditorCore.store.getState();
+            return getAllowedStyleKeysForNode(state.project as any, nodeId, { expertMode: state.ui?.expertMode });
         },
+
         isControlVisible(nodeId: NodeId, controlPath: string): boolean {
-            const project = EditorCore.store.getState().project;
-            const ui = EditorCore.store.getState().ui;
-            const comp = reader.getComponentPolicyForNode(nodeId);
-            const overlay = buildOverlayFromComponentPolicy(comp);
-            return isControlVisibleForNode(project, ui, nodeId, controlPath as any, {
-                componentOverlay: overlay,
-            });
+            const state = EditorCore.store.getState();
+            return isControlVisibleForNode(state.project as any, state.ui as any, nodeId, controlPath as any);
+        },
+
+        getAllowedStyleKeysByGroup(nodeId: NodeId, groupKey: StyleGroupKey): Set<string> {
+            const state = EditorCore.store.getState();
+            const keys = Object.keys(KEY_TO_STYLEGROUP).filter(k => KEY_TO_STYLEGROUP[k] === groupKey);
+            const visible = keys.filter(k => isControlVisibleForNode(state.project as any, state.ui as any, nodeId, `styles:${k}` as any));
+            return new Set(visible);
+        },
+
+        isStyleGroupVisible(nodeId: NodeId, groupKey: StyleGroupKey): boolean {
+            return this.getAllowedStyleKeysByGroup(nodeId, groupKey).size > 0;
         },
     } as const;
 
@@ -71,7 +65,7 @@ export function policyDomain() {
             const existingPolicy = currentPolicies[componentId];
             const def = getDefinition(componentId);
 
-            const newPolicy = deepMerge(
+            const next = deepMerge(
                 {
                     version: '1.1',
                     component: componentId,
@@ -81,18 +75,48 @@ export function policyDomain() {
                 patch
             ) as ComponentPolicy;
 
-            state._setComponentPolicy(componentId, newPolicy);
+            state._setComponentPolicy(componentId, next);
         },
 
-        upsertComponentControlVisibility(componentId: string, controlKey: string, visible: boolean) {
+        upsertComponentControlVisibility(componentId: string, controlPath: string, visible: boolean) {
             const state = EditorCore.store.getState();
 
-            const key = normalizeKey(controlKey);
-            if (!key) {
-                console.warn('[policyDomain] invalid controlKey:', controlKey);
+            const flatKey = normalizeControlPathToKey(controlPath);
+            if (!flatKey) {
+                console.warn('[policyDomain] invalid controlPath:', controlPath);
                 return;
             }
-            const flatKey = `${key.group}.${key.control}`;
+
+            const groupKey = KEY_TO_STYLEGROUP[flatKey] as StyleGroupKey | undefined;
+            if (!groupKey) {
+                console.warn('[policyDomain] unknown style key (no group mapping):', flatKey);
+                return;
+            }
+
+            const all = state.project.policies?.components ?? {};
+            const curr = all[componentId] ?? ensureComponentPolicyBase(componentId);
+
+            const currGroup = (curr.inspector ?? {})[groupKey] ?? {};
+
+            const next: ComponentPolicy = {
+                ...curr,
+                inspector: {
+                    ...(curr.inspector ?? {}),
+                    [groupKey]: {
+                        ...currGroup,
+                        controls: {
+                            ...(currGroup as any).controls ?? {},
+                            [flatKey]: { visible },
+                        },
+                    },
+                },
+            };
+
+            state._setComponentPolicy(componentId, next);
+        },
+
+        upsertComponentGroupVisibility(componentId: string, groupKey: StyleGroupKey, visible: boolean) {
+            const state = EditorCore.store.getState();
 
             const all = state.project.policies?.components ?? {};
             const curr = all[componentId] ?? ensureComponentPolicyBase(componentId);
@@ -100,10 +124,10 @@ export function policyDomain() {
             const next: ComponentPolicy = {
                 ...curr,
                 inspector: {
-                    ...(curr.inspector ?? { groups: {}, controls: {} }),
-                    controls: {
-                        ...(curr.inspector?.controls ?? {}),
-                        [flatKey]: { visible },
+                    ...(curr.inspector ?? {}),
+                    [groupKey]: {
+                        ...((curr.inspector ?? {})[groupKey] ?? {}),
+                        visible,
                     },
                 },
             };

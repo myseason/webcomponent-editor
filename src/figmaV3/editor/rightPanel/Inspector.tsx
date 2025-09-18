@@ -1,31 +1,23 @@
 'use client';
 
-import React, {useState} from 'react';
-import {getDefinition} from '../../core/registry';
-import type {Fragment, NodeId} from '../../core/types';
+import React from 'react';
+import { getDefinition } from '../../core/registry';
+import type { Fragment, NodeId } from '../../core/types';
 
-//import {SchemaEditor} from './sections/SchemaEditor';
-import {SaveAsComponentDialog} from './sections/SaveAsComponentDialog';
+import { RightDomain, useRightControllerFactory } from '../../controllers/right/RightControllerFactory';
 
-import {RightDomain, useRightControllerFactory} from '../../controllers/right/RightControllerFactory';
-import {InspectorStatusPanel} from "./sections/InspectorStatusPanel";
-import StyleInspector from "./StyleInspector";
-import CommonInspector from "@/figmaV3/editor/rightPanel/CommonInspector";
+import StyleInspector from './StyleInspector';
+import CommonInspector from './CommonInspector';
+// import { SaveAsComponentDialog } from './sections/SaveAsComponentDialog'; // ← 사용 중지
 
 function PageInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }) {
     // def는 필요 시 참조만, propsSchema 유무와 무관하게 PropsAutoSection을 항상 렌더
     const _def = getDefinition(defId);
-
     return (
         <>
             <CommonInspector nodeId={nodeId} defId={defId} width={320} />
-            <StyleInspector nodeId={nodeId} defId={defId} width={320} />
-
-            {/* Schema — 베이스 시그니처는 { nodeId }
-            <div className="mt-4">
-                <SchemaEditor nodeId={nodeId} />
-            </div>
-             */}
+            {/* 페이지 모드에서는 componentId 없음 → StyleInspector에서 lock 버튼 비노출 */}
+            <StyleInspector nodeId={nodeId} componentId={undefined} width={320} />
         </>
     );
 }
@@ -34,23 +26,25 @@ function ComponentInspector({ nodeId, defId }: { nodeId: NodeId; defId: string }
     return (
         <>
             <CommonInspector nodeId={nodeId} defId={defId} width={320} />
-            <StyleInspector nodeId={nodeId} defId={defId} width={320} />
-            {/*
-            <div className="mt-4">
-                <SchemaEditor nodeId={nodeId} />
-            </div>
-            */}
+            {/* 컴포넌트 모드에서는 componentId 전달 → StyleInspector에서 lock 버튼 항상 노출 */}
+            <StyleInspector nodeId={nodeId} componentId={defId} width={320} />
         </>
     );
 }
 
 export function Inspector() {
-
     const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
-    const { mode, selectedId, editingFragmentId, expertMode, inspector } = reader.getUI();
+
+    // UI & Project 스냅샷
+    const ui = reader.getUI();
     const { rootId, fragments, nodes } = reader.getProject();
 
-    const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+    const mode = ui.mode as 'Page' | 'Component';
+    const selectedId = ui.selectedId as NodeId | null | undefined;
+    const editingFragmentId = ui.editingFragmentId as string | null | undefined;
+    const expertMode = !!ui.expertMode;
+
+    // const [isSaveDialogOpen, setIsSaveDialogOpen] = React.useState(false); // ← 사용 중지
 
     // 대상 노드 선택: Page 모드면 현재 선택(or 루트), Component 모드면 편집 중 프래그먼트 루트
     const targetNodeId: NodeId | null =
@@ -60,155 +54,109 @@ export function Inspector() {
                 ? (fragments.find((f: Fragment) => f.id === editingFragmentId)?.rootId ?? null)
                 : null;
 
-    const node = targetNodeId ? nodes[targetNodeId] : null;
-
-    //------------------------------------------------------------------------------------------------------------------
-    // 컨트롤러 기반 VM (타깃 노드 단일화)
-    const vm = reader.getInspectorVM();
-
-    // 컨트롤러가 계산한 nodeId/defId가 있으면 우선 사용
+    // 컨트롤러 기반 VM (있으면 우선 사용)
+    const vm = reader.getInspectorVM?.();
     const effectiveNodeId = (vm?.target?.nodeId ?? targetNodeId) as NodeId | null;
     const effectiveDefId =
-        vm?.target?.componentId ??
-        (effectiveNodeId ? (nodes[effectiveNodeId]?.componentId as string | undefined) : undefined) ??
-        null as unknown as string | null;
+        (vm?.target?.componentId as string | undefined) ??
+        (effectiveNodeId ? (nodes[effectiveNodeId!]?.componentId as string | undefined) : undefined) ??
+        ('' as string);
 
-    // node도 effectiveNodeId 기준으로 다시 잡아줍니다.
-    const effectiveNode = effectiveNodeId ? nodes[effectiveNodeId] : null;
+    const node = effectiveNodeId ? nodes[effectiveNodeId] : null;
 
-    //------------------------------------------------------------------------------------------------------------------
-
-
-    // 상단 border 컬러(기존 규칙 유지): Page=blue, Component=purple
+    // 상단 보더 컬러: Page=blue, Component=purple
     const modeBorderStyle = mode === 'Page' ? 'border-t-blue-500' : 'border-t-purple-500';
 
-    const handleToggleExpertMode = () => {
-        const nextExpertMode = !expertMode;
-        writer.setExpertMode(nextExpertMode);
-        writer.setNotification(`고급 모드: ${nextExpertMode ? 'ON' : 'OFF'}`);
+    // 기본/고급 스위치 (페이지 모드에서만)
+    const onToggleExpert = (next: boolean) => {
+        if (mode !== 'Page') return;
+        writer.setExpertMode(next);
+        writer.setNotification?.(`고급 모드: ${next ? 'ON' : 'OFF'}`);
     };
 
-    // TagPolicy 강제 노출 토글(Page 모드에서만)
-    const forceAll = !!inspector?.forceTagPolicy;
-    const toggleForceTagPolicy = () => {
-        if (mode !== 'Page')
-            return;
-        writer.setInspectorForceTagPolicy?.(!forceAll);
-        writer.setNotification?.(
-            `TagPolicy: ${!forceAll ? 'ALL (component 제한 무시)' : 'Limited (component 제한 적용)'}`
-        );
-    };
-    // SaveAsComponentDialog에 전달할 nodeId
-    const dialogNodeId: NodeId | null = node?.id ?? null;
+    // const dialogNodeId: NodeId | null = node?.id ?? null; // ← SaveAs 비활성으로 사용 중지
 
     return (
         <div className="flex h-full flex-col">
-            {/* Header: sticky로 상단에 고정 */}
+            {/* Header: sticky로 상단 고정 */}
             <div
                 className={[
                     'sticky top-0 z-10 bg-white',
                     'border-t-2 border-x border-b border-gray-200 px-2 py-2',
-                    modeBorderStyle, // 개발 모드에 따른 보더 색
+                    modeBorderStyle,
                 ].join(' ')}
             >
                 <div className="flex items-center justify-between">
                     <div className="text-[13px] font-semibold">Inspector</div>
                     <div className="ml-2 text-[11px] text-gray-500">
-                        {mode === 'Page' ? '( Page Build Mode)' : '(️ Component Dev Mode)'}
+                        {mode === 'Page' ? '( Page Build Mode)' : '( Component Dev Mode )'}
                     </div>
-                    {/* Page 모드 한정: TagPolicy 강제 토글 */}
-                    {mode === 'Page' && (
-                        <button
-                            onClick={toggleForceTagPolicy}
-                            className={[
-                                'ml-auto px-2 py-0.5 text-xs rounded-md border',
-                                forceAll
-                                    ? 'bg-blue-600 text-white border-blue-600'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100',
-                                ].join(' ')}
-                                title={
-                                forceAll
-                                    ? '현재: TagPolicy 허용 전부 노출 (클릭하면 컴포넌트 제한 적용)'
-                                    : '현재: 컴포넌트 제한 적용 (클릭하면 TagPolicy 허용 전부 노출)'
-                                }
-                        >
-                        {forceAll ? 'TagPolicy: ALL' : 'TagPolicy: Limited'}
-                        </button>
-                    )}
 
-                    <div className="ml-auto flex items-center gap-2">
-                        {/* Save as Component: Page 모드 + 고급 모드일 때만 노출 (베이스 UX 유지) */}
-                        {/*
-                        {mode === 'Page' && expertMode && (
-                            <button
-                                className="rounded border border-gray-300 px-2 py-1 text-xs"
-                                onClick={() => setIsSaveDialogOpen(true)}
-                            >
-                                Save as Component
-                            </button>
-                        )}
-                        */}
-
-                        {/* 기본/고급 토글: Page 모드에서만 노출 (베이스 UX 유지) */}
+                    <div className="ml-auto flex items-center gap-3">
+                        {/* 기본/고급 스위치: 페이지 모드에서만 노출 */}
                         {mode === 'Page' && (
-                            <div className="flex items-center gap-1">
+                            <label className="flex items-center gap-2 text-xs text-gray-700 select-none">
+                                <span>기본</span>
+                                {/* 토글 스위치 (체크 = 고급) */}
                                 <button
-                                    onClick={() => {
-                                        if (expertMode) handleToggleExpertMode();
-                                    }}
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={expertMode}
+                                    onClick={() => onToggleExpert(!expertMode)}
                                     className={[
-                                        'px-2 py-0.5 text-xs rounded-md',
-                                        !expertMode ? 'bg-white shadow-sm font-semibold' : 'text-gray-500',
+                                        'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+                                        expertMode ? 'bg-blue-600' : 'bg-gray-300',
                                     ].join(' ')}
+                                    title={expertMode ? '고급 모드: ON (ComponentPolicy 무시)' : '고급 모드: OFF (ComponentPolicy 적용)'}
                                 >
-                                    기본
+                  <span
+                      className={[
+                          'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                          expertMode ? 'translate-x-5' : 'translate-x-1',
+                      ].join(' ')}
+                  />
                                 </button>
-                                <button
-                                    onClick={() => {
-                                        if (!expertMode) handleToggleExpertMode();
-                                    }}
-                                    className={[
-                                        'px-2 py-0.5 text-xs rounded-md',
-                                        expertMode ? 'bg-white shadow-sm font-semibold' : 'text-gray-500',
-                                    ].join(' ')}
-                                >
-                                    고급
-                                </button>
-                            </div>
+                                <span>고급</span>
+                            </label>
                         )}
+
+                        {/* Save as Component — 요청에 따라 주석 처리 */}
+                        {/*
+            {mode === 'Page' && expertMode && dialogNodeId && (
+              <button
+                className="rounded border border-gray-300 px-2 py-1 text-xs"
+                onClick={() => setIsSaveDialogOpen(true)}
+              >
+                Save as Component
+              </button>
+            )}
+            */}
                     </div>
                 </div>
             </div>
 
-            {/* 스크롤이 필요한 Content 영역 */}
+            {/* Content */}
             <div className="min-h-0 flex-1 overflow-y-auto">
                 {!node ? (
                     <div className="px-1 text-[12px] text-gray-500">
                         {mode === 'Page' ? 'Select a node to inspect.' : 'Select a component from the left panel.'}
                     </div>
+                ) : mode === 'Page' ? (
+                    <PageInspector nodeId={effectiveNodeId as NodeId} defId={effectiveDefId} />
                 ) : (
-                    <>
-                        {mode === 'Page' ? (
-                            <PageInspector
-                                nodeId={effectiveNodeId as NodeId}       // 기존: nodeId={targetNodeId}
-                                defId={(effectiveDefId as string) ?? ''} // 기존: defId={node.componentId 등}
-                            />
-                        ) : (
-                            editingFragmentId && (
-                                <ComponentInspector
-                                    nodeId={effectiveNodeId as NodeId}
-                                    defId={(effectiveDefId as string) ?? ''}
-                                />
-                            )
-                        )}
-                    </>
+                    // 컴포넌트 모드
+                    (reader.getUI().editingFragmentId as string | null | undefined) && (
+                        <ComponentInspector nodeId={effectiveNodeId as NodeId} defId={effectiveDefId} />
+                    )
                 )}
             </div>
 
-            {/* ✅ SaveAsComponentDialog는 nodeId가 필요합니다 */}
-            {isSaveDialogOpen && dialogNodeId && (
-                <SaveAsComponentDialog nodeId={dialogNodeId} onClose={() => setIsSaveDialogOpen(false)} />
-            )}
+            {/* Save-As dialog — 요청에 따라 주석 처리 */}
+            {/*
+      {isSaveDialogOpen && dialogNodeId && (
+        <SaveAsComponentDialog nodeId={dialogNodeId} onClose={() => setIsSaveDialogOpen(false)} />
+      )}
+      */}
         </div>
     );
 }

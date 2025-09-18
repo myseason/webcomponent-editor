@@ -3,7 +3,7 @@
 import * as React from 'react';
 import {Maximize, MoveHorizontal, Grid2x2, Crosshair} from 'lucide-react';
 
-import type { StyleValues, SetStyleValue } from '../util/types';
+import type {StyleValues, SetStyleValue, SectionProps} from '../util/types';
 import {
     GroupHeader,
     RowShell,
@@ -17,6 +17,7 @@ import {
     expandBoxShorthand,
     setIfEmpty, disabledWithReason,
 } from '../util/longhand';
+import {StyleGroupKey} from "@/figmaV3/core/types";
 
 // 그룹 아이콘 매핑 (원본과 동일)
 const GROUP_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -26,24 +27,16 @@ const GROUP_ICONS: Record<string, React.ComponentType<{ size?: number; className
     Position: Crosshair,
 };
 
-export interface LayoutSectionProps {
-    values: StyleValues;
-    setValue: SetStyleValue;
-    locks: Record<string, boolean>;
-    onToggleLock: (k: string) => void;
-    expanded: Record<string, boolean>;
-    /** 상세를 펼칠 때 호출(원본처럼 시드 가능) */
-    openDetail: (detailKey: string, seed?: () => void) => void;
-}
-
 /** Layout 섹션 (원본 UI/UX & 동작 그대로 유지) */
-export const LayoutSection: React.FC<LayoutSectionProps> = ({
+export const LayoutSection: React.FC<SectionProps> = ({
                                                          values,
                                                          setValue,
                                                          locks,
                                                          onToggleLock,
                                                          expanded,
                                                          openDetail,
+                                                         canLock,
+                                                         getCpVisible,
                                                      }) => {
     const display = values['display'];
     const isContainer = display === 'flex' || display === 'grid';
@@ -115,6 +108,11 @@ export const LayoutSection: React.FC<LayoutSectionProps> = ({
         },
     });
 
+    const headerLockedDisplay  = canLock ? (getCpVisible?.('displayFlow') === false) : !!locks['layout.display'];
+    const headerLockedPosition = canLock ? (getCpVisible?.('position')    === false) : !!locks['layout.position'];
+    const headerLockedSizing   = canLock ? (getCpVisible?.('sizing')      === false) : !!locks['layout.sizing'];
+    const headerLockedSpacing  = canLock ? (getCpVisible?.('spacing')     === false) : !!locks['layout.spacing'];
+
     return (
         <>
             {/* Display & Flow */}
@@ -122,8 +120,8 @@ export const LayoutSection: React.FC<LayoutSectionProps> = ({
                 <GroupHeader
                     label="Display & Flow"
                     Icon={GROUP_ICONS['Display & Flow']}
-                    locked={locks['layout.display']}
-                    onToggleLock={() => onToggleLock('layout.display')}
+                    locked={canLock ? headerLockedDisplay : undefined}
+                    onToggleLock={canLock ? () => onToggleLock('layout.display') : undefined}
                 />
 
                 <RowShell>

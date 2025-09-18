@@ -92,7 +92,8 @@ export function CommonInspector(props: {
 
     const project = reader.getProject();
     const node = project.nodes[nodeId];
-    if (!node) return null;
+    if (!node)
+        return null;
 
     const def = getDefinition(defId) as ComponentDefinition | undefined;
     const propsObj = (node.props ?? {}) as Record<string, unknown>;
@@ -162,7 +163,7 @@ export function CommonInspector(props: {
         ((node.props ?? {}) as any).__tag ?? (defaultTagFromDef ?? (selectableTags[0] ?? 'div')),
     );
 
-    // 자동 schema 엔트리(기존 PropsAutoSection 로직 호환) — 기존 그대로
+    // 자동 schema 엔트리 — 기존 그대로
     const schema = (def?.propsSchema ?? []) as any[];
     const baseEntries = React.useMemo(() => {
         const entries: Entry[] = [];
@@ -178,7 +179,6 @@ export function CommonInspector(props: {
         }
         return entries;
     }, [schema]);
-
     const visibleEntries = React.useMemo(() => baseEntries, [baseEntries]);
 
     // 그룹 락 (StyleInspector 방식)
@@ -324,7 +324,6 @@ export function CommonInspector(props: {
                     <div key={currentTag}>
                         {visibleEntries.map((entry) => {
                             const value = (node.props as Record<string, unknown>)?.[entry.key];
-
                             const bindingBtn = (
                                 <button
                                     title="bind"
@@ -388,7 +387,6 @@ export function CommonInspector(props: {
                                     </RowShell>
                                 );
                             }
-
                             return null;
                         })}
                     </div>

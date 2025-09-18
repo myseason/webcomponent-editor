@@ -14,30 +14,28 @@ import {
 import { renderValueControl } from '../util/controls';
 
 // 타입 (기존 파일 유지)
-import type { PropertySpec } from '../util/types';
+import type {PropertySpec, SectionProps} from '../util/types';
 
 // 섹션 공용 타입/팩토리
 import type { StyleValues, SetStyleValue } from '../util/types';
 import { makeSelect } from '../util/spec';
-
-export interface InteractivitySectionProps {
-    values: StyleValues;
-    setValue: SetStyleValue;
-    locks: Record<string, boolean>;
-    onToggleLock: (k: string) => void;
-}
+import {StyleGroupKey} from "@/figmaV3/core/types";
 
 /**
  * Interactivity 섹션
  * - UX/옵션/락키는 원본과 100% 동일 유지
  * - 상세/의존 컨트롤 없음 (RightCell의 detail 버튼 사용 안 함)
  */
-export const InteractivitySection: React.FC<InteractivitySectionProps> = ({
-                                                                       values,
-                                                                       setValue,
-                                                                       locks,
-                                                                       onToggleLock,
-                                                                   }) => {
+export const InteractivitySection: React.FC<SectionProps> = ({
+                                                                 values,
+                                                                 setValue,
+                                                                 locks,
+                                                                 onToggleLock,
+                                                                 expanded,
+                                                                 openDetail,
+                                                                 canLock,
+                                                                 getCpVisible,
+                                                             }) => {
     return (
         <div className="border-b border-neutral-200">
             <GroupHeader

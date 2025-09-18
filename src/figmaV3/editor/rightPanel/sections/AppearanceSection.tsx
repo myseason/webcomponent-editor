@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Square } from 'lucide-react';
 
-import type { StyleValues, SetStyleValue } from '../util/types';
+import type {StyleValues, SetStyleValue, SectionProps} from '../util/types';
 import {
     GroupHeader,
     RowShell,
@@ -18,31 +18,24 @@ import {
     parseBorderLike,
     setIfEmpty,
 } from '../util/longhand';
+import {StyleGroupKey} from "@/figmaV3/core/types";
 
 // 아이콘 매핑
 const GROUP_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
     Border: Square,
 };
 
-export interface AppearanceSectionProps {
-    values: StyleValues;
-    setValue: SetStyleValue;
-    locks: Record<string, boolean>;
-    onToggleLock: (k: string) => void;
-    expanded: Record<string, boolean>;
-    /** 상세를 펼칠 때 호출(원본처럼 시드 가능) */
-    openDetail: (detailKey: string, seed?: () => void) => void;
-}
-
 /** Appearance 섹션 (원본 UI/UX & 동작 유지) */
-const AppearanceSection: React.FC<AppearanceSectionProps> = ({
-                                                                 values,
-                                                                 setValue,
-                                                                 locks,
-                                                                 onToggleLock,
-                                                                 expanded,
-                                                                 openDetail,
-                                                             }) => {
+const AppearanceSection: React.FC<SectionProps> = ({
+                                                       values,
+                                                       setValue,
+                                                       locks,
+                                                       onToggleLock,
+                                                       expanded,
+                                                       openDetail,
+                                                       canLock,
+                                                       getCpVisible,
+                                                   }) => {
     const dk = (prop: string) => `Appearance.${prop}`;
 
     // background longhand 동기화

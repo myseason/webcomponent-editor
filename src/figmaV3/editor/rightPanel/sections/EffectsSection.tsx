@@ -11,7 +11,7 @@ import {
 } from '../util/ui';
 
 import { renderValueControl } from '../util/controls';
-import type { StyleValues, SetStyleValue } from '../util/types';
+import type {StyleValues, SetStyleValue, SectionProps} from '../util/types';
 
 // longhand 동기화 & 파서 유틸
 import {
@@ -22,28 +22,19 @@ import {
 } from '../util/longhand';
 
 import {makeChips, makeSelect, makeInput } from "../util/spec";
-
-// ─────────────────────────────────────────────────────────────
-// Props
-// ─────────────────────────────────────────────────────────────
-export interface EffectsSectionProps {
-    values: StyleValues;
-    setValue: SetStyleValue;
-    locks: Record<string, boolean>;
-    onToggleLock: (k: string) => void;
-    expanded: Record<string, boolean>;
-    openDetail: (detailKey: string, seed?: () => void) => void;
-}
+import {StyleGroupKey} from "@/figmaV3/core/types";
 
 /** Effects 섹션 (Visual / Transform / Transition) */
-const EffectsSection: React.FC<EffectsSectionProps> = ({
-                                                           values,
-                                                           setValue,
-                                                           locks,
-                                                           onToggleLock,
-                                                           expanded,
-                                                           openDetail,
-                                                       }) => {
+const EffectsSection: React.FC<SectionProps> = ({
+                                                    values,
+                                                    setValue,
+                                                    locks,
+                                                    onToggleLock,
+                                                    expanded,
+                                                    openDetail,
+                                                    canLock,
+                                                    getCpVisible,
+                                                }) => {
     const dk = (prop: string) => `Effects.${prop}`;
 
     // transform-origin 안내

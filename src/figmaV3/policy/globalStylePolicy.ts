@@ -1,56 +1,113 @@
-// Global StylePolicy (v1.1)
-// 전역 디자인 토큰/값 제약/허용-금지 키/값 소스 정의
-// StyleGraph, Inspector, Export가 동일 정책을 참조합니다.
-import type { StylePolicy } from '../core/types';
+// - 전역 스타일 정책: allow/deny, 태그별 allow/deny, 스타일 메타(타입/단위/프리셋) 제공
+import type { GlobalStylePolicy } from '../core/types';
 
-export const GLOBAL_STYLE_POLICY: StylePolicy = {
-    version: '1.1',
+export const GLOBAL_STYLE_POLICY: GlobalStylePolicy = {
+    // deny 우선
+    deny: [
+        // 보안/위험 속성은 기본 금지(필요 시 허용 전환)
+        'behavior', 'filter:url', // 레거시/외부 리소스 호출형
+    ],
 
-    tokens: {
-        // theme.module.css의 톤을 반영 — 필요 시 동기화 스크립트로 관리 권장
-        color: {
-            primary: '#3b82f6',
-            success: '#10b981',
-            warning: '#f59e0b',
-            danger:  '#ef4444',
-            text:    '#e5e7eb',
-            muted:   '#9aa3af',
-            panelBg: '#1a1d21'
-        },
-        spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
-        radius:  { sm: 4, md: 6, lg: 10, xl: 14 },
-        font:    { xs: 11, sm: 12, base: 13, lg: 16, xl: 20 }
+    allow: [
+        // 공통 대표 키
+        'display', 'overflow',
+        'position', 'z-index', 'top', 'right', 'bottom', 'left',
+        'width', 'height', 'min-width', 'max-width', 'min-height', 'max-height', 'box-sizing', 'aspect-ratio',
+        'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+        'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+        'row-gap', 'column-gap', 'gap',
+        'font-size', 'font-weight', 'line-height', 'letter-spacing', 'text-align', 'text-decoration', 'text-transform', 'white-space', 'color', 'font-family', 'font-style',
+        'border-width', 'border-style', 'border-color', 'border-radius',
+        'outline', 'outline-offset',
+        'background-color', 'background-image', 'background-size', 'background-repeat', 'background-position', 'background-clip', 'background-origin',
+        'opacity', 'box-shadow', 'filter', 'backdrop-filter', 'mix-blend-mode',
+        'cursor', 'pointer-events', 'user-select',
+        'transition', 'transition-property', 'transition-duration', 'transition-timing-function', 'transition-delay',
+        'animation', 'animation-name', 'animation-duration', 'animation-timing-function', 'animation-delay', 'animation-iteration-count', 'animation-direction', 'animation-fill-mode', 'animation-play-state',
+        'object-fit', 'object-position',
+    ],
+
+    byTag: {
+        img: { deny: ['font-size','font-weight','line-height','letter-spacing','text-align'] },
+        span: { deny: ['width','height'] },
     },
 
-    // 전역 기본값(필요 최소)
-    defaults: {
-        fontSize: 'token:font.base',
-        lineHeight: 1.45
+    // 스타일 메타(검증/에디터 UI)
+    meta: {
+        display: { type: 'enum', enum: ['block','inline','inline-block','flex','grid','contents','none'] },
+        overflow: { type: 'enum', enum: ['visible','hidden','scroll','auto','clip'] },
+        position: { type: 'enum', enum: ['static','relative','absolute','fixed','sticky'] },
+        'z-index': { type: 'number', min: -9999, max: 9999, step: 1 },
+        top: { type: 'length', unit: ['px','%','vh'] }, right: { type: 'length', unit: ['px','%','vh'] },
+        bottom: { type: 'length', unit: ['px','%','vh'] }, left: { type: 'length', unit: ['px','%','vh'] },
+
+        width: { type: 'length', unit: ['px','%','vw'] }, height: { type: 'length', unit: ['px','%','vh'] },
+        'min-width': { type: 'length', unit: ['px','%','vw'] }, 'max-width': { type: 'length', unit: ['px','%','vw'] },
+        'min-height': { type: 'length', unit: ['px','%','vh'] }, 'max-height': { type: 'length', unit: ['px','%','vh'] },
+        'box-sizing': { type: 'enum', enum: ['content-box','border-box'] },
+        'aspect-ratio': { type: 'ratio' },
+
+        margin: { type: 'length', unit: ['px','%','rem'] }, padding: { type: 'length', unit: ['px','%','rem'] },
+        'margin-top': { type: 'length', unit: ['px','%','rem'] }, 'margin-right': { type: 'length', unit: ['px','%','rem'] },
+        'margin-bottom': { type: 'length', unit: ['px','%','rem'] }, 'margin-left': { type: 'length', unit: ['px','%','rem'] },
+        'padding-top': { type: 'length', unit: ['px','%','rem'] }, 'padding-right': { type: 'length', unit: ['px','%','rem'] },
+        'padding-bottom': { type: 'length', unit: ['px','%','rem'] }, 'padding-left': { type: 'length', unit: ['px','%','rem'] },
+        'row-gap': { type: 'length', unit: ['px','%','rem'] }, 'column-gap': { type: 'length', unit: ['px','%','rem'] },
+        gap: { type: 'length', unit: ['px','%','rem'] },
+
+        'font-size': { type: 'length', unit: ['px','rem','em'] },
+        'font-weight': { type: 'enum', enum: ['100','200','300','400','500','600','700','800','900','normal','bold'] },
+        'line-height': { type: 'number', min: 0.5, max: 3, step: 0.05 },
+        'letter-spacing': { type: 'length', unit: ['px','em'] },
+        'text-align': { type: 'enum', enum: ['left','center','right','justify','start','end'] },
+        'text-decoration': { type: 'enum', enum: ['none','underline','line-through','overline'] },
+        'text-transform': { type: 'enum', enum: ['none','uppercase','lowercase','capitalize'] },
+        'white-space': { type: 'enum', enum: ['normal','nowrap','pre','pre-wrap','pre-line','break-spaces'] },
+        color: { type: 'color' },
+        'font-family': { type: 'string' },
+        'font-style': { type: 'enum', enum: ['normal','italic','oblique'] },
+
+        'border-width': { type: 'length', unit: ['px'] },
+        'border-style': { type: 'enum', enum: ['none','solid','dashed','dotted','double','groove','ridge','inset','outset'] },
+        'border-color': { type: 'color' },
+        'border-radius': { type: 'length', unit: ['px','%'] },
+        outline: { type: 'string' }, 'outline-offset': { type: 'length', unit: ['px'] },
+
+        'background-color': { type: 'color' },
+        'background-image': { type: 'string' },
+        'background-size': { type: 'enum', enum: ['auto','cover','contain'] },
+        'background-repeat': { type: 'enum', enum: ['repeat','repeat-x','repeat-y','no-repeat','space','round'] },
+        'background-position': { type: 'string' },
+        'background-clip': { type: 'enum', enum: ['border-box','padding-box','content-box','text'] },
+        'background-origin': { type: 'enum', enum: ['border-box','padding-box','content-box'] },
+
+        opacity: { type: 'number', min: 0, max: 1, step: 0.05 },
+        'box-shadow': { type: 'string', preset: ['elevation-xs','elevation-sm','elevation-md','elevation-lg'] },
+        filter: { type: 'string', preset: ['blur-sm','blur','blur-lg','grayscale','contrast','brightness'] },
+        'backdrop-filter': { type: 'string' },
+        'mix-blend-mode': { type: 'enum', enum: ['normal','multiply','screen','overlay','darken','lighten','color-dodge','color-burn','hard-light','soft-light','difference','exclusion','hue','saturation','color','luminosity'] },
+
+        cursor: { type: 'enum', enum: ['default','pointer','move','text','grab','not-allowed'] },
+        'pointer-events': { type: 'enum', enum: ['auto','none'] },
+        'user-select': { type: 'enum', enum: ['auto','none','text','contain','all'] },
+
+        transition: { type: 'string' },
+        'transition-property': { type: 'string' },
+        'transition-duration': { type: 'string' },
+        'transition-timing-function': { type: 'string' },
+        'transition-delay': { type: 'string' },
+
+        animation: { type: 'string' },
+        'animation-name': { type: 'string' },
+        'animation-duration': { type: 'string' },
+        'animation-timing-function': { type: 'string' },
+        'animation-delay': { type: 'string' },
+        'animation-iteration-count': { type: 'string' },
+        'animation-direction': { type: 'string' },
+        'animation-fill-mode': { type: 'string' },
+        'animation-play-state': { type: 'string' },
+
+        'object-fit': { type: 'enum', enum: ['fill','contain','cover','none','scale-down'] },
+        'object-position': { type: 'string' },
     },
-
-    // 전역 허용/금지: 기본은 * 전체 허용, 위험 키만 금지
-    allow: ['*'],
-    deny:  ['behavior','content'],
-
-    // 값 제약(런타임/Export/Inspector에서 동일 적용)
-    constraints: {
-        opacity: { min: 0, max: 1, step: 0.01 },
-        borderRadius: { min: 0, max: 64 },
-        fontSize: { min: 8, max: 96 },
-        lineHeight: { min: 1, max: 2.5, step: 0.05 },
-        width: { min: 0, max: 4096 },
-        height: { min: 0, max: 4096 }
-    },
-
-    // 키군별 허용 값 소스
-    //  - token: "token:family.key"
-    //  - raw:   수치(px, 등) 또는 원시 값
-    //  - css-var: "var(--name)"
-    valueSources: {
-        color: ['token','raw','css-var'],
-        length: ['raw','token','css-var'],
-        radius: ['token','raw'],
-        font: ['token','raw'],
-        opacity: ['raw']
-    }
 };

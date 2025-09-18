@@ -1,141 +1,114 @@
-// 정책 계산의 단일 출처(SSOT). 오직 "순수 함수"만 존재해야 합니다.
-import type { Project, EditorUI, NodeId, TagPolicy } from '../core/types';
-import { GLOBAL_TAG_POLICIES } from '../policy/globalTagPolicy';
+// - 순수 함수. 어떤 store도 접근하지 않음.
+// - 정책 우선순위: TagPolicy → GlobalStylePolicy → (페이지-기본일 때만) ComponentPolicy
+import type {ProjectLike, UIStateLike, StyleGroupKey, StyleKey, TagName} from '../core/types';
+import { GLOBAL_TAG_POLICY } from '../policy/globalTagPolicy';
 import { GLOBAL_STYLE_POLICY } from '../policy/globalStylePolicy';
-import { deepMerge } from './deepMerge';
+import { KEY_TO_STYLEGROUP } from '../policy/StyleGroupKeys';
 
-// ────────────────────────────────────────────────
-// 내부 유틸(순수)
-// ────────────────────────────────────────────────
-function normalizeControlPath(path: string): { group: string; key: string } {
-    const p = path.startsWith('styles:') ? path.slice(7) : path;
-    const [group, key] = p.split('.');
-    return { group, key };
-}
-
-function resolveNodeTag(project: Readonly<Project>, nodeId: NodeId): string {
-    const node: any = project.nodes?.[nodeId];
-    const fromProps = node?.props?.__tag;
-    if (fromProps) return String(fromProps);
-    // 순수성 유지 차원에서 registry 접근은 하지 않습니다.
-    // props 우선, 없으면 'div'로 폴백.
-    return 'div';
-}
-
-function getTagPolicy(tag: string): TagPolicy | undefined {
-    return (GLOBAL_TAG_POLICIES as any)?.[tag];
-}
-
-// TagPolicy.groups → group/controls visible:true 시드
-function buildTagSeed(tagPolicy: Readonly<TagPolicy> | undefined): any {
-    if (!tagPolicy?.styles?.groups) return {};
-    const seed: any = {};
-    for (const [group, keys] of Object.entries(tagPolicy.styles.groups)) {
-        seed[group] = seed[group] ?? { visible: true, controls: {} };
-        for (const k of keys as string[]) {
-            seed[group].controls[k] = { visible: true };
-        }
+// 'styles:group.key' | 'styles:key' | 'key' → 'key'
+function normalizeControlPathToKey(path: string): StyleKey | null {
+    if (!path) return null;
+    const norm = path.replace(/:/g, '.');
+    const parts = norm.split('.');
+    if (parts[0] === 'styles') {
+        if (parts.length === 2) return parts[1];
+        if (parts.length >= 3) return parts.slice(2).join('.');
+        return null;
     }
-    return seed;
+    return path;
 }
 
-// 메인(1차) 속성 기본 시드 — 요구 사항: Layout의 display/size/overflow
-function buildMainSeed(): any {
-    return {
-        layout: {
-            visible: true,
-            controls: {
-                display: { visible: true },
-                size: { visible: true },
-                overflow: { visible: true },
-            },
-        },
-    };
+function isTagName(x: string): x is TagName {
+    // SSOT: GLOBAL_TAG_POLICY.allowedTags를 신뢰해 런타임 가드
+    return (GLOBAL_TAG_POLICY.allowedTags as string[]).includes(x);
 }
 
-// ComponentPolicy(inspector.controls) 평탄 키 → group overlay
-export function buildOverlayFromComponentPolicy(
-    compPolicy: Readonly<any> | undefined
-): any {
-    const overlay: any = {};
-    const flat = compPolicy?.inspector?.controls;
-    if (!flat) return overlay;
-
-    for (const [path, meta] of Object.entries(flat)) {
-        const { group, key } = normalizeControlPath(path);
-        if (!group || !key) continue;
-        overlay[group] = overlay[group] ?? { controls: {} };
-        overlay[group].controls[key] = { ...(overlay[group].controls[key] ?? {}) };
-        if ((meta as any).visible === false) {
-            overlay[group].controls[key].visible = false;
-        }
-    }
-    return overlay;
+function getNode(project: ProjectLike, nodeId: string) {
+    return project?.nodes?.[nodeId] ?? null;
 }
 
-// ────────────────────────────────────────────────
-// 허용 키 계산 (alias 포함, 순수)
-// ────────────────────────────────────────────────
+function getTag(project: ProjectLike, nodeId: string): TagName {
+    const n = getNode(project, nodeId);
+    const raw = (n?.props?.__tag as string) ?? GLOBAL_TAG_POLICY.defaultTag ?? 'div';
+    return isTagName(raw) ? raw : 'div';
+}
+
+function tagAllowsGroup(tag: TagName, group: StyleGroupKey): boolean {
+    const map = GLOBAL_TAG_POLICY.allowedSectionsByTag;
+    // TS7053 방지: tag는 이제 TagName
+    const arr = map[tag];
+    return Array.isArray(arr) ? arr.includes(group) : false;
+}
+
+function styleAllowedByGlobal(tag: TagName, key: string): boolean {
+    // deny 우선
+    if (GLOBAL_STYLE_POLICY.deny?.includes(key)) return false;
+    if (GLOBAL_STYLE_POLICY.byTag?.[tag]?.deny?.includes(key)) return false;
+
+    if (GLOBAL_STYLE_POLICY.allow?.includes(key)) return true;
+    if (GLOBAL_STYLE_POLICY.byTag?.[tag]?.allow?.includes(key)) return true;
+
+    return false;
+}
+
+function componentPolicyHidden(project: ProjectLike, nodeId: string, key: string, group: StyleGroupKey, ui: UIStateLike): boolean {
+    const isPageBasic = ui?.mode === 'page' && !ui?.expertMode;
+    if (!isPageBasic) return false; // 페이지-고급/컴포넌트 모드는 CP 무시
+
+    const n = getNode(project, nodeId);
+    const compId = n?.componentId;
+    if (!compId) return false;
+    const cp = project?.policies?.components?.[compId];
+    if (!cp?.inspector) return false;
+
+    const gvis = cp.inspector[group]?.visible;
+    if (gvis === false) return true; // 그룹 숨김 시 전부 숨김
+
+    const cvis = cp.inspector[group]?.controls?.[key]?.visible;
+    if (cvis === false) return true;
+
+    return false;
+}
+
 export function getAllowedStyleKeysForNode(
-    project: Readonly<Project>,
-    nodeId: NodeId,
-    opts?: {
-        expertMode?: boolean;     // 현재 버전에서는 allow/deny에 직접 영향 없음(deny/allow는 전역/태그에서 적용)
-        withSizeAlias?: boolean;  // width/height → size 추가
-    }
+    project: ProjectLike,
+    nodeId: string,
+    opts?: { expertMode?: boolean }
 ): Set<string> {
-    const tag = resolveNodeTag(project, nodeId);
-    const tagPolicy = getTagPolicy(tag);
+    const tag = getTag(project, nodeId);
+    const keys = Object.keys(KEY_TO_STYLEGROUP);
+    // ui.expertMode만 넘어온 경우를 고려해 내부 ui 작성
+    const ui: UIStateLike = { mode: 'page', expertMode: !!opts?.expertMode };
 
-    // 1) 태그 그룹에서 허용 키 수집
-    const allowed = new Set<string>();
-    const groups = tagPolicy?.styles?.groups ?? {};
-    for (const [, keys] of Object.entries(groups)) {
-        for (const k of keys as string[]) {
-            allowed.add(k);
-        }
+    const allowed: string[] = [];
+    for (const key of keys) {
+        const group = KEY_TO_STYLEGROUP[key] as StyleGroupKey;
+
+        if (!tagAllowsGroup(tag, group)) continue;
+        if (!styleAllowedByGlobal(tag, key)) continue;
+        if (componentPolicyHidden(project, nodeId, key, group, ui)) continue;
+
+        allowed.push(key);
     }
-
-    // 2) 전역 allow/deny 반영
-    (GLOBAL_STYLE_POLICY.allow ?? []).forEach((k) => allowed.add(k));
-    (GLOBAL_STYLE_POLICY.deny ?? []).forEach((k) => allowed.delete(k));
-    (tagPolicy?.styles?.deny ?? []).forEach((k) => allowed.delete(k));
-
-    // 3) alias: width/height 중 하나라도 있으면 size 허용
-    if (opts?.withSizeAlias && (allowed.has('width') || allowed.has('height'))) {
-        allowed.add('size');
-    }
-
-    return allowed;
+    return new Set(allowed);
 }
 
-// ────────────────────────────────────────────────
-// 메인(1차) 속성 가시성 판단 (기본 true, 명시적 false만 숨김) — 순수
-// ────────────────────────────────────────────────
 export function isControlVisibleForNode(
-    project: Readonly<Project>,
-    ui: Readonly<EditorUI>,
-    nodeId: NodeId,
-    controlPath: `${string}.${string}`,
-    opts?: {
-        componentOverlay?: Readonly<any>; // 컨트롤러/도메인에서 만들어 주입
-    }
+    project: ProjectLike,
+    ui: UIStateLike,
+    nodeId: string,
+    controlPath: string
 ): boolean {
-    const tag = resolveNodeTag(project, nodeId);
-    const tagPolicy = getTagPolicy(tag);
+    const key = normalizeControlPathToKey(controlPath);
+    if (!key) return false;
 
-    // 1) 메인 시드 + 태그 시드
-    let eff = deepMerge(buildMainSeed(), buildTagSeed(tagPolicy));
+    const tag = getTag(project, nodeId);
+    const group = KEY_TO_STYLEGROUP[key] as StyleGroupKey | undefined;
+    if (!group) return false;
 
-    // 2) Page & 비-Expert에서만 Component overlay 적용
-    if (ui?.mode === 'Page' && !ui?.expertMode && opts?.componentOverlay) {
-        eff = deepMerge(eff, opts.componentOverlay);
-    }
+    if (!tagAllowsGroup(tag, group)) return false;
+    if (!styleAllowedByGlobal(tag, key)) return false;
+    if (componentPolicyHidden(project, nodeId, key, group, ui)) return false;
 
-    // 3) 평가
-    const { group, key } = normalizeControlPath(controlPath);
-    const g = (eff as any)[group];
-    if (!g || g.visible === false) return false;
-    const c = g.controls?.[key];
-    return c?.visible !== false;
+    return true;
 }

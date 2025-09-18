@@ -14,14 +14,8 @@ import {
 import { renderValueControl } from '../util/controls';
 
 // 타입
-import type { StyleValues, SetStyleValue } from '../util/types';
-
-export interface AdvancedSectionProps {
-    values: StyleValues;
-    setValue: SetStyleValue;
-    locks: Record<string, boolean>;
-    onToggleLock: (k: string) => void;
-}
+import type {StyleValues, SetStyleValue, SectionProps} from '../util/types';
+import {StyleGroupKey} from "@/figmaV3/core/types";
 
 /**
  * Advanced / Overrides 섹션
@@ -32,12 +26,16 @@ export interface AdvancedSectionProps {
  * - Attributes: __ovrAttrs (textarea, "data-xx:1; aria-yy:true;" 형식)
  * - UX, 레이아웃, 잠금키 등은 원본과 100% 동일 유지
  */
-const AdvancedSection: React.FC<AdvancedSectionProps> = ({
-                                                             values,
-                                                             setValue,
-                                                             locks,
-                                                             onToggleLock,
-                                                         }) => {
+const AdvancedSection: React.FC<SectionProps> = ({
+                                                     values,
+                                                     setValue,
+                                                     locks,
+                                                     onToggleLock,
+                                                     expanded,
+                                                     openDetail,
+                                                     canLock,
+                                                     getCpVisible,
+                                                 }) => {
     const mode = values['__ovrMode'] ?? 'merge';
     const className = values['__ovrClass'] ?? '';
     const rawCss = values['__ovrRawCss'] ?? '';
