@@ -97,7 +97,7 @@ export function ComponentEditor() {
                             <Canvas dropTarget={dropTarget} />
                             <OverlayHost />
                         </div>
-                        <div className="w-[340px] shrink-0 bg-white border-l border-gray-200">
+                        <div className="w-[325px] shrink-0 bg-white border-l border-gray-200">
                             <Inspector />
                         </div>
                     </div>
