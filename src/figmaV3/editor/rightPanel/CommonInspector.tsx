@@ -296,8 +296,8 @@ export function CommonInspector(props: {
                     <GroupHeader
                         label="태그 & 속성"
                         Icon={TagIcon}
-                        locked={lockedTagGroup}
-                        onToggleLock={toggleTagGroupLock}
+                        locked={false}
+                        onToggleLock={undefined}
                     />
 
                     {/* As(tag) */}

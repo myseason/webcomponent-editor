@@ -22,8 +22,8 @@ export interface Node<
     S extends StyleBase = StyleBase
 > {
     id: NodeId;
-    parentId?: NodeId;
     componentId: string;
+    parentId?: NodeId;
     props: P;
     styles: S;
     children?: NodeId[];
@@ -189,7 +189,7 @@ export type ProjectLike = {
 
 export type UIStateLike = {
     /** 'page' | 'component' */
-    mode: 'page' | 'component';
+    mode: EditorMode;
     /** 페이지 모드에서 '고급'인지 여부 (고급이면 ComponentPolicy 무시) */
     expertMode?: boolean;
     /** 현재 선택된 노드 ID(선택) */
@@ -344,8 +344,9 @@ export interface BindingScope {
    5. Editor State & UI Models
    에디터의 상태와 UI 관련 구조를 정의합니다.
 ============================================================================= */
-
+// 개발 모드
 export type EditorMode = 'Page' | 'Component';
+
 export type LeftTabKind = 'Explorer' | 'Composer';
 export type ExplorerPreviewSel =
     | { kind: 'page' | 'component'; id: string }
@@ -356,7 +357,6 @@ export type BottomRightPanelKind = 'SchemaEditor' | 'PropVisibility' | 'Logs' | 
 export type ViewportMode = 'Unified' | 'Independent';
 
 export type ProjectHubTab = 'Pages' | 'Assets' | 'Components' | 'Layers' | 'Settings';
-
 export interface EditorUI {
     // --- Global ---
     selectedId: NodeId | null;
@@ -447,9 +447,3 @@ export type CSSDecl = Record<string, unknown>;
 export const VOID_TAGS: ReadonlySet<string> = new Set([
     'area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'
 ]);
-
-
-/* =============================================================================
-   개발 모드 정의
-============================================================================= */
-export type DevMode = 'Page' | 'Component';

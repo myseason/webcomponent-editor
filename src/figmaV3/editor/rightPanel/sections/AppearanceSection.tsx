@@ -8,7 +8,9 @@ import {
     GroupHeader,
     RowShell,
     LeftCell,
-    RightCell, DetailBlock,
+    RightCell,
+    DetailBlock,
+    GROUP_ICONS
 } from '../util/ui';
 import { renderValueControl } from '../util/controls';
 import { makeSelect, makeIcons, makeChips, makeColor, makeInput, makeRatio } from "@/figmaV3/editor/rightPanel/util/spec";
@@ -19,11 +21,6 @@ import {
     setIfEmpty,
 } from '../util/longhand';
 import {StyleGroupKey} from "@/figmaV3/core/types";
-
-// 아이콘 매핑
-const GROUP_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-    Border: Square,
-};
 
 /** Appearance 섹션 (원본 UI/UX & 동작 유지) */
 const AppearanceSection: React.FC<SectionProps> = ({
@@ -110,8 +107,9 @@ const AppearanceSection: React.FC<SectionProps> = ({
             <div className="border-b border-neutral-200">
                 <GroupHeader
                     label="Fill"
-                    locked={!!locks['appearance.fill']}
-                    onToggleLock={() => onToggleLock('appearance.fill')}
+                    Icon={GROUP_ICONS['Fill']}
+                    locked={canLock ? false : undefined}
+                    onToggleLock={canLock ? () => onToggleLock('appearance.fill') : undefined}
                 />
 
                 <RowShell>
@@ -283,8 +281,8 @@ const AppearanceSection: React.FC<SectionProps> = ({
                 <GroupHeader
                     label="Border"
                     Icon={GROUP_ICONS['Border']}
-                    locked={!!locks['appearance.border']}
-                    onToggleLock={() => onToggleLock('appearance.border')}
+                    locked={canLock ? false : undefined}
+                    onToggleLock={canLock ? () => onToggleLock('appearance.border') : undefined}
                 />
 
                 {/* border */}

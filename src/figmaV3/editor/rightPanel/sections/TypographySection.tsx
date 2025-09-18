@@ -8,17 +8,12 @@ import {
     GroupHeader,
     RowShell,
     LeftCell,
-    RightCell, WarningRow,
+    RightCell,
+    WarningRow,
+    GROUP_ICONS
 } from '../util/ui';
 import { renderValueControl } from '../util/controls';
 import { makeSelect, makeIcons, makeChips, makeColor, makeInput, makeRatio } from "@/figmaV3/editor/rightPanel/util/spec";
-import {StyleGroupKey} from "@/figmaV3/core/types";
-
-// 그룹 아이콘 매핑(원본과 동일한 의도)
-const GROUP_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-    Font: TypeIcon,
-    Text: TextIcon,
-};
 
 /** Typography 섹션 (원본 UI/UX & 동작 유지) */
 const TypographySection: React.FC<SectionProps> = ({
@@ -44,8 +39,8 @@ const TypographySection: React.FC<SectionProps> = ({
                 <GroupHeader
                     label="Font"
                     Icon={GROUP_ICONS['Font']}
-                    locked={locks['typo.font']}
-                    onToggleLock={() => onToggleLock('typo.font')}
+                    locked={canLock ? false : undefined}
+                    onToggleLock={canLock ? () => onToggleLock('typo.font') : undefined}
                 />
                 <RowShell>
                     <LeftCell title="글꼴" />
@@ -126,8 +121,8 @@ const TypographySection: React.FC<SectionProps> = ({
                 <GroupHeader
                     label="Text"
                     Icon={GROUP_ICONS['Text']}
-                    locked={locks['typo.text']}
-                    onToggleLock={() => onToggleLock('typo.text')}
+                    locked={canLock ? false : undefined}
+                    onToggleLock={canLock ? () => onToggleLock('typo.text') : undefined}
                 />
 
                 <RowShell>
@@ -223,8 +218,9 @@ const TypographySection: React.FC<SectionProps> = ({
             <div className="border-b border-neutral-200">
                 <GroupHeader
                     label="Content Flow"
-                    locked={locks['typo.flow']}
-                    onToggleLock={() => onToggleLock('typo.flow')}
+                    Icon={GROUP_ICONS['Content Flow']}
+                    locked={canLock ? false : undefined}
+                    onToggleLock={canLock ? () => onToggleLock('typo.flow') : undefined}
                 />
                 {ellipsisBlocked && (
                     <WarningRow message="‘ellipsis’가 보이려면 Layout의 overflow를 hidden/clip으로, Typography의 whiteSpace를 nowrap으로 설정하세요." />

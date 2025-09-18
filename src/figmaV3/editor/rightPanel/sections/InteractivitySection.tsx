@@ -8,6 +8,7 @@ import {
     RowShell,
     LeftCell,
     RightCell,
+    GROUP_ICONS
 } from '../util/ui';
 
 // 단일 컨트롤 렌더 함수
@@ -19,7 +20,6 @@ import type {PropertySpec, SectionProps} from '../util/types';
 // 섹션 공용 타입/팩토리
 import type { StyleValues, SetStyleValue } from '../util/types';
 import { makeSelect } from '../util/spec';
-import {StyleGroupKey} from "@/figmaV3/core/types";
 
 /**
  * Interactivity 섹션
@@ -40,8 +40,9 @@ export const InteractivitySection: React.FC<SectionProps> = ({
         <div className="border-b border-neutral-200">
             <GroupHeader
                 label="User Interaction"
-                locked={locks['interact.user']}
-                onToggleLock={() => onToggleLock('interact.user')}
+                Icon={GROUP_ICONS['User Interaction']}
+                locked={canLock ? false : undefined}
+                onToggleLock={canLock ? () => onToggleLock('interact.user') : undefined}
             />
 
             {/* cursor */}

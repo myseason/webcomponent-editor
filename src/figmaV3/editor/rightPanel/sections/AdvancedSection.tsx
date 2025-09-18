@@ -8,6 +8,7 @@ import {
     RowShell,
     LeftCell,
     RightCell,
+    GROUP_ICONS
 } from '../util/ui';
 
 // 컨트롤 렌더러
@@ -46,8 +47,9 @@ const AdvancedSection: React.FC<SectionProps> = ({
         <div className="border-b border-neutral-200">
             <GroupHeader
                 label="Advanced / Overrides"
-                locked={!!locks['advanced.overrides']}
-                onToggleLock={() => onToggleLock('advanced.overrides')}
+                Icon={GROUP_ICONS['Advanced']}
+                locked={canLock ? false : undefined}
+                onToggleLock={canLock ? () => onToggleLock('advanced.overrides') : undefined}
             />
 
             {/* Mode */}

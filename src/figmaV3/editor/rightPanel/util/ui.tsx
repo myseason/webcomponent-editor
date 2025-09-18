@@ -2,11 +2,42 @@
 
 import React from 'react';
 import {
-    Lock, Unlock, ChevronDown, ChevronRight, Info, Wand2, AlertTriangle
+    Lock, Unlock, ChevronDown, ChevronRight, Info, Wand2, AlertTriangle, TypeIcon, TextIcon, Square, Grid2x2, Maximize,
+    MoveHorizontal, Crosshair, AlignJustify, Droplet, Eye, Move3d, Timer, MousePointer, Shuffle
 } from 'lucide-react';
 
 import { PropertySpec, StyleValues, SetStyleValue } from "./types";
 import {renderValueControl} from "./controls";
+
+
+// 그룹 아이콘 매핑(원본과 동일한 의도)
+export const GROUP_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+    // Layout
+    'Display & Flow': Grid2x2,
+    Sizing: Maximize,
+    Spacing: MoveHorizontal,
+    Position: Crosshair,
+
+    // Typography
+    Font: TypeIcon,
+    Text: TextIcon,
+    'Content Flow': AlignJustify,
+
+    // Appearance
+    Fill: Droplet,
+    Border: Square,
+
+    // Effects
+    Visual: Eye,
+    Transform:Move3d, // Crop
+    Transition: Timer, // Clock
+
+    // Interactivity
+    'User Interaction': MousePointer, // Pointer
+
+    // Advanced / Override
+    Advanced: Shuffle, // Replace
+};
 
 //----------------------------------------------------------------------------------------------------------------------
 // 알림 관련

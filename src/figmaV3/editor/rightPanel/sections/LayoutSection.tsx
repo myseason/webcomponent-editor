@@ -8,7 +8,11 @@ import {
     GroupHeader,
     RowShell,
     LeftCell,
-    RightCell, DetailBlock, InlineInfo, NoticeRow,
+    RightCell,
+    DetailBlock,
+    NoticeRow,
+    InlineInfo,
+    GROUP_ICONS
 } from '../util/ui';
 import { renderValueControl } from '../util/controls';
 import { makeSelect, makeIcons, makeChips, makeColor, makeInput, makeRatio } from "@/figmaV3/editor/rightPanel/util/spec";
@@ -17,15 +21,6 @@ import {
     expandBoxShorthand,
     setIfEmpty, disabledWithReason,
 } from '../util/longhand';
-import {StyleGroupKey} from "@/figmaV3/core/types";
-
-// 그룹 아이콘 매핑 (원본과 동일)
-const GROUP_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-    'Display & Flow': Grid2x2,
-    Sizing: Maximize,
-    Spacing: MoveHorizontal,
-    Position: Crosshair,
-};
 
 /** Layout 섹션 (원본 UI/UX & 동작 그대로 유지) */
 export const LayoutSection: React.FC<SectionProps> = ({
@@ -108,11 +103,6 @@ export const LayoutSection: React.FC<SectionProps> = ({
         },
     });
 
-    const headerLockedDisplay  = canLock ? (getCpVisible?.('displayFlow') === false) : !!locks['layout.display'];
-    const headerLockedPosition = canLock ? (getCpVisible?.('position')    === false) : !!locks['layout.position'];
-    const headerLockedSizing   = canLock ? (getCpVisible?.('sizing')      === false) : !!locks['layout.sizing'];
-    const headerLockedSpacing  = canLock ? (getCpVisible?.('spacing')     === false) : !!locks['layout.spacing'];
-
     return (
         <>
             {/* Display & Flow */}
@@ -120,7 +110,7 @@ export const LayoutSection: React.FC<SectionProps> = ({
                 <GroupHeader
                     label="Display & Flow"
                     Icon={GROUP_ICONS['Display & Flow']}
-                    locked={canLock ? headerLockedDisplay : undefined}
+                    locked={canLock ? false : undefined}
                     onToggleLock={canLock ? () => onToggleLock('layout.display') : undefined}
                 />
 
@@ -413,10 +403,10 @@ export const LayoutSection: React.FC<SectionProps> = ({
             {/* position */}
             <div className="border-b border-neutral-200">
                 <GroupHeader
-                    label="위치"
+                    label="Position"
                     Icon={GROUP_ICONS?.Position ?? Crosshair}
-                    locked={!!locks['layout.position']}
-                    onToggleLock={() => onToggleLock('layout.position')}
+                    locked={canLock ? false : undefined}
+                    onToggleLock={canLock ? () => onToggleLock('layout.position') : undefined}
                 />
                 {/* position: static이면 offsets 비활성 + 안내 배너 */}
                 {(() => {
@@ -511,8 +501,8 @@ export const LayoutSection: React.FC<SectionProps> = ({
                 <GroupHeader
                     label="Sizing"
                     Icon={GROUP_ICONS['Sizing']}
-                    locked={locks['layout.sizing']}
-                    onToggleLock={() => onToggleLock('layout.sizing')}
+                    locked={canLock ? false : undefined}
+                    onToggleLock={canLock ? () => onToggleLock('layout.sizing') : undefined}
                 />
                 {/* 새 전용 메시지 Row (RowShell 바깥에서 한 줄 전체 사용) */}
                 {!locks['layout.sizing'] && sizingState.reason && (
@@ -628,8 +618,8 @@ export const LayoutSection: React.FC<SectionProps> = ({
                 <GroupHeader
                     label="Spacing"
                     Icon={GROUP_ICONS['Spacing']}
-                    locked={locks['layout.spacing']}
-                    onToggleLock={() => onToggleLock('layout.spacing')}
+                    locked={canLock ? false : undefined}
+                    onToggleLock={canLock ? () => onToggleLock('layout.spacing') : undefined}
                 />
 
                 {/* padding */}

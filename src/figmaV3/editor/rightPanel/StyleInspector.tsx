@@ -31,22 +31,14 @@ type Props = {
 };
 
 export default function StyleInspector({ nodeId, componentId, width = 360 }: Props) {
-
     const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
 
-    // === VM: 모드/고급 여부 ===
-    const vm = reader.getInspectorVM?.() as {
-        mode?: 'page' | 'component';
-        expertMode?: boolean;
-        target?: { nodeId: NodeId; componentId: string | null } | null;
-    };
-    const uiModeRaw = reader.getUI?.().mode as string | undefined;
-    const modeRaw = vm?.mode ?? uiModeRaw ?? 'Page';
-    const mode = ('' + modeRaw).toLowerCase() as 'page' | 'component';
-    const expertMode = vm?.expertMode ?? !! reader.getUI?.().expertMode;
-    const isComponentMode = mode === 'component';
+    // === 모드/고급 (EditorMode는 'Page' | 'Component')
+    const ui = reader.getUI?.();
+    const mode = ui?.mode === 'Component' ? 'Component' : 'Page';
+    const expertMode = !!ui?.expertMode;
 
-    // === 값 동기화 (무한 루프 방지: reader를 deps에 넣지 않음 + shallowEqual) ===
+    // === 값 동기화 (무한 루프 방지: reader deps 제외 + shallowEqual)
     const [values, setValues] = React.useState<Values>({});
 
     React.useEffect(() => {
@@ -65,25 +57,24 @@ export default function StyleInspector({ nodeId, componentId, width = 360 }: Pro
         });
     }, [nodeId]);
 
-    // === 값 쓰기: 엔진 도메인으로 위임 ===
+    // === 값 쓰기: 엔진 도메인으로 위임
     const setValue = React.useCallback(
         (key: string, val: any) => {
-            // 로컬 즉시 반영(깜빡임 예방). 필요 없으면 주석처리 가능
             setValues((p) => ({ ...p, [key]: val }));
             writer.updateNodeStyles?.(nodeId, { [key]: val });
         },
         [nodeId, writer]
     );
 
-    // === 그룹 가시성 (정책/모드 내부 반영) ===
+    // === 그룹 가시성 (엔진이 Tag/Style/CP/고급모드 반영해서 반환)
     const isGroupVisible = React.useCallback(
         (g: StyleGroupKey) => reader.isStyleGroupVisible?.(nodeId, g) ?? false,
         [reader, nodeId]
     );
 
-    // === 잠금 표시(페이지 기본에서만 “숨김=잠김처럼 보이기”) ===
+    // === 잠금 표시(페이지 기본에서만 “숨김=잠김처럼 보이기”)
     const locks = React.useMemo(() => {
-        if (isComponentMode || expertMode) {
+        if (mode === 'Component' || expertMode) {
             // 컴포넌트 모드/페이지 고급: 잠금 개념 표시하지 않음
             return {
                 'layout.display': false,
@@ -97,49 +88,52 @@ export default function StyleInspector({ nodeId, componentId, width = 360 }: Pro
                 'layout.advanced': false,
             };
         }
-        // 페이지 기본: CP가 숨긴 섹션은 잠김처럼 표시
+        // 페이지 기본: CP까지 반영된 가시성으로 “잠김처럼” 비활성
         return {
             'layout.display': !isGroupVisible('displayFlow'),
             'layout.position': !isGroupVisible('position'),
             'layout.sizing': !isGroupVisible('sizing'),
             'layout.spacing': !isGroupVisible('spacing'),
             'layout.typography': !isGroupVisible('typography'),
-            'layout.appearance': !isGroupVisible('background'), // Appearance가 background/border 묶음일 경우
+            'layout.appearance': !isGroupVisible('background'),
             'layout.effects': !isGroupVisible('effects'),
             'layout.interactivity': !isGroupVisible('interactivity'),
             'layout.advanced': !isGroupVisible('advanced'),
         };
-    }, [isComponentMode, expertMode, isGroupVisible]);
+    }, [mode, expertMode, isGroupVisible]);
 
-    // === 컴포넌트 모드에서만 lock 버튼 노출 ===
-    const canLock = isComponentMode && !!componentId;
+    // === 락 버튼 노출 규칙
+    // 정책: Page 모드에서는 expertMode와 무관하게 절대 락 버튼 미노출
+    //      Component 모드에서만 락 버튼 노출 + 클릭 시 CP upsert
+    const canLock = mode === 'Component';
 
-    // CP 가시성 읽기(아이콘/툴팁 표시에 사용하고 싶을 때)
+    // === 컴포넌트 ID 해석 (props > node → compId)
+    const resolvedComponentId =
+        componentId ?? reader.getNode?.(nodeId)?.componentId ?? null;
+
+    // === CP 가시성 읽기(아이콘/툴팁 등 참고 — 컴포넌트 모드에서만 의미)
     const getCpVisible = React.useCallback(
         (g: StyleGroupKey) => {
-            if (!canLock) return undefined;
-
-            // 1) 컨트롤러 리더가 있으면 우선 사용
-            const viaReader = reader.getComponentGroupVisibility?.(componentId as string, g);
+            if (!canLock || !resolvedComponentId) return undefined;
+            const viaReader = reader.getComponentGroupVisibility?.(resolvedComponentId, g);
             if (typeof viaReader === 'boolean') return viaReader;
 
-            // 2) 폴백: 프로젝트에서 직접 읽기 (스키마: policies.components[compId].inspector.groups[g].visible)
+            // 폴백: policies.components[compId].inspector[g].visible
             try {
                 const proj = reader.getProject?.();
-                const grp = proj?.policies?.components?.[componentId as string]?.inspector?.groups?.[g as any];
-                if (grp && typeof grp.visible === 'boolean') return grp.visible;
+                const v = (proj?.policies?.components?.[resolvedComponentId]?.inspector as any)?.[g]?.visible;
+                if (typeof v === 'boolean') return v;
             } catch {}
 
-            // 기본값: 표시는 true(= 페이지 기본에서 보임)
             return true;
         },
-        [canLock, componentId, reader]
+        [canLock, resolvedComponentId, reader]
     );
 
-    // === lock 토글: CP 저장 + 토스트 ===
+    // === 락 토글: ComponentPolicy upsert
     const onToggleLock = React.useCallback(
         (lockKey: string) => {
-            if (!canLock) return;
+            if (!canLock || !resolvedComponentId) return;
 
             const map: Record<string, StyleGroupKey> = {
                 'layout.display': 'displayFlow',
@@ -158,32 +152,24 @@ export default function StyleInspector({ nodeId, componentId, width = 360 }: Pro
             const currentVisible = getCpVisible(gk);
             const nextVisible = !(currentVisible ?? true);
 
-            // 1) 표준 경로: 컨트롤러 writer 존재 시
             if (writer.setStyleGroupVisibility) {
-                writer.setStyleGroupVisibility(componentId as string, gk, nextVisible);
-            }
-            // 2) 폴백: updateComponentPolicy deep-merge 지원 시
-            else if (writer.updateComponentPolicy) {
-                writer.updateComponentPolicy(componentId as string, {
+                writer.setStyleGroupVisibility(resolvedComponentId, gk, nextVisible);
+            } else if (writer.updateComponentPolicy) {
+                writer.updateComponentPolicy(resolvedComponentId, {
                     inspector: {
-                        groups: {
-                            [gk]: { visible: nextVisible },
-                        },
+                        [gk]: { visible: nextVisible },
                     } as any,
                 });
             } else {
                 console.warn('[StyleInspector] No writer to set group visibility');
             }
 
-            writer.setNotification?.({
-                type: 'info',
-                message: '페이지 개발 모드에서 해당 속성을 변경할 수 없습니다.',
-            });
+            writer.setNotification?.('페이지 개발 모드에서 해당 속성을 변경할 수 없습니다.');
         },
-        [canLock, componentId, writer, getCpVisible]
+        [canLock, resolvedComponentId, writer, getCpVisible]
     );
 
-    // === 섹션 접힘/디테일 상태 (로컬) ===
+    // === 섹션 접힘/디테일 상태 (로컬)
     const [collapsed, setCollapsed] = React.useState<Record<
         'Layout' | 'Typography' | 'Appearance' | 'Effects' | 'Interactivity' | 'Advanced',
         boolean
@@ -201,13 +187,15 @@ export default function StyleInspector({ nodeId, componentId, width = 360 }: Pro
         setExpanded((prev) => {
             const opening = !prev[detailKey];
             if (opening && seed) {
-                try { seed(); } catch {}
+                try {
+                    seed();
+                } catch {}
             }
             return { ...prev, [detailKey]: !prev[detailKey] };
         });
     }, []);
 
-    // === 렌더 ===
+    // === 렌더
     return (
         <>
             {/* Layout */}
@@ -315,8 +303,10 @@ export default function StyleInspector({ nodeId, componentId, width = 360 }: Pro
                 </SectionFrame>
             )}
 
-            {/* Advanced */}
-            {isGroupVisible('advanced') && (
+            {/* Advanced — ✅ 페이지 모드에서는 고급일 때만 노출 */}
+            {(mode === 'Component'
+                ? isGroupVisible('advanced')
+                : (expertMode && isGroupVisible('advanced'))) && (
                 <SectionFrame
                     title="Advanced"
                     Icon={Sparkles}

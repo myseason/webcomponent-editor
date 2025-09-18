@@ -7,7 +7,9 @@ import {
     RowShell,
     LeftCell,
     RightCell,
-    DetailBlock, WarningRow,        // 상세 블록 (util/ui)
+    DetailBlock,
+    WarningRow,        // 상세 블록 (util/ui)
+    GROUP_ICONS
 } from '../util/ui';
 
 import { renderValueControl } from '../util/controls';
@@ -22,7 +24,7 @@ import {
 } from '../util/longhand';
 
 import {makeChips, makeSelect, makeInput } from "../util/spec";
-import {StyleGroupKey} from "@/figmaV3/core/types";
+
 
 /** Effects 섹션 (Visual / Transform / Transition) */
 const EffectsSection: React.FC<SectionProps> = ({
@@ -124,8 +126,9 @@ const EffectsSection: React.FC<SectionProps> = ({
             <div className="border-b border-neutral-200">
                 <GroupHeader
                     label="Visual"
-                    locked={!!locks['effects.visual']}
-                    onToggleLock={() => onToggleLock('effects.visual')}
+                    Icon={GROUP_ICONS['Visual']}
+                    locked={canLock ? false : undefined}
+                    onToggleLock={canLock ? () => onToggleLock('effects.visual') : undefined}
                 />
 
                 {/* opacity */}
@@ -233,8 +236,9 @@ const EffectsSection: React.FC<SectionProps> = ({
             <div className="border-b border-neutral-200">
                 <GroupHeader
                     label="Transform"
-                    locked={!!locks['effects.transform']}
-                    onToggleLock={() => onToggleLock('effects.transform')}
+                    Icon={GROUP_ICONS['Transform']}
+                    locked={canLock ? false : undefined}
+                    onToggleLock={canLock ? () => onToggleLock('effects.transform') : undefined}
                 />
                 {/* transform (메인 + 상세) */}
                 <RowShell>
@@ -321,8 +325,9 @@ const EffectsSection: React.FC<SectionProps> = ({
             <div className="border-b border-neutral-200">
                 <GroupHeader
                     label="Transition"
-                    locked={!!locks['effects.transition']}
-                    onToggleLock={() => onToggleLock('effects.transition')}
+                    Icon={GROUP_ICONS['Transition']}
+                    locked={canLock ? false : undefined}
+                    onToggleLock={canLock ? () => onToggleLock('effects.transition') : undefined}
                 />
                 {transitionBlocked && (
                     <WarningRow message="transitionProperty가 none이면 전환 효과가 적용되지 않습니다." />

@@ -39,12 +39,17 @@ export function Inspector() {
     const ui = reader.getUI();
     const { rootId, fragments, nodes } = reader.getProject();
 
-    const mode = ui.mode as 'Page' | 'Component';
+    const mode = ui?.mode === 'Component' ? 'Component' : 'Page';
     const selectedId = ui.selectedId as NodeId | null | undefined;
     const editingFragmentId = ui.editingFragmentId as string | null | undefined;
     const expertMode = !!ui.expertMode;
 
-    // const [isSaveDialogOpen, setIsSaveDialogOpen] = React.useState(false); // ← 사용 중지
+    const isPage = mode === 'Page';
+    const selId = ui?.selectedId;
+    const selNode = selId ? reader.getProject().nodes[selId] : null;
+    const canSaveAs = isPage && selNode?.componentId === 'box';
+
+    const [isSaveDialogOpen, setIsSaveDialogOpen] = React.useState(false); // ← 사용 중지
 
     // 대상 노드 선택: Page 모드면 현재 선택(or 루트), Component 모드면 편집 중 프래그먼트 루트
     const targetNodeId: NodeId | null =
@@ -122,15 +127,15 @@ export function Inspector() {
 
                         {/* Save as Component — 요청에 따라 주석 처리 */}
                         {/*
-            {mode === 'Page' && expertMode && dialogNodeId && (
-              <button
-                className="rounded border border-gray-300 px-2 py-1 text-xs"
-                onClick={() => setIsSaveDialogOpen(true)}
-              >
-                Save as Component
-              </button>
-            )}
-            */}
+                        {mode === 'Page' && expertMode && dialogNodeId && (
+                          <button
+                            className="rounded border border-gray-300 px-2 py-1 text-xs"
+                            onClick={() => setIsSaveDialogOpen(true)}
+                          >
+                            Save as Component
+                          </button>
+                        )}
+                        */}
                     </div>
                 </div>
             </div>
