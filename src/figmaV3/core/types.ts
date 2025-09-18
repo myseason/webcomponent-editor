@@ -447,3 +447,9 @@ export type CSSDecl = Record<string, unknown>;
 export const VOID_TAGS: ReadonlySet<string> = new Set([
     'area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'
 ]);
+
+
+/* =============================================================================
+   개발 모드 정의
+============================================================================= */
+export type DevMode = 'Page' | 'Component';

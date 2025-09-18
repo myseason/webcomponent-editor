@@ -369,26 +369,32 @@ export function makeSmartController<R extends object, W extends object>(
     opts?: {
         aspect?: Aspect;               // Reader 전역 Aspect
         writerAspect?: Aspect;         // Writer 전용 전역 Aspect (writer 호출 후 리렌더 등)
-        wrap?: Record<string, WrapEntry>;
+        readerWrap?: Record<string, WrapEntry>;
+        writerWrap?: Record<string, WrapEntry>;
     }
 ): ExposeBuilder<R, W> {
     const readerWraps: WrapMaps = { methodAspects: {}, methodWrappers: {} };
     const writerWraps: WrapMaps = { methodAspects: {}, methodWrappers: {} };
-
-    if (opts?.wrap) {
-        for (const k of Object.keys(opts.wrap)) {
-            const entry = opts.wrap[k];
+    const wrap = (wrapList: Record<string, WrapEntry>, wrapMap: WrapMaps) => {
+        for (const k of Object.keys(wrapList)) {
+            const entry = wrapList[k];
             const { aspect, wrapper } = splitWrapEntry(entry);
             if (aspect) {
-                readerWraps.methodAspects[k] = aspect;
-                writerWraps.methodAspects[k] = aspect;
+                wrapMap.methodAspects[k] = aspect;
             }
             if (wrapper) {
-                readerWraps.methodWrappers[k] = wrapper;
-                writerWraps.methodWrappers[k] = wrapper;
+                wrapMap.methodWrappers[k] = wrapper;
             }
         }
     }
+
+    if (opts?.readerWrap) {
+        wrap(opts.readerWrap, readerWraps);
+    }
+    if (opts?.writerWrap) {
+        wrap(opts.writerWrap, writerWraps);
+    }
+
 
     // rerender을 위한 aspect
     const resolvedWriterAspect: Aspect | undefined =

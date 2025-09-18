@@ -45,7 +45,7 @@ export function useBottomControllerFactory(domain?: BottomDomain): { reader: any
 function createDockController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Dock', RE, WE, {
         //writerAspect: writerRerenderAspect,
-        wrap: { toggleBottomDock: withLog('toggleBottomDock'), update: withLog('update') },
+        writerWrap: { toggleBottomDock: withLog('toggleBottomDock'), update: withLog('update') },
     });
     return ctl
         .exposeAll()
@@ -57,7 +57,7 @@ function createDockController(RE: any, WE: any) {
 function createFlowsController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Flows', RE, WE, {
         //writerAspect: writerRerenderAspect,
-        wrap: {
+        writerWrap: {
             addFlowEdge: withLog('addFlowEdge'),
             updateFlowEdge: withLog('updateFlowEdge'),
             removeFlowEdge: withLog('removeFlowEdge'),
@@ -74,7 +74,7 @@ function createFlowsController(RE: any, WE: any) {
 function createDataController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Data', RE, WE, {
         //writerAspect: writerRerenderAspect,
-        wrap: { update: withLog('update') },
+        writerWrap: { update: withLog('update') },
     });
 
     return ctl
@@ -87,7 +87,7 @@ function createDataController(RE: any, WE: any) {
 function createActionsController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Actions', RE, WE, {
         //writerAspect: writerRerenderAspect,
-        wrap: {
+        writerWrap: {
             setActionSteps: withLog('setActionSteps'),
             runActionSteps: withLog('runActionSteps'),
         },
@@ -102,7 +102,7 @@ function createActionsController(RE: any, WE: any) {
 
 function createFragmentsController(RE: any, WE: any) {
     const ctl = makeSmartController('Bottom/Fragments', RE, WE, {
-        wrap: {
+        writerWrap: {
             addFragment: withLog('addFragment'),
             removeFragment: withLog('removeFragment'),
             openFragment: withLog('openFragment'),

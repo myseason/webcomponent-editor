@@ -205,11 +205,15 @@ export const GroupHeader: React.FC<{
     locked?: boolean;
     onToggleLock?: () => void;
 }> = ({ label, Icon, locked, onToggleLock }) => {
+
+    const showLock = typeof onToggleLock === 'function';
+
     return (
         <div className="px-3 py-2 border-b border-neutral-200 bg-transparent">
             <div className="flex items-center">
                 {Icon ? <Icon size={13} className="text-neutral-700 mr-2" /> : null}
                 <div className="text-[11px] font-semibold text-neutral-800">{label}</div>
+                {showLock && (
                 <div className="ml-auto">
                     <button
                         className="p-1 rounded hover:bg-neutral-100"
@@ -220,6 +224,7 @@ export const GroupHeader: React.FC<{
                         {locked ? <Lock size={14} /> : <Unlock size={14} />}
                     </button>
                 </div>
+               )}
             </div>
         </div>
     );

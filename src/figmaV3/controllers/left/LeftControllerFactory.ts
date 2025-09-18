@@ -51,7 +51,7 @@ export function useLeftControllerFactory(domain?: LeftDomain): { reader: any; wr
 function createPagesController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Pages', RE, WE, {
         writerAspect: writerRerenderAspect,
-        wrap: {
+        writerWrap: {
             addPage: withLog('addPage'),
             removePage: withLog('removePage'),
             duplicatePage: withLog('duplicatePage'),
@@ -69,7 +69,7 @@ function createPagesController(RE: any, WE: any) {
 function createLayersController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Layers', RE, WE, {
         writerAspect: writerRerenderAspect,
-        wrap: {
+        writerWrap: {
             //select: withLog('select'),
             moveNode: withLog('moveNode'),
             toggleNodeVisibility: withLog('toggleNodeVisibility'),
@@ -88,7 +88,7 @@ function createLayersController(RE: any, WE: any) {
 function createComponentsController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Components', RE, WE, {
         writerAspect: writerRerenderAspect,
-        wrap: {
+        writerWrap: {
             addFragment: withLog('addFragment'),
             updateFragment: withLog('updateFragment'),
             removeFragment: withLog('removeFragment'),
@@ -119,7 +119,7 @@ function createComponentsController(RE: any, WE: any) {
 function createAssetsController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Assets', RE, WE, {
         writerAspect: writerRerenderAspect,
-        wrap: {
+        writerWrap: {
             addAsset: withLog('addAsset'),
             removeAsset: withLog('removeAsset'),
             updateGlobalCss: withLog('updateGlobalCss'),
@@ -147,7 +147,7 @@ function createStylesheetsController(RE: any, WE: any) {
 function createPaletteController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Palette', RE, WE, {
         writerAspect: writerRerenderAspect,
-        wrap: {
+        writerWrap: {
             addByDef: withLog('addByDef'),
             insertComponent: withLog('insertComponent'),
             removeFragment: withLog('removeFragment'),
@@ -164,7 +164,7 @@ function createPaletteController(RE: any, WE: any) {
 function createTemplatesController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Templates', RE, WE, {
         writerAspect: writerRerenderAspect,
-        wrap: {
+        writerWrap: {
             insertComponent: withLog('insertComponent'),
             removeFragment: withLog('removeFragment'),
         },
@@ -178,7 +178,7 @@ function createTemplatesController(RE: any, WE: any) {
 
 function createSidebarController(RE: any, WE: any) {
     const ctl = makeSmartController('Left/Sidebar', RE, WE, {
-        wrap: {
+        writerWrap: {
             setActiveHubTab: withLog('setActiveHubTab'),
             toggleLeftPanelSplit: withLog('toggleLeftPanelSplit'),
             setLeftPanelSplitPercentage: withLog('setLeftPanelSplitPercentage'),

@@ -47,7 +47,7 @@ type InspectorVM = {
 function createInspectorController(RE: any, WE: any) {
     const ctl = makeSmartController('Right/Inspector', RE, WE, {
         // writerAspect: writerRerenderAspect,
-        wrap: {
+        writerWrap: {
             updateNodeStyles: withLog('updateNodeStyles'),
             updateNodeProps: withLog('updateNodeProps'),
             setNotification: withLog('setNotification'),
@@ -62,7 +62,8 @@ function createInspectorController(RE: any, WE: any) {
         .attachReader('getInspectorVM', (): InspectorVM => {
             const ui = RE.getUI?.();
             const nodeId: NodeId | null = ui?.selectedId ?? null;
-            if (!nodeId) return { target: null };
+            if (!nodeId)
+                return { target: null };
 
             const node = RE.getNode(nodeId);
             if (!node) return { target: null };
@@ -124,7 +125,7 @@ function createInspectorController(RE: any, WE: any) {
 
 function createPolicyController(RE: any, WE: any) {
     const ctl = makeSmartController('Right/Policy', RE, WE, {
-        wrap: {
+        writerWrap: {
             updateComponentPolicy: withLog('updateComponentPolicy'),
         },
     });

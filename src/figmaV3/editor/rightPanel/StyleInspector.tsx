@@ -40,8 +40,10 @@ export default function StyleInspector({ nodeId, componentId, width = 360 }: Pro
         expertMode?: boolean;
         target?: { nodeId: NodeId; componentId: string | null } | null;
     };
-    const mode = vm?.mode ?? 'page';
-    const expertMode = !!vm?.expertMode;
+    const uiModeRaw = reader.getUI?.().mode as string | undefined;
+    const modeRaw = vm?.mode ?? uiModeRaw ?? 'Page';
+    const mode = ('' + modeRaw).toLowerCase() as 'page' | 'component';
+    const expertMode = vm?.expertMode ?? !! reader.getUI?.().expertMode;
     const isComponentMode = mode === 'component';
 
     // === 값 동기화 (무한 루프 방지: reader를 deps에 넣지 않음 + shallowEqual) ===
