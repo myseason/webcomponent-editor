@@ -19,11 +19,8 @@ export enum RightDomain {
 export function useRightControllerFactory(
     domain?: RightDomain
 ): { reader: any; writer: any } {
-    const { reader: RE, writer: WE } = useEditorApi([
-        EditorDomain.Policy,
-        EditorDomain.Fragment,
-    ]);
 
+    const { reader: RE, writer: WE } = useEditorApi([ EditorDomain.Policy, EditorDomain.Fragment,]);
     // re render
     useRerenderOnWrite();
 
@@ -35,6 +32,7 @@ export function useRightControllerFactory(
             default:
                 return createInspectorController(RE, WE);
         }
+
     }, [domain, RE, WE]);
 }
 
@@ -45,6 +43,7 @@ type InspectorVM = {
 };
 
 function createInspectorController(RE: any, WE: any) {
+
     const ctl = makeSmartController('Right/Inspector', RE, WE, {
         // writerAspect: writerRerenderAspect,
         writerWrap: {

@@ -304,9 +304,7 @@ export default function StyleInspector({ nodeId, componentId, width = 360 }: Pro
             )}
 
             {/* Advanced — ✅ 페이지 모드에서는 고급일 때만 노출 */}
-            {(mode === 'Component'
-                ? isGroupVisible('advanced')
-                : (expertMode && isGroupVisible('advanced'))) && (
+            {(mode === 'Component' || expertMode) && (
                 <SectionFrame
                     title="Advanced"
                     Icon={Sparkles}

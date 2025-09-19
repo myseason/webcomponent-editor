@@ -1,0 +1,373 @@
+{
+  "version": "1.4",
+  "meta": {
+    "name": "Default Style Policy",
+    "description": "Inspector 컨트롤, 값 스키마, 단위/토큰/상태/뷰포트 제약 정의",
+    "compat": ">=2025.01"
+  },
+
+  "groups": {
+    "Layout.Display&Flow": {
+      "controls": [
+        {
+          "id": "display",
+          "label": "Display",
+          "type": "select",
+          "bind": { "styleKeys": ["display"] },
+          "valueSchema": { "type": "enum", "enum": ["block","inline","inline-block","flex","grid","none"] }
+        },
+        {
+          "id": "flexDirection",
+          "label": "Direction",
+          "type": "segmented",
+          "bind": { "styleKeys": ["flexDirection"] },
+          "valueSchema": { "type": "enum", "enum": ["row","row-reverse","column","column-reverse"] },
+          "conditions": [{ "if": { "style.display": "flex" } }]
+        },
+        {
+          "id": "gap",
+          "label": "Gap",
+          "type": "composite",
+          "bind": { "styleKeys": ["rowGap","columnGap"] },
+          "valueSchema": {
+            "type": "object",
+            "fields": {
+              "rowGap":   { "type": "length", "units": ["px","rem"], "min": 0, "tokens": ["spacing.*"] },
+              "columnGap":{ "type": "length", "units": ["px","rem"], "min": 0, "tokens": ["spacing.*"] }
+            }
+          },
+          "compose": { "to": "gap" },           // UI에서 row/column 입력해도 내부 저장은 rowGap/columnGap 또는 gap 등 정책으로
+          "decompose": { "from": ["gap"] },
+          "conditions": [{ "ifAny": [{ "style.display": "flex" }, { "style.display": "grid" }] }]
+        }
+      ]
+    },
+
+    "Layout.Position": {
+      "controls": [
+        {
+          "id": "position",
+          "label": "Position",
+          "type": "select",
+          "bind": { "styleKeys": ["position"] },
+          "valueSchema": { "type": "enum", "enum": ["static","relative","absolute","fixed","sticky"] }
+        },
+        {
+          "id": "inset",
+          "label": "Offsets",
+          "type": "composite",
+          "bind": { "styleKeys": ["top","right","bottom","left"] },
+          "valueSchema": {
+            "type": "object",
+            "fields": {
+              "top":    { "type": "length", "units": ["px","%","rem","vh","vw"], "tokens": [] },
+              "right":  { "type": "length", "units": ["px","%","rem","vh","vw"], "tokens": [] },
+              "bottom": { "type": "length", "units": ["px","%","rem","vh","vw"], "tokens": [] },
+              "left":   { "type": "length", "units": ["px","%","rem","vh","vw"], "tokens": [] }
+            }
+          },
+          "conditions": [{ "ifNot": { "style.position": "static" } }]
+        },
+        {
+          "id": "zIndex",
+          "label": "Z-Index",
+          "type": "number",
+          "bind": { "styleKeys": ["zIndex"] },
+          "valueSchema": { "type": "number", "min": -9999, "max": 9999, "step": 1 }
+        }
+      ]
+    },
+
+    "Layout.Sizing": {
+      "controls": [
+        {
+          "id": "size",
+          "label": "Size",
+          "type": "composite",
+          "bind": { "styleKeys": ["width","height"] },
+          "valueSchema": {
+            "type": "object",
+            "fields": {
+              "width":  { "type": "length-or-auto", "units": ["px","%","rem","vw"], "tokens": ["size.*"] },
+              "height": { "type": "length-or-auto", "units": ["px","%","rem","vh"], "tokens": ["size.*"] }
+            }
+          }
+        },
+        {
+          "id": "minMax",
+          "label": "Min/Max",
+          "type": "composite",
+          "bind": { "styleKeys": ["minWidth","minHeight","maxWidth","maxHeight"] },
+          "valueSchema": {
+            "type": "object",
+            "fields": {
+              "minWidth":  { "type": "length", "units": ["px","%","rem","vw"], "min": 0, "tokens": ["size.*"] },
+              "minHeight": { "type": "length", "units": ["px","%","rem","vh"], "min": 0, "tokens": ["size.*"] },
+              "maxWidth":  { "type": "length-or-none", "units": ["px","%","rem","vw"], "tokens": ["size.*"] },
+              "maxHeight": { "type": "length-or-none", "units": ["px","%","rem","vh"], "tokens": ["size.*"] }
+            }
+          }
+        },
+        {
+          "id": "aspectRatio",
+          "label": "Aspect Ratio",
+          "type": "text",                         // "1/1", "16/9" 등 파서 포함
+          "bind": { "styleKeys": ["aspectRatio"] },
+          "valueSchema": { "type": "aspect" }
+        }
+      ]
+    },
+
+    "Layout.Spacing": {
+      "controls": [
+        {
+          "id": "margin",
+          "label": "Margin",
+          "type": "box",
+          "bind": { "styleKeys": ["marginTop","marginRight","marginBottom","marginLeft"] },
+          "valueSchema": { "type": "length", "units": ["px","rem","%"], "tokens": ["spacing.*"] },
+          "compose": { "to": "margin" },
+          "decompose": { "from": ["margin"] }
+        },
+        {
+          "id": "padding",
+          "label": "Padding",
+          "type": "box",
+          "bind": { "styleKeys": ["paddingTop","paddingRight","paddingBottom","paddingLeft"] },
+          "valueSchema": { "type": "length", "units": ["px","rem","%"], "min": 0, "tokens": ["spacing.*"] },
+          "compose": { "to": "padding" },
+          "decompose": { "from": ["padding"] }
+        }
+      ]
+    },
+
+    "Typography.Font": {
+      "controls": [
+        {
+          "id": "fontFamily",
+          "label": "Font",
+          "type": "token-select",
+          "bind": { "styleKeys": ["fontFamily"] },
+          "valueSchema": { "type": "token", "kinds": ["typography.fontFamily"] }
+        },
+        {
+          "id": "fontSizeLineHeight",
+          "label": "Size / Line Height",
+          "type": "pair",
+          "bind": { "styleKeys": ["fontSize","lineHeight"] },
+          "valueSchema": {
+            "type": "object",
+            "fields": {
+              "fontSize":   { "type": "length", "units": ["px","rem"], "min": 0, "tokens": ["typography.size.*"] },
+              "lineHeight": { "type": "unitless-or-length", "units": ["px","rem"], "min": 0, "tokens": ["typography.lineHeight.*"] }
+            }
+          }
+        },
+        {
+          "id": "weightStyle",
+          "label": "Weight / Style",
+          "type": "pair",
+          "bind": { "styleKeys": ["fontWeight","fontStyle"] },
+          "valueSchema": {
+            "type": "object",
+            "fields": {
+              "fontWeight": { "type": "enum", "enum": ["100","200","300","400","500","600","700","800","900","bold","normal"] },
+              "fontStyle":  { "type": "enum", "enum": ["normal","italic","oblique"] }
+            }
+          }
+        },
+        {
+          "id": "letterSpacing",
+          "label": "Letter Spacing",
+          "type": "number",
+          "bind": { "styleKeys": ["letterSpacing"] },
+          "valueSchema": { "type": "length-or-normal", "units": ["px","em"], "tokens": ["typography.letterSpacing.*"] }
+        }
+      ]
+    },
+
+    "Typography.Text": {
+      "controls": [
+        {
+          "id": "textAlign",
+          "label": "Align",
+          "type": "segmented",
+          "bind": { "styleKeys": ["textAlign"] },
+          "valueSchema": { "type": "enum", "enum": ["left","center","right","justify","start","end"] }
+        },
+        {
+          "id": "decorationTransform",
+          "label": "Decoration / Transform",
+          "type": "composite",
+          "bind": { "styleKeys": ["textDecoration","textTransform"] },
+          "valueSchema": {
+            "type": "object",
+            "fields": {
+              "textDecoration": { "type": "enum", "enum": ["none","underline","line-through","overline"] },
+              "textTransform":  { "type": "enum", "enum": ["none","capitalize","uppercase","lowercase"] }
+            }
+          }
+        },
+        {
+          "id": "whiteSpace",
+          "label": "White Space",
+          "type": "select",
+          "bind": { "styleKeys": ["whiteSpace"] },
+          "valueSchema": { "type": "enum", "enum": ["normal","nowrap","pre","pre-wrap","pre-line","break-spaces"] }
+        }
+      ]
+    },
+
+    "Typography.Content Flow": {
+      "controls": [
+        {
+          "id": "listStyle",
+          "label": "List",
+          "type": "composite",
+          "bind": { "styleKeys": ["listStyleType","listStylePosition"] },
+          "valueSchema": {
+            "type": "object",
+            "fields": {
+              "listStyleType":     { "type": "enum", "enum": ["disc","circle","square","decimal","decimal-leading-zero","lower-roman","upper-roman","lower-alpha","upper-alpha","none"] },
+              "listStylePosition": { "type": "enum", "enum": ["outside","inside"] }
+            }
+          }
+        }
+      ]
+    },
+
+    "Appearance.Fill": {
+      "controls": [
+        {
+          "id": "backgroundColor",
+          "label": "Background",
+          "type": "color-token",
+          "bind": { "styleKeys": ["backgroundColor"] },
+          "valueSchema": { "type": "color", "tokens": ["color.*"] }
+        },
+        {
+          "id": "backgroundImage",
+          "label": "Background Image",
+          "type": "image",
+          "bind": { "styleKeys": ["backgroundImage","backgroundSize","backgroundRepeat","backgroundPosition"] },
+          "valueSchema": {
+            "type": "object",
+            "fields": {
+              "backgroundImage":  { "type": "image-url-or-gradient" },
+              "backgroundSize":   { "type": "enum-or-length", "enum": ["cover","contain"], "units": ["px","%"] },
+              "backgroundRepeat": { "type": "enum", "enum": ["no-repeat","repeat","repeat-x","repeat-y"] },
+              "backgroundPosition": { "type": "position" }
+            }
+          }
+        }
+      ]
+    },
+
+    "Appearance.Border": {
+      "controls": [
+        {
+          "id": "border",
+          "label": "Border",
+          "type": "border-editor",
+          "bind": { "styleKeys": ["borderWidth","borderStyle","borderColor","borderRadius"] },
+          "valueSchema": {
+            "type": "object",
+            "fields": {
+              "borderWidth": { "type": "length", "units": ["px"], "min": 0, "tokens": ["border.width.*"] },
+              "borderStyle": { "type": "enum", "enum": ["none","solid","dashed","dotted"] },
+              "borderColor": { "type": "color", "tokens": ["color.*"] },
+              "borderRadius":{ "type": "length", "units": ["px","rem"], "min": 0, "tokens": ["radius.*"] }
+            }
+          },
+          "compose": { "to": "border" },
+          "decompose": { "from": ["border","borderTop","borderRight","borderBottom","borderLeft"] }
+        }
+      ]
+    },
+
+    "Appearance.Visual": {
+      "controls": [
+        {
+          "id": "shadowOpacity",
+          "label": "Shadow / Opacity",
+          "type": "composite",
+          "bind": { "styleKeys": ["boxShadow","opacity"] },
+          "valueSchema": {
+            "type": "object",
+            "fields": {
+              "boxShadow": { "type": "shadow-token-or-custom", "tokens": ["shadow.*"] },
+              "opacity":   { "type": "number", "min": 0, "max": 1, "step": 0.01 }
+            }
+          }
+        },
+        {
+          "id": "mixBlendMode",
+          "label": "Blend Mode",
+          "type": "select",
+          "bind": { "styleKeys": ["mixBlendMode"] },
+          "valueSchema": { "type": "enum", "enum": ["normal","multiply","screen","overlay","darken","lighten","color-dodge","color-burn","hard-light","soft-light","difference","exclusion","hue","saturation","color","luminosity"] }
+        }
+      ]
+    },
+
+    "Effects.Transform": {
+      "controls": [
+        {
+          "id": "transform",
+          "label": "Transform",
+          "type": "transform-builder",
+          "bind": { "styleKeys": ["transform","transformOrigin"] },
+          "valueSchema": { "type": "transform" }
+        }
+      ]
+    },
+
+    "Effects.Transition": {
+      "controls": [
+        {
+          "id": "transition",
+          "label": "Transition / Animation",
+          "type": "transition-builder",
+          "bind": { "styleKeys": ["transition","transitionProperty","transitionDuration","transitionTimingFunction","transitionDelay","animation","animationName","animationDuration","animationTimingFunction","animationDelay","animationIterationCount","animationDirection","animationFillMode","animationPlayState"] },
+          "valueSchema": { "type": "transition-or-animation" }
+        }
+      ]
+    },
+
+    "Interactive.UserInteraction": {
+      "controls": [
+        {
+          "id": "cursor",
+          "label": "Cursor",
+          "type": "select",
+          "bind": { "styleKeys": ["cursor"] },
+          "valueSchema": { "type": "enum", "enum": ["auto","default","pointer","text","move","grab","not-allowed"] }
+        },
+        {
+          "id": "userSelect",
+          "label": "Text Select",
+          "type": "select",
+          "bind": { "styleKeys": ["userSelect"] },
+          "valueSchema": { "type": "enum", "enum": ["auto","text","none","contain","all"] }
+        }
+      ]
+    },
+
+    "Advanced.Advanced / Overrides": {
+      "controls": [
+        {
+          "id": "customProps",
+          "label": "Custom CSS Vars",
+          "type": "kv",
+          "bind": { "styleKeys": ["--*"] },
+          "valueSchema": { "type": "css-variable-map" }
+        }
+      ],
+      "scopes": {
+        "base": { "allow": true },
+        "state": { "allow": true, "states": [":hover",":focus",":disabled"] },
+        "viewport": { "allow": true, "breakpoints": ["sm","md","lg","xl"] }
+      }
+    }
+  }
+}

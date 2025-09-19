@@ -106,7 +106,8 @@ export type StyleGroupKey =
     | 'advanced';     // Advanced
 
 export type StyleKey = string; // 정규화된 CSS 키(flat)
-export type TagName = 'div'|'span'|'img'|'button'|'a'|'p'|'h1'|'h2'|'h3'|'ul'|'li'; // 최소 셋
+//export type TagName = 'div'|'span'|'img'|'button'|'a'|'p'|'h1'|'h2'|'h3'|'ul'|'li'; // 최소 셋
+export type TagName = string;
 
 /** 그룹/컨트롤 가시성 오버레이(Inspector에서 보이기/숨기기 제어) */
 export type StylePolicy = Partial<Record<StyleGroupKey,

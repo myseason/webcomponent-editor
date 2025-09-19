@@ -75,3 +75,21 @@ Inspector/렌더 모두 동일한 순수 함수로 처리:
 - StyleGraph는 실제 저장/머지 엔진 역할.
 - Inspector는 StylePolicy → 컨트롤 생성 → StyleGraph에 값 쓰기.
 - 렌더는 StyleGraph를 해석(Base + Delta merge)하여 실제 style 생성.
+
+
+
+
+TagPolicy & StylePolicy
+	•	GlobalTagPolicy: “무엇을 허용/금지할 수 있는가” (태그별 섹션/스타일키/속성/이벤트의 범위)
+	•	StylePolicy: “허용된 스타일키를 어떻게 노출/입력/검증할 것인가” (컨트롤 정의, 값 스키마, 단위/토큰/의존성, 상태/뷰포트/가변 조건)
+
+1) StylePolicy의 역할
+	1.	컨트롤 정의: Inspector에 어떤 컨트롤(슬라이더/셀렉트/스위치/멀티필드 등)을 보여줄지, 어떤 스타일키를 바인딩할지.
+	2.	값 스키마/검증: 단위(px, %, rem), 허용 enum, 범위(min/max/step), 복합 값(shorthand 분해/조립) 등.
+	3.	의존성: display가 flex일 때만 flex-* 노출 등의 조건.
+	4.	상태/가상 클래스: :hover, :focus, :disabled 등 state 별 override 허용 범위.
+	5.	뷰포트/브레이크포인트: base + viewport(delta) 허용 및 입력 제약.
+	6.	토큰 연동: 디자인 토큰(색/타이포/스페이싱/라디우스 등)과의 바인딩 허용/권장.
+	7.	샤orthand ↔ longhand 변환 규칙: padding ↔ paddingTop/Right/Bottom/Left, border, background 등.
+
+즉, TagPolicy가 “경비원(허용 범위)”, StylePolicy는 “UX/폼스키마(입력 방식과 규칙)”입니다.

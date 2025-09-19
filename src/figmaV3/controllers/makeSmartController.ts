@@ -47,7 +47,6 @@ function splitWrapEntry(entry?: WrapEntry): { aspect?: Aspect; wrapper?: MethodW
 
 /* =========================================
  * 기본 제공 Aspect: writer 호출 후 리렌더
- *  - 컨트롤러에서 opts.writerAspect: writerRerenderAspect 로 켜면 됩니다.
  * ======================================= */
 export const writerRerenderAspect: Aspect = {
     after: () => { requestRerenderTick(); },
@@ -56,9 +55,6 @@ export const writerRerenderAspect: Aspect = {
 
 /* ========================
  * Proxy(Reader/Writer) 생성
- *  - per-method wrapper -> 먼저 적용
- *  - aspect(before/after/onError) -> 호출 전/후에 실행
- *  - globalAspect도 병행 적용
  * ====================== */
 
 function createHybridProxy<T extends object>(
@@ -87,11 +83,9 @@ function createHybridProxy<T extends object>(
 
             // 3) Aspect 적용 (before/after/onError)
             if (!globalAspect && !aspect) {
-                // 아무 부가 처리 없으면 그대로 반환 (최단 경로)
                 return fn as T[Extract<keyof T, string>];
             }
 
-            // Aspect가 있으면 래퍼를 한 번 더 씌움
             return ((...args: unknown[]) => {
                 const base = { ctrlName, method: methodName } as const;
                 try {
@@ -100,7 +94,6 @@ function createHybridProxy<T extends object>(
 
                     const result = fn(...args);
 
-                    // 동기/비동기 모두 지원
                     if (result && typeof (result as any).then === 'function') {
                         return (result as Promise<unknown>)
                             .then((res) => {
@@ -129,13 +122,30 @@ function createHybridProxy<T extends object>(
 }
 
 /* ========================
+ * 충돌 안전 attach 보강
+ * ====================== */
+
+// 충돌 처리 전략
+type AttachConflictPolicy = 'skip' | 'override' | 'wrap';
+
+// attach 옵션
+type AttachOptions<F extends AnyFn = AnyFn> = {
+    onConflict?: AttachConflictPolicy;                 // 기본 'skip'
+    wrapResolver?: (orig: F, injected: F) => F;       // wrap일 때의 합성 규칙
+};
+
+// 안전한 hasOwn
+function hasOwn(obj: object | undefined, k: string) {
+    return !!obj && Object.prototype.hasOwnProperty.call(obj, k);
+}
+
+// 로깅(원하면 console.debug로)
+function logAttach(controllerName: string, side: 'reader'|'writer', name: string, action: string) {
+    try { console.warn(`[${controllerName}] ${side}.attach("${name}") -> ${action}`); } catch {}
+}
+
+/* ========================
  * Expose Builder
- *  - pickReader / pickWriter: 필요한 키만
- *  - exposeReaderAll / exposeWriterAll / exposeAll: 전부 노출
- *  - wrapReader / wrapWriter: per-method에 MethodWrapper/Aspect 부착
- *  - requireReader / requireWriter: 런타임 검증
- *  - attachReader / attachWriter: 컨트롤러 내부 정의 함수 레지스트리에 추가
- *  - build: Proxy 적용한 객체 반환
  * ====================== */
 
 export type ExposeBuilder<R extends object, W extends object> = {
@@ -148,8 +158,8 @@ export type ExposeBuilder<R extends object, W extends object> = {
     wrapWriter: <K extends keyof W & string>(key: K, entry: WrapEntry) => ExposeBuilder<R, W>;
     requireReader: (...keys: (keyof R & string)[]) => ExposeBuilder<R, W>;
     requireWriter: (...keys: (keyof W & string)[]) => ExposeBuilder<R, W>;
-    attachReader: <N extends string, F extends AnyFn>(name: N, fn: F) => ExposeBuilder<R & Record<N, F>, W>;
-    attachWriter: <N extends string, F extends AnyFn>(name: N, fn: F) => ExposeBuilder<R, W & Record<N, F>>;
+    attachReader: <N extends string, F extends AnyFn>(name: N, fn: F, opts?: AttachOptions<F>) => ExposeBuilder<R & Record<N, F>, W>;
+    attachWriter: <N extends string, F extends AnyFn>(name: N, fn: F, opts?: AttachOptions<F>) => ExposeBuilder<R, W & Record<N, F>>;
     build: () => { reader: R; writer: W };
 };
 
@@ -316,9 +326,84 @@ function makeBuilder<R extends object, W extends object>(
             );
         },
 
-        attachReader: (name, fn) => {
-            const nextFullReader = { ...((fullReader ?? curReader) as any), [name]: fn } as object;
-            const nextCurReader = { ...(curReader as any), [name]: fn } as any;
+        // ⬇️ 충돌 안전 attachReader
+        attachReader: (name, fn, opts = {onConflict: 'skip'}) => {
+            const key = String(name);
+            const policy: AttachConflictPolicy = opts?.onConflict ?? 'skip';
+
+            const srcFull = (fullReader ?? curReader) as any;
+            const srcCur  = (curReader as any);
+
+            const existsInFull = hasOwn(srcFull, key);
+            const existsInCur  = hasOwn(srcCur, key);
+
+            if (existsInFull || existsInCur) {
+                const prev = (existsInCur ? srcCur[key] : srcFull[key]) as AnyFn | unknown;
+
+                if (policy === 'skip') {
+                    logAttach(controllerName, 'reader', key, 'skipped (exists)');
+                    return makeBuilder(
+                        controllerName,
+                        curReader,
+                        curWriter,
+                        readerGlobalAspect,
+                        writerGlobalAspect,
+                        readerWraps,
+                        writerWraps,
+                        fullReader ?? curReader,
+                        fullWriter ?? curWriter
+                    ) as any;
+                }
+
+                if (policy === 'wrap') {
+                    const wrapResolver =
+                        (opts?.wrapResolver as ((o: AnyFn, n: AnyFn) => AnyFn) | undefined)
+                        // 기본: 새 함수(injected)만 호출(기존은 필요 시 클로저로 사용)
+                        ?? ((o, n) => ((...args: unknown[]) => (n as any)(...args)) as AnyFn);
+
+                    if (typeof prev === 'function') {
+                        const wrapped = wrapResolver(prev as AnyFn, fn as AnyFn);
+                        const nextFullReader = { ...srcFull, [key]: wrapped } as object;
+                        const nextCurReader  = { ...srcCur,  [key]: wrapped } as any;
+                        logAttach(controllerName, 'reader', key, 'wrapped');
+                        return makeBuilder(
+                            controllerName,
+                            nextCurReader,
+                            curWriter,
+                            readerGlobalAspect,
+                            writerGlobalAspect,
+                            readerWraps,
+                            writerWraps,
+                            nextFullReader,
+                            fullWriter ?? curWriter
+                        ) as any;
+                    }
+                    // prev가 함수가 아니면 override와 동일 처리
+                }
+
+                // override
+                if (policy === 'override') {
+                    const nextFullReader = { ...srcFull, [key]: fn } as object;
+                    const nextCurReader  = { ...srcCur,  [key]: fn } as any;
+                    logAttach(controllerName, 'reader', key, 'overridden');
+                    return makeBuilder(
+                        controllerName,
+                        nextCurReader,
+                        curWriter,
+                        readerGlobalAspect,
+                        writerGlobalAspect,
+                        readerWraps,
+                        writerWraps,
+                        nextFullReader,
+                        fullWriter ?? curWriter
+                    ) as any;
+                }
+            }
+
+            // 신규 추가
+            const nextFullReader = { ...((fullReader ?? curReader) as any), [key]: fn } as object;
+            const nextCurReader  = { ...(curReader as any), [key]: fn } as any;
+            logAttach(controllerName, 'reader', key, 'attached');
             return makeBuilder(
                 controllerName,
                 nextCurReader,
@@ -332,9 +417,82 @@ function makeBuilder<R extends object, W extends object>(
             ) as any;
         },
 
-        attachWriter: (name, fn) => {
-            const nextFullWriter = { ...((fullWriter ?? curWriter) as any), [name]: fn } as object;
-            const nextCurWriter = { ...(curWriter as any), [name]: fn } as any;
+        // ⬇️ 충돌 안전 attachWriter
+        attachWriter: (name, fn, opts = {onConflict: 'skip'}) => {
+            const key = String(name);
+            const policy: AttachConflictPolicy = opts?.onConflict ?? 'skip';
+
+            const srcFull = (fullWriter ?? curWriter) as any;
+            const srcCur  = (curWriter as any);
+
+            const existsInFull = hasOwn(srcFull, key);
+            const existsInCur  = hasOwn(srcCur, key);
+
+            if (existsInFull || existsInCur) {
+                const prev = (existsInCur ? srcCur[key] : srcFull[key]) as AnyFn | unknown;
+
+                if (policy === 'skip') {
+                    logAttach(controllerName, 'writer', key, 'skipped (exists)');
+                    return makeBuilder(
+                        controllerName,
+                        curReader,
+                        curWriter,
+                        readerGlobalAspect,
+                        writerGlobalAspect,
+                        readerWraps,
+                        writerWraps,
+                        fullReader ?? curReader,
+                        fullWriter ?? curWriter
+                    ) as any;
+                }
+
+                if (policy === 'wrap') {
+                    const wrapResolver =
+                        (opts?.wrapResolver as ((o: AnyFn, n: AnyFn) => AnyFn) | undefined)
+                        ?? ((o, n) => ((...args: unknown[]) => (n as any)(...args)) as AnyFn);
+
+                    if (typeof prev === 'function') {
+                        const wrapped = wrapResolver(prev as AnyFn, fn as AnyFn);
+                        const nextFullWriter = { ...srcFull, [key]: wrapped } as object;
+                        const nextCurWriter  = { ...srcCur,  [key]: wrapped } as any;
+                        logAttach(controllerName, 'writer', key, 'wrapped');
+                        return makeBuilder(
+                            controllerName,
+                            curReader,
+                            nextCurWriter,
+                            readerGlobalAspect,
+                            writerGlobalAspect,
+                            readerWraps,
+                            writerWraps,
+                            fullReader ?? curReader,
+                            nextFullWriter
+                        ) as any;
+                    }
+                    // prev가 함수가 아니면 override와 동일 처리
+                }
+
+                if (policy === 'override') {
+                    const nextFullWriter = { ...srcFull, [key]: fn } as object;
+                    const nextCurWriter  = { ...srcCur,  [key]: fn } as any;
+                    logAttach(controllerName, 'writer', key, 'overridden');
+                    return makeBuilder(
+                        controllerName,
+                        curReader,
+                        nextCurWriter,
+                        readerGlobalAspect,
+                        writerGlobalAspect,
+                        readerWraps,
+                        writerWraps,
+                        fullReader ?? curReader,
+                        nextFullWriter
+                    ) as any;
+                }
+            }
+
+            // 신규 추가
+            const nextFullWriter = { ...((fullWriter ?? curWriter) as any), [key]: fn } as object;
+            const nextCurWriter  = { ...(curWriter as any), [key]: fn } as any;
+            logAttach(controllerName, 'writer', key, 'attached');
             return makeBuilder(
                 controllerName,
                 curReader,
@@ -343,7 +501,7 @@ function makeBuilder<R extends object, W extends object>(
                 writerGlobalAspect,
                 readerWraps,
                 writerWraps,
-                fullReader ?? curReader,
+                fullReader ?? curWriter,
                 nextFullWriter
             ) as any;
         },
@@ -358,9 +516,9 @@ function makeBuilder<R extends object, W extends object>(
 
 /**
  * makeSmartController
- * - opts.aspect:    Reader 전역 Aspect(before/after/onError)
- * - opts.writerAspect: Writer 전역 Aspect(Writer 전용)  ← 신규
- * - opts.wrap:      { [methodName]: Aspect | MethodWrapper } (reader/writer 이름 기준 공통 매핑)
+ * - opts.aspect:       Reader 전역 Aspect(before/after/onError)
+ * - opts.writerAspect: Writer 전역 Aspect(Writer 호출 후 리렌더 등)
+ * - opts.readerWrap / writerWrap: per-method Aspect/Wrapper 지정
  */
 export function makeSmartController<R extends object, W extends object>(
     controllerName: string,
@@ -368,7 +526,7 @@ export function makeSmartController<R extends object, W extends object>(
     WE: W,
     opts?: {
         aspect?: Aspect;               // Reader 전역 Aspect
-        writerAspect?: Aspect;         // Writer 전용 전역 Aspect (writer 호출 후 리렌더 등)
+        writerAspect?: Aspect;         // Writer 전용 전역 Aspect
         readerWrap?: Record<string, WrapEntry>;
         writerWrap?: Record<string, WrapEntry>;
     }
@@ -386,17 +544,12 @@ export function makeSmartController<R extends object, W extends object>(
                 wrapMap.methodWrappers[k] = wrapper;
             }
         }
-    }
+    };
 
-    if (opts?.readerWrap) {
-        wrap(opts.readerWrap, readerWraps);
-    }
-    if (opts?.writerWrap) {
-        wrap(opts.writerWrap, writerWraps);
-    }
+    if (opts?.readerWrap) wrap(opts.readerWrap, readerWraps);
+    if (opts?.writerWrap) wrap(opts.writerWrap, writerWraps);
 
-
-    // rerender을 위한 aspect
+    // writer는 기본적으로 호출 후 리렌더를 켭니다(원하면 명시적으로 끌 수 있음)
     const resolvedWriterAspect: Aspect | undefined =
         opts?.writerAspect === undefined
             ? writerRerenderAspect
@@ -407,7 +560,7 @@ export function makeSmartController<R extends object, W extends object>(
         controllerName,
         RE,
         WE,
-        opts?.aspect,          // Reader 글로벌 Aspect
+        opts?.aspect,            // Reader 글로벌 Aspect
         resolvedWriterAspect,    // Writer 전용 글로벌 Aspect
         readerWraps,
         writerWraps,

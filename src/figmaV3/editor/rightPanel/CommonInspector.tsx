@@ -29,7 +29,6 @@ type Entry =
     | { key: string; type: 'text'; label?: string }
     | { key: string; type: 'select'; label?: string; options?: unknown[] };
 
-// Select 옵션 key 충돌 방지용 정규화
 function normOpt(op: unknown): { value: string; label: string } {
     if (op == null) return { value: '', label: '' };
     if (typeof op === 'object') {
@@ -38,11 +37,7 @@ function normOpt(op: unknown): { value: string; label: string } {
             any?.value != null
                 ? String(any.value)
                 : (() => {
-                    try {
-                        return JSON.stringify(any);
-                    } catch {
-                        return String(any);
-                    }
+                    try { return JSON.stringify(any); } catch { return String(any); }
                 })();
         const l =
             (typeof any.label === 'string' && any.label) ||
@@ -54,8 +49,7 @@ function normOpt(op: unknown): { value: string; label: string } {
     return { value: v, label: v };
 }
 
-/** StyleInspector와 동일한 그리드 레이아웃을 유지하면서
- *  우측에 바인딩 버튼을 배치하는 래퍼(UI 변경만, 기능 변경 없음) */
+/** StyleInspector와 동일한 그리드 + 바인딩 버튼 */
 const FieldWithBind: React.FC<{
     children: React.ReactNode;
     bindButton?: React.ReactNode;
@@ -68,6 +62,16 @@ const FieldWithBind: React.FC<{
     );
 };
 
+/** 에디터 전역 단축키가 인풋 타이핑을 가로채지 않도록 보호 */
+const inputGuardProps = {
+    onKeyDown: (e: React.KeyboardEvent) => e.stopPropagation(),
+    onKeyUp: (e: React.KeyboardEvent) => e.stopPropagation(),
+    onKeyPress: (e: React.KeyboardEvent) => e.stopPropagation(),
+    onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
+    onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+};
+
 export function CommonInspector(props: {
     nodeId: NodeId;
     defId: string;
@@ -76,15 +80,11 @@ export function CommonInspector(props: {
     /** StyleInspector처럼 섹션 패널의 고정 너비(px). 기본 360 */
     width?: number;
 }) {
-    const {
-        nodeId,
-        defId,
-        width = 360,            // ← 추가: 폭 주입(기본 360)
-    } = props;
+    const { nodeId, defId, width = 360 } = props;
 
     const { reader, writer } = useRightControllerFactory(RightDomain.Inspector);
 
-    // SectionFrame은 collapsed 플래그 사용 (StyleInspector와 동일 UX)
+    // SectionFrame 접힘 상태 (StyleInspector와 동일 UX)
     const [collapsed, setCollapsed] = React.useState<boolean>(
         props.open === undefined ? false : !props.open,
     );
@@ -92,21 +92,19 @@ export function CommonInspector(props: {
 
     const project = reader.getProject();
     const node = project.nodes[nodeId];
-    if (!node)
-        return null;
+    if (!node) return null;
 
     const def = getDefinition(defId) as ComponentDefinition | undefined;
     const propsObj = (node.props ?? {}) as Record<string, unknown>;
 
     // ─────────────────────────────────────────────────────────────
-    // 일반(공통) 입력 상태 (id/name/slotId) — 기존 동작 그대로 유지
+    // 일반(공통) 입력 상태 (id / name) — 저장은 onBlur에서만
     // ─────────────────────────────────────────────────────────────
     const initialAttrs = (propsObj.__tagAttrs as AttrMap | undefined) ?? {};
     const [elemId, setElemId] = React.useState(String(initialAttrs.id ?? node.id));
     const [name, setName] = React.useState(String((propsObj as any).name ?? ''));
-    const [slotId, setSlotId] = React.useState(String((propsObj as any).slotId ?? ''));
 
-    // nodeId 변경 시 동기화 (기존 로직 유지)
+    // ⚠️ nodeId 변경시에만 프로젝트값으로 초기 동기화
     React.useEffect(() => {
         const pj = reader.getProject();
         const n = pj.nodes[nodeId];
@@ -117,19 +115,17 @@ export function CommonInspector(props: {
 
         const nextElemId = String((a.id as string | undefined) ?? n.id ?? '');
         const nextName = String((p as any).name ?? '');
-        const nextSlotId = String((p as any).slotId ?? '');
 
-        setElemId((prev) => (Object.is(prev, nextElemId) ? prev : nextElemId));
-        setName((prev) => (Object.is(prev, nextName) ? prev : nextName));
-        setSlotId((prev) => (Object.is(prev, nextSlotId) ? prev : nextSlotId));
-    }, [nodeId, reader]);
+        setElemId(nextElemId);
+        setName(nextName);
+        // ✅ deps에서 reader 제거 — 컨트롤러 재생성으로 인한 되감기 방지
+    }, [nodeId]); // ← 오직 nodeId만
 
-    // 저장(일반) — 기존 동작 그대로
     const saveBasic = React.useCallback(() => {
-        // name/slotId
-        writer.updateNodeProps(nodeId, { name, slotId });
+        // name 저장
+        writer.updateNodeProps(nodeId, { name });
 
-        // attrs(id)
+        // id 저장 (__tagAttrs)
         const curAttrs = ((reader.getProject().nodes[nodeId].props ?? {}) as any).__tagAttrs as AttrMap | undefined;
         const next: AttrMap = { ...(curAttrs ?? {}) };
 
@@ -138,52 +134,33 @@ export function CommonInspector(props: {
         else delete next.id;
 
         writer.updateNodeProps(nodeId, { __tagAttrs: next });
-    }, [nodeId, name, slotId, elemId, reader, writer]);
+    }, [nodeId, name, elemId, reader, writer]);
 
     // ─────────────────────────────────────────────────────────────
     // 태그 & 속성
     // ─────────────────────────────────────────────────────────────
-    const allowedTagsFromDef = (def as any)?.capabilities?.allowedTags as string[] | undefined;
-    const defaultTagFromDef = (def as any)?.capabilities?.defaultTag as string | undefined;
-    const isContainerDef = !!(def as any)?.capabilities?.canHaveChildren;
+    const selectableTags = reader.getSelectableTagsForNode(nodeId) as string[]; // TagName[]
+    const currentTag =
+        String(((node.props ?? {}) as any).__tag ?? (selectableTags?.[0] ?? ''));
 
-    const CONTAINER_TAGS = React.useMemo(() => ['div', 'section', 'article', 'ul', 'ol'], []);
-    const selectableTags: string[] = React.useMemo(() => {
-        const base =
-            allowedTagsFromDef && allowedTagsFromDef.length > 0
-                ? allowedTagsFromDef
-                : [defaultTagFromDef ?? 'div'];
-        if (!isContainerDef) {
-            return base.filter((t) => !CONTAINER_TAGS.includes(t));
-        }
-        return base;
-    }, [allowedTagsFromDef, defaultTagFromDef, isContainerDef, CONTAINER_TAGS]);
-
-    const currentTag = String(
-        ((node.props ?? {}) as any).__tag ?? (defaultTagFromDef ?? (selectableTags[0] ?? 'div')),
-    );
-
-    // 자동 schema 엔트리 — 기존 그대로
+    // 자동 schema 엔트리 — __tag 항목은 제외(상단 전용)
     const schema = (def?.propsSchema ?? []) as any[];
-    const baseEntries = React.useMemo(() => {
-        const entries: Entry[] = [];
+    const entries: Entry[] = React.useMemo(() => {
+        const out: Entry[] = [];
         for (const f of schema) {
             if (!f || !f.key) continue;
             const key = String(f.key);
-            if (f.type === 'string') {
-                entries.push({ key, type: 'text', label: f.label ?? key });
-            } else if (f.type === 'select') {
+            if (key === '__tag') continue; // Tag는 전용 셀렉트로 처리
+            const t = String(f.type ?? f.control ?? 'string');
+            if (t === 'string' || t === 'input' || t === 'text') {
+                out.push({ key, type: 'text', label: f.label ?? key });
+            } else if (t === 'select') {
                 const options = Array.isArray(f.options) ? f.options : [];
-                entries.push({ key, type: 'select', label: f.label ?? key, options });
+                out.push({ key, type: 'select', label: f.label ?? key, options });
             }
         }
-        return entries;
+        return out;
     }, [schema]);
-    const visibleEntries = React.useMemo(() => baseEntries, [baseEntries]);
-
-    // 그룹 락 (StyleInspector 방식)
-    const [lockedTagGroup, setLockedTagGroup] = React.useState(false);
-    const toggleTagGroupLock = React.useCallback(() => setLockedTagGroup((v) => !v), []);
 
     // 바인딩 팝오버
     const [binding, setBinding] = React.useState<{ propKey: string; anchorEl: HTMLElement } | null>(null);
@@ -230,7 +207,6 @@ export function CommonInspector(props: {
     };
 
     return (
-        // ← StyleInspector와 동일하게 width 적용
         <div style={{ width }} className="mt-4 text-[11px] text-neutral-800 overflow-x-hidden">
             <SectionFrame
                 title="공통"
@@ -250,6 +226,7 @@ export function CommonInspector(props: {
                         <LeftCell title="id" />
                         <RightCell>
                             <input
+                                {...inputGuardProps}
                                 className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
                                 value={elemId}
                                 onChange={(e) => setElemId(e.target.value)}
@@ -265,6 +242,7 @@ export function CommonInspector(props: {
                         <LeftCell title="name" />
                         <RightCell>
                             <input
+                                {...inputGuardProps}
                                 className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
@@ -274,24 +252,9 @@ export function CommonInspector(props: {
                             />
                         </RightCell>
                     </RowShell>
-
-                    {/* slotId */}
-                    <RowShell>
-                        <LeftCell title="slotId" />
-                        <RightCell>
-                            <input
-                                className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
-                                value={slotId}
-                                onChange={(e) => setSlotId(e.target.value)}
-                                onBlur={saveBasic}
-                                placeholder="slot identifier"
-                                title="slotId"
-                            />
-                        </RightCell>
-                    </RowShell>
                 </div>
 
-                {/* ──────────────── 서브 그룹: 태그 & 속성 (잠금 버튼 有) ──────────────── */}
+                {/* ──────────────── 서브 그룹: 태그 & 속성 (락 버튼 없음) ──────────────── */}
                 <div className="border-b border-neutral-200">
                     <GroupHeader
                         label="태그 & 속성"
@@ -305,13 +268,13 @@ export function CommonInspector(props: {
                         <LeftCell title="As (tag)" />
                         <RightCell>
                             <select
+                                {...inputGuardProps}
                                 className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
                                 title="As(tag)"
                                 value={currentTag}
                                 onChange={(e) => writer.updateNodeProps(nodeId, { __tag: e.target.value })}
-                                disabled={lockedTagGroup}
                             >
-                                {selectableTags.map((t, i) => (
+                                {(selectableTags ?? []).map((t, i) => (
                                     <option key={`as:opt:${t}:${i}`} value={t}>
                                         {t}
                                     </option>
@@ -320,9 +283,9 @@ export function CommonInspector(props: {
                         </RightCell>
                     </RowShell>
 
-                    {/* Auto schema props */}
+                    {/* Auto schema props ( __tag 제외 ) */}
                     <div key={currentTag}>
-                        {visibleEntries.map((entry) => {
+                        {entries.map((entry) => {
                             const value = (node.props as Record<string, unknown>)?.[entry.key];
                             const bindingBtn = (
                                 <button
@@ -347,12 +310,12 @@ export function CommonInspector(props: {
                                         <RightCell>
                                             <FieldWithBind bindButton={bindingBtn}>
                                                 <input
+                                                    {...inputGuardProps}
                                                     className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
                                                     value={(value as string) ?? ''}
                                                     onChange={(e) => writer.updateNodeProps(nodeId, { [entry.key]: e.target.value })}
                                                     placeholder=""
                                                     title={entry.key}
-                                                    disabled={lockedTagGroup}
                                                 />
                                             </FieldWithBind>
                                         </RightCell>
@@ -367,11 +330,11 @@ export function CommonInspector(props: {
                                         <RightCell>
                                             <FieldWithBind bindButton={bindingBtn}>
                                                 <select
+                                                    {...inputGuardProps}
                                                     className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
                                                     value={(value as string) ?? ''}
                                                     onChange={(e) => writer.updateNodeProps(nodeId, { [entry.key]: e.target.value })}
                                                     title={entry.key}
-                                                    disabled={lockedTagGroup}
                                                 >
                                                     {(entry.options ?? []).map((op, i) => {
                                                         const { value: ov, label: ol } = normOpt(op);
@@ -398,20 +361,20 @@ export function CommonInspector(props: {
                             <div className="grid grid-cols-10 gap-2 items-center w-full">
                                 <div className="col-span-4">
                                     <input
+                                        {...inputGuardProps}
                                         className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
                                         placeholder="key"
                                         value={newKey}
                                         onChange={(e) => setNewKey(e.target.value)}
-                                        disabled={lockedTagGroup}
                                     />
                                 </div>
                                 <div className="col-span-4">
                                     <input
+                                        {...inputGuardProps}
                                         className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
                                         placeholder="value"
                                         value={newVal}
                                         onChange={(e) => setNewVal(e.target.value)}
-                                        disabled={lockedTagGroup}
                                     />
                                 </div>
                                 <div className="col-span-2 flex justify-end">
@@ -420,7 +383,6 @@ export function CommonInspector(props: {
                                         title="add"
                                         onClick={addAttr}
                                         type="button"
-                                        disabled={lockedTagGroup}
                                     >
                                         <Plus size={16} />
                                     </button>
@@ -438,18 +400,18 @@ export function CommonInspector(props: {
                                     <div className="grid grid-cols-10 gap-2 items-center w-full">
                                         <div className="col-span-4">
                                             <input
+                                                {...inputGuardProps}
                                                 className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
                                                 value={k}
                                                 onChange={(e) => updateAttrKey(k, e.target.value)}
-                                                disabled={lockedTagGroup}
                                             />
                                         </div>
                                         <div className="col-span-4">
                                             <input
+                                                {...inputGuardProps}
                                                 className="h-6 px-1 border border-neutral-200 rounded text-[11px] w-full min-w-0"
                                                 value={v}
                                                 onChange={(e) => updateAttrVal(k, e.target.value)}
-                                                disabled={lockedTagGroup}
                                             />
                                         </div>
                                         <div className="col-span-2 flex justify-end">
@@ -458,7 +420,6 @@ export function CommonInspector(props: {
                                                 title="remove"
                                                 onClick={() => removeAttr(k)}
                                                 type="button"
-                                                disabled={lockedTagGroup}
                                             >
                                                 ×
                                             </button>

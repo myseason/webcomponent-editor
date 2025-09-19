@@ -5,8 +5,7 @@
 import type { TagPolicy, TagName, StyleGroupKey } from '../core/types';
 
 const ALL_TAGS: TagName[] = [
-    'div', 'span', 'img', 'button', 'a',
-    'p', 'h1', 'h2', 'h3', 'ul', 'li',
+    'div','span','img','button','a','p','h1','h2','h3','h4','h5','h6','label','ul','li',
 ];
 
 // 섹션 alias
@@ -38,6 +37,10 @@ export const GLOBAL_TAG_POLICY: TagPolicy = {
         h3:   [DF, PS, SP, TP, BG, EF, IN],
         ul:   [DF, PS, SZ, SP, BD, BG, EF, IN],
         li:   [DF, PS, SZ, SP, TP, BD, BG, EF, IN],
+        h4:   [DF, PS, SP, TP, BG, EF, IN],
+        h5:   [DF, PS, SP, TP, BG, EF, IN],
+        h6:   [DF, PS, SP, TP, BG, EF, IN],
+        label:[DF, PS, SP, TP, BG, EF, IN],
     },
 
     // (선택) 태그별 허용/금지 키 white/black-list (deny 우선)

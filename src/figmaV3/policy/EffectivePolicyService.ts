@@ -10,7 +10,7 @@ import {
   ComponentPolicy,
 } from '../core/types';
 import { getDefinition } from '../core/registry';
-import { GLOBAL_TAG_POLICIES } from '../policy/globalTagPolicy';
+//import { GLOBAL_TAG_POLICIY } from '../policy/globalTagPolicy';
 import { GLOBAL_STYLE_POLICY } from '../policy/globalStylePolicy';
 import { deepMerge } from '../runtime/deepMerge';
 import { normalizeStyleKey } from './PolicyKeys';
@@ -22,7 +22,8 @@ export function buildEffectivePolicies(
   overrides?: ProjectSettingsPoliciesOverride
 ): EffectivePolicies {
   return {
-    tag: deepMerge({}, GLOBAL_TAG_POLICIES, overrides?.tag ?? {}) as Record<string, TagPolicy>,
+    //tag: deepMerge({},, overrides?.tag ?? {}) as Record<string, TagPolicy>,
+      tag: {} as Record<string, TagPolicy>,
     style: deepMerge({}, GLOBAL_STYLE_POLICY, overrides?.style ?? {}) as StylePolicy,
     components: deepMerge({}, {}, overrides?.components ?? {}) as Record<string, ComponentPolicy>,
   };
@@ -67,7 +68,7 @@ export function getEffectivePoliciesForNode(
     componentPolicy,
   };
 }
-
+/*
 // -------------------------------------------------------
 // Helpers
 // -------------------------------------------------------
@@ -83,12 +84,9 @@ function collectTagStyleKeys(tagPolicy?: TagPolicy): Set<string> {
 }
 
 export type AllowedStyleOptions = {
-  /** 기존 expertMode 의미 유지(광범위 허용) */
+
   expertMode?: boolean;
-  /**
-   * Page 모드에서 “TagPolicy 강제 공개” 토글에 해당
-   * - true면 ComponentPolicy.inspector.controls.visible === false를 무시
-   */
+
   force?: boolean;
 };
 
@@ -136,6 +134,7 @@ export function getAllowedStyleKeysForNode(
 
   return allowed;
 }
+*/
 
 /**
  * Phase 2에서 Inspector 교체 시 사용될 추천 API

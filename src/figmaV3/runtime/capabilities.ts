@@ -52,7 +52,7 @@ function styleAllowedByGlobal(tag: TagName, key: string): boolean {
 }
 
 function componentPolicyHidden(project: ProjectLike, nodeId: string, key: string, group: StyleGroupKey, ui: UIStateLike): boolean {
-    const isPageBasic = ui?.mode === 'page' && !ui?.expertMode;
+    const isPageBasic = ui?.mode === 'Page' && !ui?.expertMode;
     if (!isPageBasic) return false; // 페이지-고급/컴포넌트 모드는 CP 무시
 
     const n = getNode(project, nodeId);
@@ -78,7 +78,7 @@ export function getAllowedStyleKeysForNode(
     const tag = getTag(project, nodeId);
     const keys = Object.keys(KEY_TO_STYLEGROUP);
     // ui.expertMode만 넘어온 경우를 고려해 내부 ui 작성
-    const ui: UIStateLike = { mode: 'page', expertMode: !!opts?.expertMode };
+    const ui: UIStateLike = { mode: 'Page', expertMode: !!opts?.expertMode };
 
     const allowed: string[] = [];
     for (const key of keys) {

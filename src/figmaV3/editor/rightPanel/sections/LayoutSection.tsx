@@ -421,13 +421,12 @@ export const LayoutSection: React.FC<SectionProps> = ({
                         {renderValueControl(
                             'Layout',
                             'position',
-                            // select: static / relative / absolute / fixed / sticky
-                            { control: 'select', options: [
-                                    { value: 'static',   label: { ko: 'static' } },
-                                    { value: 'relative', label: { ko: 'relative' } },
-                                    { value: 'absolute', label: { ko: 'absolute' } },
-                                    { value: 'fixed',    label: { ko: 'fixed' } },
-                                    { value: 'sticky',   label: { ko: 'sticky' } },
+                               { control: 'select', options: [
+                                   { value: 'relative', label: { ko: 'relative' } },
+                                   { value: 'absolute', label: { ko: 'absolute' } },
+                                   { value: 'fixed',    label: { ko: 'fixed' } },
+                                   { value: 'sticky',   label: { ko: 'sticky' } },
+                                   { value: 'static',   label: { ko: 'static' } },
                                 ], ui: { size: 'sm' } },
                             String(values['position'] ?? ''),
                             (v) => setValue('position', v),
