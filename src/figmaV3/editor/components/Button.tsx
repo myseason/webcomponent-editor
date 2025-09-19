@@ -29,14 +29,13 @@ export const ButtonDef: ComponentDefinition = {
     },
     propsSchema: [
         {
-            key: 'as',
+            key: '__tag',
             type: 'select',
-            label: 'As',
+            label: 'As (Tag)',
             default: 'button',
             options: [
                 { label: 'button', value: 'button' },
                 { label: 'a', value: 'a' },
-                { label: 'div', value: 'div' },
                 { label: 'span', value: 'span' },
             ],
         },

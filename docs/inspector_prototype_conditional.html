@@ -1,0 +1,551 @@
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Inspector Prototype v2 (조건부 섹션 = 노란 셀)</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#151923; --panel-2:#1b2130; --text:#e6e8ef; --muted:#95a1b2;
+    --accent:#5b8cff; --border:#2a3245; --chip:#20283a; --danger:#ff5d5d; --cond:#2a2a08; --cond-border:#8f8f00; --cond-bg:#3a3a10;
+  }
+  html,body{background:var(--bg); color:var(--text); font-family:ui-sans-serif,system-ui,AppleSDGothicNeo,'Apple Color Emoji',Segoe UI,Roboto,Pretendard,Apple SD Gothic Neo,Noto Sans KR,Helvetica,Arial;}
+  .wrap{max-width:980px;margin:24px auto;padding:16px;}
+  .topbar{display:flex;gap:12px;align-items:center;margin-bottom:16px}
+  .toggle{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel)}
+  .toggle input{accent-color:var(--accent)}
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:16px;}
+  .panel h2{margin:0;padding:10px 12px;font-size:13px;letter-spacing:.2px;background:var(--panel-2); border-bottom:1px solid var(--border);}
+  .unit{padding:10px 12px; border-top:1px dashed rgba(255,255,255,0.06)}
+  .row{display:grid; grid-template-columns:200px 1fr; gap:8px; align-items:center; margin:8px 0;}
+  .label{position:relative; font-size:12px; color:var(--text);}
+  .label .lock{position:absolute; right:-22px; top:50%; transform:translateY(-50%); width:18px; height:18px; display:inline-grid; place-items:center; border:1px solid var(--border); border-radius:6px; background:var(--chip); cursor:pointer;}
+  .label .lock[data-state="on"]{background:var(--danger); border-color:#ff8080;}
+  .hint{color:var(--muted); font-size:11px}
+  .chip{display:inline-flex; align-items:center; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:var(--chip); font-size:12px; margin-right:6px; cursor:pointer; user-select:none}
+  .chip[data-active="true"]{background:var(--accent); color:white; border-color:transparent}
+  .input, select{background:#0e1320; color:var(--text); border:1px solid var(--border); padding:6px 8px; border-radius:8px; font-size:12px; width:100%}
+  .groupbox{margin:8px 0; padding:8px; border:1px dashed var(--border); border-radius:10px; background:rgba(255,255,255,0.02)}
+  .subgrid{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;}
+  .badge{font-size:10px; color:var(--muted); border:1px solid var(--border); padding:2px 6px; border-radius:999px; margin-left:6px}
+  .hidden{display:none !important}
+  .btn{padding:6px 10px; border:1px solid var(--border); background:var(--chip); color:var(--text); border-radius:8px; cursor:pointer; font-size:12px}
+  .btn[aria-pressed="true"]{background:var(--accent); color:#fff; border-color:transparent}
+
+  /* 조건부(노란 셀) 표현 */
+  .conditional{border:1px solid var(--cond-border); background:var(--cond); border-radius:10px; padding:8px; margin-top:4px;}
+  .conditional[data-active="true"]{background:var(--cond-bg); box-shadow:inset 0 0 0 9999px rgba(255, 221, 87, 0.08);}
+  .conditional .cond-head{font-size:11px; color:#ffdd57; display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+  .conditional .cond-dot{width:8px;height:8px;border-radius:50%;background:#ffdd57; display:inline-block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <label class="toggle"><input type="checkbox" id="modePage" checked> Page 모드</label>
+    <label class="toggle"><input type="checkbox" id="expertMode"> Expert(고급) 모드</label>
+    <span class="hint">※ 노란색 박스(조건부)는 **옵션을 선택했을 때** 등장/활성화됩니다.</span>
+  </div>
+
+  <!-- Layout Panel -->
+  <section class="panel" id="panel-layout">
+    <h2>Layout</h2>
+
+    <!-- Unit: display -->
+    <div class="unit" data-unit="display">
+      <div class="row">
+        <div class="label">display
+          <button class="lock" title="Lock display" data-key="display">🔒</button>
+        </div>
+        <div>
+          <div class="chip" data-radio="display" data-value="block">block</div>
+          <div class="chip" data-radio="display" data-value="inline">inline</div>
+          <div class="chip" data-radio="display" data-value="flex">flex</div>
+          <div class="chip" data-radio="display" data-value="grid">grid</div>
+        </div>
+      </div>
+
+      <!-- FLEX (조건부: display=flex) -->
+      <div id="display-flex" class="conditional" data-active="false">
+        <div class="cond-head"><span class="cond-dot"></span><span>조건부 섹션: display=flex 선택 시</span></div>
+        <div class="groupbox">
+          <div class="row">
+            <div class="label">flex (direction / wrap / alignment)
+              <button class="lock" title="Lock flex" data-key="flexDirection">🔒</button>
+            </div>
+            <div class="subgrid">
+              <select class="input" data-key="flexDirection">
+                <option value="row">direction: row</option>
+                <option value="row-reverse">direction: row-reverse</option>
+                <option value="column">direction: column</option>
+                <option value="column-reverse">direction: column-reverse</option>
+              </select>
+              <select class="input" data-key="flexWrap">
+                <option value="nowrap">wrap: nowrap</option>
+                <option value="wrap">wrap</option>
+                <option value="wrap-reverse">wrap-reverse</option>
+              </select>
+              <select class="input" data-key="justifyContent">
+                <option>justify: flex-start</option>
+                <option>justify: center</option>
+                <option>justify: flex-end</option>
+                <option>justify: space-between</option>
+                <option>justify: space-around</option>
+                <option>justify: space-evenly</option>
+              </select>
+              <select class="input" data-key="alignItems">
+                <option>align-items: stretch</option>
+                <option>align-items: flex-start</option>
+                <option>align-items: center</option>
+                <option>align-items: flex-end</option>
+                <option>align-items: baseline</option>
+              </select>
+              <select class="input" data-key="alignContent">
+                <option>align-content: stretch</option>
+                <option>align-content: flex-start</option>
+                <option>align-content: center</option>
+                <option>align-content: flex-end</option>
+                <option>align-content: space-between</option>
+                <option>align-content: space-around</option>
+              </select>
+              <input class="input" placeholder="gap: 8px" data-key="gap"/>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GRID (조건부: display=grid) -->
+      <div id="display-grid" class="conditional" data-active="false">
+        <div class="cond-head"><span class="cond-dot"></span><span>조건부 섹션: display=grid 선택 시</span></div>
+        <div class="groupbox">
+          <div class="row">
+            <div class="label">grid (template / auto-flow / gap)
+              <button class="lock" title="Lock grid" data-key="gridTemplateColumns">🔒</button>
+            </div>
+            <div class="subgrid">
+              <input class="input" placeholder="grid-template-columns: repeat(3,1fr)" data-key="gridTemplateColumns"/>
+              <input class="input" placeholder="grid-template-rows: auto 1fr auto" data-key="gridTemplateRows"/>
+              <select class="input" data-key="gridAutoFlow">
+                <option value="">auto-flow: (none)</option>
+                <option>row</option><option>column</option><option>dense</option>
+                <option>row dense</option><option>column dense</option>
+              </select>
+              <input class="input" placeholder="grid-gap: 8px" data-key="gridGap"/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Unit: size -->
+    <div class="unit" data-unit="size">
+      <div class="row">
+        <div class="label">size (width / height)
+          <button class="lock" title="Lock size" data-key="width">🔒</button>
+        </div>
+        <div class="subgrid">
+          <input class="input" placeholder="width: 100% or 320px" data-key="width"/>
+          <input class="input" placeholder="height: auto or 48px" data-key="height"/>
+          <button class="btn" id="btn-size-detail" aria-pressed="false">상세</button>
+        </div>
+      </div>
+      <div id="size-detail" class="conditional" data-active="false">
+        <div class="cond-head"><span class="cond-dot"></span><span>옵션: “상세” 버튼 ON 시</span></div>
+        <div class="groupbox">
+          <div class="row">
+            <div class="label">size detail<span class="badge">min/max</span></div>
+            <div class="subgrid">
+              <input class="input" placeholder="min-width: 0" data-key="minWidth"/>
+              <input class="input" placeholder="max-width: none" data-key="maxWidth"/>
+              <input class="input" placeholder="min-height: 0" data-key="minHeight"/>
+              <input class="input" placeholder="max-height: none" data-key="maxHeight"/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Unit: overflow -->
+    <div class="unit" data-unit="overflow">
+      <div class="row">
+        <div class="label">overflow / visibility
+          <button class="lock" title="Lock overflow" data-key="overflow">🔒</button>
+        </div>
+        <div class="subgrid">
+          <select class="input" data-key="overflow">
+            <option value="">overflow: (inherit)</option>
+            <option>visible</option><option>hidden</option><option>scroll</option><option>auto</option>
+          </select>
+          <select class="input" data-key="visibility">
+            <option value="">visibility: (inherit)</option>
+            <option>visible</option><option>hidden</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Position Panel -->
+  <section class="panel" id="panel-position">
+    <h2>Position</h2>
+    <div class="unit" data-unit="position">
+      <div class="row">
+        <div class="label">position
+          <button class="lock" title="Lock position" data-key="position">🔒</button>
+        </div>
+        <div>
+          <div class="chip" data-radio="position" data-value="">static</div>
+          <div class="chip" data-radio="position" data-value="relative">relative</div>
+          <div class="chip" data-radio="position" data-value="absolute">absolute</div>
+          <div class="chip" data-radio="position" data-value="fixed">fixed</div>
+          <div class="chip" data-radio="position" data-value="sticky">sticky</div>
+        </div>
+      </div>
+      <div id="offsets" class="conditional" data-active="false">
+        <div class="cond-head"><span class="cond-dot"></span><span>조건부 섹션: position ≠ static 선택 시</span></div>
+        <div class="groupbox">
+          <div class="row">
+            <div class="label">offsets<span class="badge">top/right/bottom/left</span></div>
+            <div class="subgrid">
+              <input class="input" placeholder="top: auto or 8px" data-key="top"/>
+              <input class="input" placeholder="right: auto or 8px" data-key="right"/>
+              <input class="input" placeholder="bottom: auto or 8px" data-key="bottom"/>
+              <input class="input" placeholder="left: auto or 8px" data-key="left"/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="unit" data-unit="zindex">
+      <div class="row">
+        <div class="label">z-index
+          <button class="lock" title="Lock z-index" data-key="zIndex">🔒</button>
+        </div>
+        <div><input class="input" placeholder="z-index: auto or 10" data-key="zIndex"/></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Spacing Panel -->
+  <section class="panel" id="panel-spacing">
+    <h2>Spacing</h2>
+    <div class="unit" data-unit="margin">
+      <div class="row">
+        <div class="label">margin
+          <button class="lock" title="Lock margin" data-key="margin">🔒</button>
+        </div>
+        <div><input class="input" placeholder="8px 12px" data-key="margin"/></div>
+      </div>
+      <div class="groupbox">
+        <div class="row">
+          <div class="label">margin TRBL</div>
+          <div class="subgrid">
+            <input class="input" placeholder="margin-top" data-key="marginTop"/>
+            <input class="input" placeholder="margin-right" data-key="marginRight"/>
+            <input class="input" placeholder="margin-bottom" data-key="marginBottom"/>
+            <input class="input" placeholder="margin-left" data-key="marginLeft"/>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="unit" data-unit="padding">
+      <div class="row">
+        <div class="label">padding
+          <button class="lock" title="Lock padding" data-key="padding">🔒</button>
+        </div>
+        <div><input class="input" placeholder="8px 12px" data-key="padding"/></div>
+      </div>
+      <div class="groupbox">
+        <div class="row">
+          <div class="label">padding TRBL</div>
+          <div class="subgrid">
+            <input class="input" placeholder="padding-top" data-key="paddingTop"/>
+            <input class="input" placeholder="padding-right" data-key="paddingRight"/>
+            <input class="input" placeholder="padding-bottom" data-key="paddingBottom"/>
+            <input class="input" placeholder="padding-left" data-key="paddingLeft"/>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Typography Panel -->
+  <section class="panel" id="panel-typo">
+    <h2>Typography</h2>
+    <div class="unit" data-unit="fontfamily">
+      <div class="row">
+        <div class="label">font-family
+          <button class="lock" title="Lock font-family" data-key="fontFamily">🔒</button>
+        </div>
+        <div><input class="input" placeholder="'Inter', system-ui" data-key="fontFamily"/></div>
+      </div>
+    </div>
+    <div class="unit" data-unit="sizeweight">
+      <div class="row">
+        <div class="label">font-size / weight
+          <button class="lock" title="Lock size/weight" data-key="fontSize">🔒</button>
+        </div>
+        <div class="subgrid">
+          <input class="input" placeholder="font-size: 16px" data-key="fontSize"/>
+          <select class="input" data-key="fontWeight">
+            <option value="">weight: (inherit)</option>
+            <option>400</option><option>500</option><option>600</option><option>700</option><option>800</option><option>bold</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="unit" data-unit="lineletter">
+      <div class="row">
+        <div class="label">line-height / letter-spacing
+          <button class="lock" title="Lock line/letter" data-key="lineHeight">🔒</button>
+        </div>
+        <div class="subgrid">
+          <input class="input" placeholder="line-height: 1.5 or 24px" data-key="lineHeight"/>
+          <input class="input" placeholder="letter-spacing: 0 or 0.02em" data-key="letterSpacing"/>
+        </div>
+      </div>
+    </div>
+    <div class="unit" data-unit="color">
+      <div class="row">
+        <div class="label">color
+          <button class="lock" title="Lock color" data-key="color">🔒</button>
+        </div>
+        <div><input class="input" type="color" value="#333333" data-key="color"/></div>
+      </div>
+    </div>
+    <div class="unit" data-unit="align">
+      <div class="row">
+        <div class="label">text-align
+          <button class="lock" title="Lock align" data-key="textAlign">🔒</button>
+        </div>
+        <div>
+          <div class="chip" data-radio="textAlign" data-value="left">left</div>
+          <div class="chip" data-radio="textAlign" data-value="center">center</div>
+          <div class="chip" data-radio="textAlign" data-value="right">right</div>
+          <div class="chip" data-radio="textAlign" data-value="justify">justify</div>
+        </div>
+      </div>
+    </div>
+    <div class="unit" data-unit="textmeta">
+      <div class="row">
+        <div class="label">text meta (transform / decoration / white-space)
+          <button class="lock" title="Lock text meta" data-key="textTransform">🔒</button>
+        </div>
+        <div class="subgrid">
+          <select class="input" data-key="textTransform">
+            <option value="">transform: (none)</option><option>capitalize</option><option>uppercase</option><option>lowercase</option>
+          </select>
+          <select class="input" data-key="textDecoration">
+            <option value="">decoration: (none)</option><option>underline</option><option>line-through</option><option>overline</option>
+          </select>
+          <select class="input" data-key="whiteSpace">
+            <option value="">white-space: (normal)</option><option>nowrap</option><option>pre</option><option>pre-wrap</option><option>pre-line</option><option>break-spaces</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Background Panel -->
+  <section class="panel" id="panel-bg">
+    <h2>Background</h2>
+    <div class="unit" data-unit="bgsh">
+      <div class="row">
+        <div class="label">background (shorthand)
+          <button class="lock" title="Lock background" data-key="background">🔒</button>
+        </div>
+        <div><input class="input" placeholder="color image repeat position / size" data-key="background"/></div>
+      </div>
+    </div>
+    <div class="unit" data-unit="bgcolor">
+      <div class="row">
+        <div class="label">background-color
+          <button class="lock" title="Lock bg color" data-key="backgroundColor">🔒</button>
+        </div>
+        <div><input class="input" type="color" value="#ffffff" data-key="backgroundColor"/></div>
+      </div>
+    </div>
+    <div class="unit" data-unit="bgimage">
+      <div class="row">
+        <div class="label">background-image
+          <button class="lock" title="Lock bg image" data-key="backgroundImage">🔒</button>
+        </div>
+        <div class="subgrid">
+          <input class="input" placeholder="url(...) or linear-gradient(...)" data-key="backgroundImage"/>
+          <label class="toggle" style="margin-left:8px"><input type="checkbox" id="useBgImage"> 이미지 사용</label>
+        </div>
+      </div>
+      <div id="bg-psr" class="conditional" data-active="false">
+        <div class="cond-head"><span class="cond-dot"></span><span>옵션: '이미지 사용' 체크 시 (position/size/repeat)</span></div>
+        <div class="groupbox">
+          <div class="row">
+            <div class="label">background pos/size/repeat
+              <button class="lock" title="Lock bg pos/size/repeat" data-key="backgroundPosition">🔒</button>
+            </div>
+            <div class="subgrid">
+              <input class="input" placeholder="background-position: center" data-key="backgroundPosition"/>
+              <select class="input" data-key="backgroundSize">
+                <option value="">size: (auto)</option><option>cover</option><option>contain</option>
+              </select>
+              <select class="input" data-key="backgroundRepeat">
+                <option value="">repeat: (default)</option><option>no-repeat</option><option>repeat</option><option>repeat-x</option><option>repeat-y</option><option>space</option><option>round</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Effects -->
+  <section class="panel" id="panel-effects">
+    <h2>Effects</h2>
+    <div class="unit" data-unit="shadow">
+      <div class="row">
+        <div class="label">box-shadow
+          <button class="lock" title="Lock shadow" data-key="boxShadow">🔒</button>
+        </div>
+        <div><input class="input" placeholder="0 1px 2px rgba(0,0,0,.2)" data-key="boxShadow"/></div>
+      </div>
+    </div>
+    <div class="unit" data-unit="opacity">
+      <div class="row">
+        <div class="label">opacity
+          <button class="lock" title="Lock opacity" data-key="opacity">🔒</button>
+        </div>
+        <div><input class="input" placeholder="0 ~ 1" data-key="opacity"/></div>
+      </div>
+    </div>
+    <div class="unit" data-unit="filter">
+      <div class="row">
+        <div class="label">filter / backdrop-filter
+          <button class="lock" title="Lock filter" data-key="filter">🔒</button>
+        </div>
+        <div class="subgrid">
+          <input class="input" placeholder="filter: blur(4px) saturate(1.2)" data-key="filter"/>
+          <input class="input" placeholder="backdrop-filter: blur(6px)" data-key="backdropFilter"/>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  const $ = (sel, root=document)=>root.querySelector(sel);
+  const $$ = (sel, root=document)=>Array.from(root.querySelectorAll(sel));
+
+  // radio-style chips
+  $$('.chip[data-radio]').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      const name = chip.getAttribute('data-radio');
+      const val = chip.getAttribute('data-value');
+      $$('.chip[data-radio="'+name+'"]').forEach(c=>c.dataset.active = (c===chip ? 'true':'false'));
+
+      // conditional sections for display
+      if(name === 'display'){
+        const isFlex = val==='flex';
+        const isGrid = val==='grid';
+        const flexBox = $('#display-flex');
+        const gridBox = $('#display-grid');
+        flexBox.dataset.active = String(isFlex);
+        gridBox.dataset.active = String(isGrid);
+      }
+
+      // conditional for position offsets
+      if(name === 'position'){
+        const off = $('#offsets');
+        off.dataset.active = String(val !== '');
+      }
+    });
+  });
+
+  // background image toggle => show PSR
+  const useBg = $('#useBgImage');
+  useBg.addEventListener('change', ()=>{
+    $('#bg-psr').dataset.active = String(useBg.checked);
+  });
+
+  // default selects
+  $$('[data-radio="display"]').find(c=>c.textContent==='block')?.click();
+  $$('[data-radio="position"]').find(c=>c.textContent==='static')?.click();
+  useBg.checked = false; $('#bg-psr').dataset.active = 'false';
+
+  // lock buttons state + page/expert gating
+  const locked = new Set(); // keys that are locked (visible=false)
+
+  function applyVisibility(){
+    const page = $('#modePage').checked;
+    const expert = $('#expertMode').checked;
+
+    // Map 1st-key -> unit DOMs
+    const keyToUnits = {
+      display: ['[data-unit="display"]'],
+      flexDirection: ['#display-flex'],
+      gridTemplateColumns: ['#display-grid'],
+      width: ['[data-unit="size"]'],
+      overflow: ['[data-unit="overflow"]'],
+      position: ['[data-unit="position"]'],
+      zIndex: ['[data-unit="zindex"]'],
+      margin: ['[data-unit="margin"]'],
+      padding: ['[data-unit="padding"]'],
+      fontFamily: ['[data-unit="fontfamily"]'],
+      fontSize: ['[data-unit="sizeweight"]'],
+      lineHeight: ['[data-unit="lineletter"]'],
+      color: ['[data-unit="color"]'],
+      textAlign: ['[data-unit="align"]'],
+      textTransform: ['[data-unit="textmeta"]'],
+      background: ['[data-unit="bgsh"]'],
+      backgroundColor: ['[data-unit="bgcolor"]'],
+      backgroundImage: ['[data-unit="bgimage"]'],
+      backgroundPosition: ['#bg-psr'],
+      boxShadow: ['[data-unit="shadow"]'],
+      opacity: ['[data-unit="opacity"]'],
+      filter: ['[data-unit="filter"]'],
+    };
+
+    Object.entries(keyToUnits).forEach(([key, selectors])=>{
+      selectors.forEach(sel=>{
+        const node = $(sel);
+        if(!node) return;
+        const isLocked = locked.has(key);
+        // Page mode (non-Expert): hide when locked
+        node.classList.toggle('hidden', page && !expert && isLocked);
+      });
+    });
+
+    // lock button appearance
+    $$('.lock').forEach(btn=>{
+      const key = btn.getAttribute('data-key');
+      const on = locked.has(key);
+      btn.dataset.state = on ? 'on' : 'off';
+      btn.title = (on ? 'Unlock ' : 'Lock ') + key;
+    });
+  }
+
+  $$('.lock').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const key = btn.getAttribute('data-key');
+      if(locked.has(key)) locked.delete(key); else locked.add(key);
+      applyVisibility();
+    });
+  });
+
+  $('#modePage').addEventListener('change', applyVisibility);
+  $('#expertMode').addEventListener('change', applyVisibility);
+
+  // size detail toggle (also visual yellow state)
+  $('#btn-size-detail').addEventListener('click', (e)=>{
+    const pressed = e.currentTarget.getAttribute('aria-pressed') === 'true';
+    e.currentTarget.setAttribute('aria-pressed', String(!pressed));
+    const box = $('#size-detail');
+    box.dataset.active = String(!pressed);
+  });
+
+  applyVisibility();
+})();
+</script>
+</body>
+</html>

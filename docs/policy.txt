@@ -169,3 +169,49 @@ export interface ProjectSettingsPoliciesOverride {
   style?: Partial<StylePolicy>;
   components?: Partial<EffectivePolicies['components']>;
 }
+
+
+--------------------------------------------------------------------
+프로젝트의 핵심인 TagPolicy, StylePolicy, ComponentPolicy에 대한 최종 정리된 내용을 알려드립니다.
+
+이 정책 시스템은 에디터의 Inspector 패널에 표시되는 스타일 속성을 동적으로 제어하여, 일관된 디자인 시스템을 구축하고 사용자의 편집 경험을 최적화하는 것을 목표로 합니다.
+
+1. StylePolicy
+역할: **"기본 스타일 규칙"**을 정의하는 가장 기반이 되는 정책입니다. Layout, Spacing, Typography 등 각 스타일 그룹과 그 하위의 개별 속성(예: display, margin, fontSize)이 Inspector에 기본적으로 표시될지 여부(visible)를 결정합니다.
+
+적용 범위: 전역적으로 모든 컴포넌트에 적용되는 기본값입니다. globalStylePolicy.ts 파일에 정의되어 있습니다.
+
+예시: globalStylePolicy.ts에서 layout 그룹의 visible을 false로 설정하면, 기본적으로 모든 컴포넌트의 Inspector에서 Layout 패널이 보이지 않게 됩니다.
+
+2. TagPolicy
+역할: **"HTML 태그별 예외 규칙"**을 정의하는 정책입니다. StylePolicy가 정의한 기본 규칙 위에서, 특정 HTML 태그(p, img, span 등)에 대해서만 스타일 속성을 다르게 보여주거나 숨길 때 사용됩니다.
+
+적용 범위: 컴포넌트가 사용하는 기본 HTML 태그에 따라 적용됩니다. globalTagPolicy.ts 파일에 정의되어 있습니다.
+
+예시: StylePolicy에서 Typography 그룹이 기본적으로 보인다고 설정했더라도, globalTagPolicy.ts에서 img 태그에 대해 typography: { visible: false } 라고 정의하면, Image 컴포넌트를 선택했을 때는 Typography 패널이 숨겨집니다.
+
+3. ComponentPolicy
+역할: **"컴포넌트별 최종 규칙"**을 정의하는 가장 구체적이고 강력한 정책입니다. "컴포넌트 개발 모드"에서 제작자가 설정한 규칙으로, "페이지 개발 모드"에서 해당 컴포넌트를 사용하는 사용자에게 어떤 스타일을 노출할지를 최종 결정합니다.
+
+적용 범위: 특정 컴포넌트(componentId)에 개별적으로 적용되며, 이 정보는 프로젝트 파일 내(project.policies.components)에 저장됩니다.
+
+핵심 기능:
+
+잠금 (비노출): "컴포넌트 개발 모드"에서 제작자가 특정 스타일 속성을 "잠금(Lock)" 처리하면, 해당 속성은 ComponentPolicy에 { visible: false }로 기록됩니다. "페이지 개발 모드"에서 이 컴포넌트를 사용하는 사용자는 해당 속성을 Inspector에서 볼 수 없게 됩니다.
+
+규칙 오버라이드: ComponentPolicy는 StylePolicy와 TagPolicy의 규칙을 덮어쓰는 최종 결정권을 가집니다. 예를 들어, StylePolicy에서 width 속성이 보이도록 설정되어 있더라도, 특정 버튼 컴포넌트의 ComponentPolicy에서 width를 { visible: false }로 설정하면, "페이지 개발 모드"에서는 해당 버튼의 width를 수정할 수 없습니다.
+
+정책 적용 우선순위
+Inspector에 스타일 속성이 표시될지 여부는 아래와 같은 우선순위에 따라 최종적으로 결정됩니다.
+
+고급 모드(Expert Mode)가 ON 인가?
+
+Yes: ComponentPolicy를 무시하고, StylePolicy와 TagPolicy만으로 모든 속성을 표시합니다.
+
+현재 "페이지 개발 모드"인가?
+
+Yes: StylePolicy + TagPolicy + ComponentPolicy 세 가지를 모두 병합하여 최종적으로 표시할 속성을 결정합니다. ComponentPolicy가 가장 높은 우선순위를 가집니다.
+
+현재 "컴포넌트 개발 모드"인가?
+
+Yes: StylePolicy + TagPolicy만으로 표시할 속성을 결정합니다. 이 모드에서는 사용자가 "잠금" 액션을 통해 ComponentPolicy를 생성하고 수정할 수 있습니다.

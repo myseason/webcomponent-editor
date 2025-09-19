@@ -39,9 +39,11 @@ export default function PageBar() {
         [project.pages, project.rootId]
     );
 
-    const { activeViewport, baseViewport, vpMode, width: canvasWidth, height: canvasHeight, zoom } = ui.canvas;
+    const { activeViewport, baseViewport, viewportMode, width: canvasWidth, height: canvasHeight, zoom } = ui.canvas;
     const notification = ui.notification;
     const editorMode = ui.mode;
+    // 현재 활성 뷰포트의 모드(통합/개별) — 구/신 필드 호환
+    const currentVpMode: ViewportMode = (viewportMode && viewportMode[activeViewport]) || 'Unified';
 
     const [wStr, setWStr] = useState(String(canvasWidth));
     const [hStr, setHStr] = useState(String(canvasHeight));
@@ -93,6 +95,13 @@ export default function PageBar() {
         writer.setNotification(`Expert Mode: ${!ui.expertMode ? 'ON' : 'OFF'}`); // ✨ [수정] 전역 알림 액션 사용
     }
 
+    // 통합/개별 모드 토글(라디오)
+    const onChangeViewportMode = (mode: ViewportMode) => {
+        if (mode === currentVpMode) return;
+        writer.setViewportMode(activeViewport, mode);     // (viewport, mode) 시그니처.  [oai_citation:3‡GitHub](https://raw.githubusercontent.com/myseason/webcomponent-editor/feature/v1.4/src/figmaV3/engine/domains/ui.ts)
+        writer.setNotification(`Mode: ${mode} (${activeViewport})`);
+    };
+
     return (
         <div className="relative w-full flex items-center justify-between border-b border-gray-200 bg-white px-3 py-2">
             {/* Left: 페이지 선택 또는 컴포넌트 모드 표시 */}
@@ -142,11 +151,8 @@ export default function PageBar() {
                         <input
                             type="radio"
                             name="vp-mode"
-                            checked={vpMode[activeViewport] === 'Unified'}
-                            onChange={() => {
-                                writer.setViewportMode(activeViewport, 'Unified');
-                                writer.setNotification(`Mode: Unified (${activeViewport})`);
-                            }}
+                            checked={viewportMode[activeViewport] === 'Unified'}
+                            onChange={() => onChangeViewportMode('Unified')}
                         />
                         통합
                     </label>
@@ -154,11 +160,8 @@ export default function PageBar() {
                         <input
                             type="radio"
                             name="vp-mode"
-                            checked={vpMode[activeViewport] === 'Independent'}
-                            onChange={() => {
-                                writer.setViewportMode(activeViewport, 'Independent');
-                                writer.setNotification(`Mode: Independent (${activeViewport})`);
-                            }}
+                            checked={viewportMode[activeViewport] === 'Independent'}
+                            onChange={() => onChangeViewportMode('Independent')}
                         />
                         개별
                     </label>

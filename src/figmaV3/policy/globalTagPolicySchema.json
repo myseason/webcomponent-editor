@@ -1,0 +1,359 @@
+{
+  "version": "1.4",
+
+  "groups": {
+    "Layout.Display&Flow": {
+      "styleKeys": ["display","flexDirection","flexWrap","order","justifyContent","alignItems","alignContent","gap","rowGap","columnGap","overflow","overflowX","overflowY","visibility"]
+    },
+    "Layout.Position": {
+      "styleKeys": ["position","top","right","bottom","left","inset","zIndex","float","clear"]
+    },
+    "Layout.Sizing": {
+      "styleKeys": ["boxSizing","width","height","minWidth","minHeight","maxWidth","maxHeight","aspectRatio","objectFit","objectPosition"]
+    },
+    "Layout.Spacing": {
+      "styleKeys": ["margin","marginTop","marginRight","marginBottom","marginLeft","padding","paddingTop","paddingRight","paddingBottom","paddingLeft"]
+    },
+
+    "Typography.Font": {
+      "styleKeys": ["fontFamily","fontSize","fontWeight","fontStyle","fontVariant","lineHeight","letterSpacing"]
+    },
+    "Typography.Text": {
+      "styleKeys": ["textAlign","textDecoration","textTransform","whiteSpace","wordBreak","overflowWrap","textOverflow","direction"]
+    },
+    "Typography.Content Flow": {
+      "styleKeys": ["listStyle","listStyleType","listStylePosition","listStyleImage","verticalAlign"]
+    },
+
+    "Appearance.Fill": {
+      "styleKeys": ["background","backgroundColor","backgroundImage","backgroundSize","backgroundRepeat","backgroundPosition","backgroundClip","backgroundOrigin","backgroundAttachment"]
+    },
+    "Appearance.Border": {
+      "styleKeys": ["border","borderWidth","borderStyle","borderColor","borderTop","borderRight","borderBottom","borderLeft","borderRadius","outline","outlineColor","outlineStyle","outlineWidth"]
+    },
+    "Appearance.Visual": {
+      "styleKeys": ["boxShadow","opacity","mixBlendMode","filter","backdropFilter","cursor"]
+    },
+
+    "Effects.Transform": {
+      "styleKeys": ["transform","transformOrigin","perspective"]
+    },
+    "Effects.Transition": {
+      "styleKeys": ["transition","transitionProperty","transitionDuration","transitionTimingFunction","transitionDelay","animation","animationName","animationDuration","animationTimingFunction","animationDelay","animationIterationCount","animationDirection","animationFillMode","animationPlayState"]
+    },
+
+    "Interactive.UserInteraction": {
+      "styleKeys": ["pointerEvents","userSelect","touchAction","caretColor","scrollBehavior","scrollSnapType","scrollSnapAlign","accentColor"]
+    },
+
+    "Advanced.Advanced / Overrides": {
+      "styleKeys": ["--*","contain","isolation","clipPath","mask","maskImage","maskSize","maskRepeat","resize","willChange","appearance","content"]
+    }
+  },
+
+  "common": {
+    "sections": [
+      { "group": "Layout.Display&Flow" },
+      { "group": "Layout.Position" },
+      { "group": "Layout.Sizing" },
+      { "group": "Layout.Spacing" },
+
+      { "group": "Typography.Font" },
+      { "group": "Typography.Text" },
+      { "group": "Typography.Content Flow" },
+
+      { "group": "Appearance.Fill" },
+      { "group": "Appearance.Border" },
+      { "group": "Appearance.Visual" },
+
+      { "group": "Effects.Transform" },
+      { "group": "Effects.Transition" },
+
+      { "group": "Interactive.UserInteraction" },
+
+      { "group": "Advanced.Advanced / Overrides" }
+    ],
+
+    "attrs": {
+      "allow": ["id","class","title","role","tabIndex","aria-*","data-*"],
+      "deny": []
+    },
+
+    "events": {
+      "allow": ["onClick","onMouseEnter","onMouseLeave","onFocus","onBlur","onKeyDown","onKeyUp"],
+      "deny": []
+    },
+
+    "styles": {
+      "allow": ["*"],
+      "deny": ["content"]
+    }
+  },
+
+  "tags": {
+    "div": {},
+
+    "span": {
+      "sections": [
+        { "group": "Layout.Sizing", "denyStyles": ["width","height","minWidth","minHeight","maxWidth","maxHeight"] }
+      ]
+    },
+
+    "p": {
+      "sections": [
+        { "group": "Layout.Sizing", "denyStyles": ["width","height"] }
+      ]
+    },
+
+    "h1": { "sections": [ { "group": "Layout.Sizing", "denyStyles": ["height"] } ] },
+    "h2": { "sections": [ { "group": "Layout.Sizing", "denyStyles": ["height"] } ] },
+    "h3": { "sections": [ { "group": "Layout.Sizing", "denyStyles": ["height"] } ] },
+    "h4": { "sections": [ { "group": "Layout.Sizing", "denyStyles": ["height"] } ] },
+    "h5": { "sections": [ { "group": "Layout.Sizing", "denyStyles": ["height"] } ] },
+    "h6": { "sections": [ { "group": "Layout.Sizing", "denyStyles": ["height"] } ] },
+
+    "a": {
+      "sections": [
+        { "group": "Typography.Text", "allowStyles": ["textDecoration","textTransform","textAlign","whiteSpace","wordBreak","overflowWrap","textOverflow","direction","color","letterSpacing","lineHeight","fontWeight","fontSize"] }
+      ],
+      "attrs": { "allow": ["href","target","rel","title","download","tabIndex","aria-*","data-*"] },
+      "events": { "allow": ["onClick","onFocus","onBlur","onKeyDown","onKeyUp"] }
+    },
+
+    "img": {
+      "sections": [
+        { "group": "Typography.Font", "denyStyles": ["fontFamily","fontSize","fontWeight","fontStyle","fontVariant","lineHeight","letterSpacing"] },
+        { "group": "Typography.Text", "denyStyles": ["textAlign","textDecoration","textTransform","whiteSpace","wordBreak","overflowWrap","textOverflow","direction"] },
+        { "group": "Typography.Content Flow", "denyStyles": ["listStyle","listStyleType","listStylePosition","listStyleImage","verticalAlign"] },
+        { "group": "Appearance.Fill", "denyStyles": ["backgroundImage","backgroundSize","backgroundRepeat","backgroundPosition","backgroundAttachment","backgroundClip","backgroundOrigin"] },
+        { "group": "Layout.Sizing", "allowStyles": ["width","height","minWidth","minHeight","maxWidth","maxHeight","objectFit","objectPosition"] }
+      ],
+      "attrs": { "allow": ["alt","src","srcset","sizes","decoding","loading","width","height","referrerPolicy","aria-*","data-*"] },
+      "events": { "allow": ["onLoad","onError"] }
+    },
+
+    "button": {
+      "attrs": { "allow": ["type","disabled","name","value","title","tabIndex","aria-*","data-*"] },
+      "events": { "allow": ["onClick","onFocus","onBlur","onKeyDown","onKeyUp"] }
+    },
+
+    "label": {
+      "attrs": { "allow": ["htmlFor","title","tabIndex","aria-*","data-*"] },
+      "events": { "allow": ["onClick","onFocus","onBlur"] }
+    },
+
+    "input": {
+      "sections": [
+        { "group": "Typography.Font", "allowStyles": ["fontSize","lineHeight","letterSpacing","fontWeight","fontStyle","fontFamily","color"] },
+        { "group": "Appearance.Fill", "allowStyles": ["backgroundColor"] }
+      ],
+      "attrs": { "allow": ["type","value","placeholder","disabled","readOnly","name","required","min","max","step","checked","pattern","inputMode","autocomplete","tabIndex","aria-*","data-*"] },
+      "events": { "allow": ["onChange","onInput","onFocus","onBlur","onKeyDown","onKeyUp"] }
+    },
+
+    "textarea": {
+      "sections": [
+        { "group": "Layout.Sizing", "allowStyles": ["width","height","minHeight","maxHeight"] },
+        { "group": "Typography.Font", "allowStyles": ["fontSize","lineHeight","letterSpacing","fontWeight","fontStyle","fontFamily","color"] },
+        { "group": "Appearance.Fill", "allowStyles": ["backgroundColor"] }
+      ],
+      "attrs": { "allow": ["value","placeholder","disabled","readOnly","name","required","rows","cols","wrap","tabIndex","aria-*","data-*"] },
+      "events": { "allow": ["onChange","onInput","onFocus","onBlur","onKeyDown","onKeyUp"] }
+    },
+
+    "select": {
+      "sections": [
+        { "group": "Layout.Sizing", "allowStyles": ["width","height","minWidth","maxWidth"] }
+      ],
+      "attrs": { "allow": ["name","disabled","required","multiple","size","value","autocomplete","tabIndex","aria-*","data-*"] },
+      "events": { "allow": ["onChange","onFocus","onBlur"] }
+    },
+
+    "option": {
+      "sections": [],
+      "attrs": { "allow": ["value","label","selected","disabled"] }
+    },
+
+    "ul": {
+      "sections": [
+        { "group": "Typography.Content Flow", "allowStyles": ["listStyle","listStyleType","listStylePosition","listStyleImage"] }
+      ],
+      "attrs": { "allow": ["role","tabIndex","aria-*","data-*"] }
+    },
+
+    "ol": {
+      "sections": [
+        { "group": "Typography.Content Flow", "allowStyles": ["listStyle","listStyleType","listStylePosition","listStyleImage"] }
+      ],
+      "attrs": { "allow": ["start","reversed","type","role","tabIndex","aria-*","data-*"] }
+    },
+
+    "li": { "sections": [] },
+
+    "nav": { "sections": [] },
+    "header": { "sections": [] },
+    "footer": { "sections": [] },
+    "section": { "sections": [] },
+    "article": { "sections": [] },
+    "main": { "sections": [] },
+    "aside": { "sections": [] },
+
+    "form": {
+      "sections": [],
+      "attrs": { "allow": ["action","method","target","noValidate","name","acceptCharset","autocomplete","rel","aria-*","data-*"] },
+      "events": { "allow": ["onSubmit","onReset","onChange","onInput"] }
+    },
+
+    "table": {
+      "sections": [],
+      "attrs": { "allow": ["cellPadding","cellSpacing","summary","title","role","tabIndex","aria-*","data-*"] }
+    },
+    "thead": { "sections": [] },
+    "tbody": { "sections": [] },
+    "tfoot": { "sections": [] },
+    "tr": { "sections": [] },
+    "th": {
+      "sections": [
+        { "group": "Typography.Text", "allowStyles": ["textAlign","verticalAlign","whiteSpace"] }
+      ],
+      "attrs": { "allow": ["scope","colspan","rowspan","abbr","headers"] }
+    },
+    "td": {
+      "sections": [
+        { "group": "Typography.Text", "allowStyles": ["textAlign","verticalAlign","whiteSpace"] }
+      ],
+      "attrs": { "allow": ["headers","colspan","rowspan","abbr"] }
+    },
+    "caption": {
+      "sections": [
+        { "group": "Typography.Text", "allowStyles": ["textAlign"] }
+      ]
+    },
+
+    "figure": { "sections": [] },
+    "figcaption": { "sections": [] },
+
+    "video": {
+      "sections": [
+        { "group": "Layout.Sizing", "allowStyles": ["width","height","minWidth","minHeight","maxWidth","maxHeight","objectFit","objectPosition"] },
+        { "group": "Appearance.Visual", "allowStyles": ["opacity","filter"] }
+      ],
+      "attrs": { "allow": ["src","poster","controls","autoplay","loop","muted","playsInline","preload","width","height","crossOrigin"] },
+      "events": { "allow": ["onPlay","onPause","onEnded","onTimeUpdate","onLoadedMetadata","onError"] }
+    },
+
+    "audio": {
+      "sections": [
+        { "group": "Appearance.Visual", "allowStyles": ["opacity"] }
+      ],
+      "attrs": { "allow": ["src","controls","autoplay","loop","muted","preload","crossOrigin"] },
+      "events": { "allow": ["onPlay","onPause","onEnded","onTimeUpdate","onLoadedMetadata","onError"] }
+    },
+
+    "canvas": {
+      "sections": [
+        { "group": "Layout.Sizing", "allowStyles": ["width","height"] }
+      ],
+      "attrs": { "allow": ["width","height"] }
+    },
+
+    "svg": {
+      "sections": [
+        { "group": "Layout.Sizing", "allowStyles": ["width","height"] },
+        { "group": "Appearance.Fill", "allowStyles": ["background","backgroundColor"] },
+        { "group": "Appearance.Visual", "allowStyles": ["opacity","filter"] }
+      ],
+      "attrs": { "allow": ["viewBox","width","height","fill","stroke","xmlns","role","aria-*","data-*"] }
+    },
+
+    "iframe": {
+      "sections": [
+        { "group": "Layout.Sizing", "allowStyles": ["width","height","minWidth","minHeight","maxWidth","maxHeight"] },
+        { "group": "Appearance.Border", "allowStyles": ["border","borderRadius"] },
+        { "group": "Appearance.Visual", "allowStyles": ["opacity"] }
+      ],
+      "attrs": { "allow": ["src","srcdoc","title","name","allow","loading","referrerPolicy","sandbox","width","height"] },
+      "events": { "allow": [] }
+    },
+
+    "picture": { "sections": [] },
+    "source": {
+      "sections": [],
+      "attrs": { "allow": ["src","srcset","type","media","sizes"] }
+    },
+
+    "hr": {
+      "sections": [
+        { "group": "Layout.Sizing", "allowStyles": ["width","height"] },
+        { "group": "Appearance.Border", "allowStyles": ["borderColor","borderWidth","borderStyle"] },
+        { "group": "Appearance.Visual", "allowStyles": ["opacity"] }
+      ],
+      "attrs": { "allow": ["role","aria-*","data-*"] }
+    },
+
+    "br": {
+      "sections": [
+        { "group": "Layout.Sizing", "denyStyles": ["width","height"] }
+      ],
+      "attrs": { "allow": [] }
+    },
+
+    "code": {
+      "sections": [
+        { "group": "Typography.Font", "allowStyles": ["fontFamily","fontSize","lineHeight","letterSpacing","fontWeight","fontStyle"] },
+        { "group": "Appearance.Fill", "allowStyles": ["backgroundColor"] }
+      ]
+    },
+    "pre": {
+      "sections": [
+        { "group": "Typography.Text", "allowStyles": ["whiteSpace"] },
+        { "group": "Typography.Font", "allowStyles": ["fontFamily","fontSize","lineHeight"] }
+      ]
+    },
+    "small": { "sections": [] },
+    "strong": { "sections": [] },
+    "em": { "sections": [] },
+    "mark": {
+      "sections": [
+        { "group": "Appearance.Fill", "allowStyles": ["backgroundColor"] }
+      ]
+    },
+    "blockquote": { "sections": [] },
+    "cite": { "sections": [] },
+    "q": { "sections": [] },
+    "time": {
+      "sections": [],
+      "attrs": { "allow": ["dateTime"] }
+    },
+
+    "progress": {
+      "sections": [
+        { "group": "Layout.Sizing", "allowStyles": ["width","height"] }
+      ],
+      "attrs": { "allow": ["value","max"] }
+    },
+    "meter": {
+      "sections": [
+        { "group": "Layout.Sizing", "allowStyles": ["width","height"] }
+      ],
+      "attrs": { "allow": ["value","min","max","low","high","optimum"] }
+    },
+
+    "details": {
+      "sections": [],
+      "attrs": { "allow": ["open","name","id"] }
+    },
+    "summary": { "sections": [] },
+
+    "dialog": {
+      "sections": [
+        { "group": "Layout.Sizing", "allowStyles": ["width","height","minWidth","minHeight","maxWidth","maxHeight"] },
+        { "group": "Appearance.Fill", "allowStyles": ["backgroundColor"] },
+        { "group": "Appearance.Border", "allowStyles": ["border","borderRadius"] },
+        { "group": "Appearance.Visual", "allowStyles": ["boxShadow","opacity"] },
+        { "group": "Layout.Position", "allowStyles": ["position","top","right","bottom","left","zIndex"] }
+      ],
+      "attrs": { "allow": ["open"] }
+    }
+  }
+}

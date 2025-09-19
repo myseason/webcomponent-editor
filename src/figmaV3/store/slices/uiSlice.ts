@@ -45,4 +45,9 @@ export const createUiSlice: StateCreator<EditorStoreState, [], [], UiSlice> = (s
 
     _setLastActivePageId: (pageId) => get().update((s) => { s.ui.panels.left.lastActivePageId = pageId; }),
     _setLastActiveFragmentId: (fragmentId) => get().update((s) => { s.ui.panels.left.lastActiveFragmentId = fragmentId; }),
+
+    /** Page 모드에서 TagPolicy 강제 공개 토글 */
+    _setInspectorForceTagPolicy: (force: boolean) => get().update((s) => {
+        s.ui.inspector = { ...(s.ui.inspector ?? {}), forceTagPolicy: !!force };
+    }, true),
 });

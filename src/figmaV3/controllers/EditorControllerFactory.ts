@@ -21,7 +21,7 @@ export function useEditorControllerFactory(): { reader: any; writer: any } {
 
 function createEditorController(RE: any, WE: any) {
     const ctl = makeSmartController('editor', RE, WE, {
-        wrap: {
+        writerWrap: {
             setEditorMode: withLog('setEditorMode'),
             selectPage: withLog('selectPage'),
             setNotification: withLog('setNotification'),

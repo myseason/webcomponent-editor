@@ -30,7 +30,7 @@ export function useTopbarControllerFactory(domain?: TopbarDomain): { reader: any
 /* ───────── 내부 구현 숨김 ───────── */
 function createTopbarController(RE: any, WE: any) {
     const ctl = makeSmartController('Topbar', RE, WE, {
-        wrap: {
+        writerWrap: {
             setEditorMode: withLog('setEditorMode'),
             selectPage: withLog('selectPage'),
             setNotification: withLog('setNotification'),

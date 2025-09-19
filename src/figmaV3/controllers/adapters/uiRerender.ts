@@ -15,7 +15,7 @@ export function requestRerenderTick() {
     scheduled = true;
     queueMicrotask(() => {
         scheduled = false;
-        for (const l of listeners) l();
+        for (const listener of listeners) listener();
     });
 }
 

@@ -1,0 +1,83 @@
+# Inspector 정책 및 스타일 시스템 기획 (v1.1)
+
+## 1. 정책 계층과 우선순위
+모든 정책과 정의는 다음 우선순위로 병합 및 적용한다.
+
+PropsSchema  >  ComponentPolicy  >  Capabilities  >  TagPolicy(Global)  >  Defaults
+
+- PropsSchema: 컴포넌트 저자가 정의한 입력 필드 및 Tag/속성 후보. (schemaEditor와 연결)
+- ComponentPolicy: 프로젝트/운영 단계에서 특정 스타일 그룹이나 속성을 잠그거나 숨기기 위한 정책.
+- Capabilities: 컴포넌트 구조적 특성(컨테이너 여부, 기본 Tag, 허용 Tag 후보).
+- TagPolicy(Global): HTML 스펙 기반 기본 허용/제한. (attributes/events/styles 그룹 단위)
+- Defaults: 컴포넌트 정의의 기본 값.
+
+## 2. TagPolicy
+- 목적: HTML 태그별 허용 가능한 속성, 이벤트, 스타일 그룹을 정의.
+- 구조: { tag, attributes, events, styles { allow, deny, groups } }
+- Inspector에서는 TagPolicy를 기반으로 속성/스타일 패널 가시성을 제어.
+- 글로벌 단일 소스로 관리 (`globalTagPolicy.ts`).
+
+## 3. StylePolicy
+- 목적: Inspector에서 노출할 수 있는 스타일 컨트롤 정의.
+- 3층 구조로 분리:
+  - Binding Layer: CSS 속성 ↔ 내부 토큰 키 매핑 (예: font-weight ↔ typo.weight).
+  - Control Layer: Inspector UI 제어 정의 (슬라이더/셀렉트/토글 등).
+  - Token Layer: 디자인 토큰/프리셋 정의 (theme 연결).
+- TagPolicy는 "허용된 키 집합"만 넘기고, 실제 컨트롤 표현은 StylePolicy에서 관리.
+
+## 4. ComponentPolicy
+- 목적: 특정 컴포넌트의 스타일/속성 편집을 운영자가 차단하거나 제한.
+- 범위: Inspector 그룹/컨트롤 단위 visible/locked 토글.
+- 원칙: "잠금 전용" 최소주의. 값 강제는 defaults가 담당.
+- EditorMode === Component일 때만 Lock 버튼 표시.
+- Page 모드에서는 Lock 버튼은 보이지 않음.
+
+## 5. PropsSchema
+- 목적: 컴포넌트 개발자가 Inspector에 노출할 속성을 직접 정의.
+- TagPolicy의 Tag Attributes와 동일 역할을 하되, 제한/추가 목적.
+- Capabilities와 함께 schemaEditor와 연결되어 UI 제어.
+- 조건부 노출 지원: { when: { __tag: 'a' } } 같은 구조.
+
+## 6. Capabilities
+- 목적: 컴포넌트 구조적 가능성 정의.
+  - canHaveChildren, defaultTag, allowedTags 등.
+- TagPolicy보다 우선 적용. 
+- 예: Button은 canHaveChildren=false, allowedTags=['button','a','div'].
+
+## 7. 평가 파이프라인
+Inspector/렌더 모두 동일한 순수 함수로 처리:
+- resolveTagCandidates(node)
+- resolveAttributeSpec(tag, def)
+- resolveStyleSpec(tag, ui)
+- validate(node)
+
+## 8. 병합 규칙
+- 배열: 기본 교집합. PropsSchema 명시는 최우선.
+- 객체: 얕은 병합 + 명시 키 우선. visible=false는 강한 금지.
+- 정책 버전 관리: version: '1.x' + migratePolicy().
+
+## 9. UI/UX
+- Page 모드 + 기본: TagPolicy + StylePolicy 교차 → 최소한만 노출.
+- Page 모드 + 고급: 숨김 섹션은 회색/툴팁으로 표시, 편집 불가.
+- Component 모드: Lock 버튼 항상 표시. 클릭 시 ComponentPolicy에 반영.
+- __tag 변경 시: schema.when 재평가, 불가 속성은 값 보존하되 비활성화.
+
+## 10. 개발/운영 품질
+- 단위 테스트: resolve* 함수 전용 테이블 기반 테스트.
+- 통합 테스트: 스냅샷 (예: Button → a → href 활성).
+- Telemetry: 금지 위반, Lock 토글, 전문가 모드 진입 비율.
+- 문서화 자동화: definition → schema JSON 내보내기.
+
+## 11. StyleGraph 연동
+- 목적: 뷰포트/상태별 스타일을 "Base + Delta" 방식으로 관리.
+- 구조: { element: { base: {...}, sm: {...}, hover: {...}, dark: {...} } }
+- StylePolicy는 허용 키와 컨트롤 정의를 제공.
+- StyleGraph는 실제 저장/머지 엔진 역할.
+- Inspector는 StylePolicy → 컨트롤 생성 → StyleGraph에 값 쓰기.
+- 렌더는 StyleGraph를 해석(Base + Delta merge)하여 실제 style 생성.
+
+## 12. 추가 제안 사항
+- Definition/Policy/Schema 자동 문서화 도구 추가: JSON → Markdown export.
+- Telemetry 기반 개선: 자주 잠금되는 속성/불필요한 속성 식별.
+- Studio(Expert) 모드 제공: 모든 TagPolicy/StylePolicy를 직접 수정 가능.
+- 정책 마이그레이션 도구: version 차이 발생 시 자동 변환기 제공.

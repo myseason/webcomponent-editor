@@ -1,0 +1,1068 @@
+
+<!doctype html><html lang="ko"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Inspector (Left 5 cols: main 1-4 / detail 2-4 / lock 5)</title>
+<style>
+:root{--inspector-width:400px; --bg:#0f1115; --panel:#151923; --panel-2:#1b2130; --text:#e6e8ef; --muted:#9aa4b2; --accent:#5b8cff; --border:#2a3245; --chip:#20283a;}
+html,body{background:var(--bg); color:var(--text); font-family:ui-sans-serif,system-ui,Pretendard,Apple SD Gothic Neo,Segoe UI,Roboto,Helvetica,Arial; margin:0;}
+.dock{position:relative; height:100vh; display:flex; justify-content:flex-end;}
+.inspector{width:var(--inspector-width); height:100%; background:var(--panel); border-left:1px solid var(--border); overflow:auto;}
+.section{padding:6px 8px}
+.row{display:grid; grid-template-columns:3fr 7fr; gap:8px; align-items:center; padding:6px 0; border-bottom:1px dashed rgba(255,255,255,0.07)}
+
+/* Left: 5 columns
+   - .prop-main spans 1/5 (cols 1..4)
+   - .prop-detail spans 2/5 (cols 2..4) with empty col1 to look indented
+   - .lock-btn at col 5
+*/
+.left5{
+  display:grid; grid-template-columns:repeat(5, minmax(0,1fr));
+  align-items:center; gap:6px; padding:0 4px; position:relative;
+}
+.prop-main{
+  grid-column:1 / 5; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.prop-detail{
+  grid-column:2 / 5; font-size:11px; color:#aeb7c6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.lock-btn{
+  grid-column:5 / 6; display:inline-grid; place-items:center; width:22px; height:22px; border:1px solid var(--border); border-radius:7px; background:var(--chip); cursor:pointer;
+}
+.lock-btn svg{width:14px;height:14px;fill:#c9d4e5}
+
+/* Right: 9:1; controls -> 7 equal cols */
+.right{display:grid; grid-template-columns:9fr 1fr; gap:6px; align-items:center}
+.controls{display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:6px; align-items:center}
+.controls .label{font-size:10.5px; color:var(--muted); white-space:nowrap}
+.input, select{width:100%; background:#0e1320; color:#e6e8ef; border:1px solid var(--border); border-radius:8px; padding:6px 8px; font-size:12px}
+.chip{display:inline-flex; align-items:center; justify-content:center; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:var(--chip); font-size:12px; user-select:none}
+.btn{padding:6px 8px; border:1px solid var(--border); background:var(--chip); color:#e6e8ef; border-radius:8px; font-size:12px; cursor:pointer}
+.detail-col{display:flex; align-items:center; justify-content:center}
+.detail-col .btn{min-width:48px; padding:6px 6px}
+</style></head><body>
+<div class="dock">
+  <aside class="inspector">
+    <div class="section">
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">display</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="chip">block</div><div class="chip">inline</div><div class="chip">flex</div><div class="chip">grid</div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">display</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="chip">block</div><div class="chip">inline</div><div class="chip">flex</div><div class="chip">grid</div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">display</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="chip">block</div><div class="chip">inline</div><div class="chip">flex</div><div class="chip">grid</div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">direction</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">justify</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">align</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><input class="input" placeholder="icons"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">gap</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">display</div>
+      <div class="prop-detail">lock</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="chip">block</div><div class="chip">inline</div><div class="chip">flex</div><div class="chip">grid</div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">column</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="A"/><input class="input" placeholder="1"/><input class="input" placeholder="2"/><input class="input" placeholder="3"/><input class="input" placeholder="4"/><input class="input" placeholder="입력(text field)"/><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">rows</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="A"/><input class="input" placeholder="1"/><input class="input" placeholder="2"/><input class="input" placeholder="3"/><input class="input" placeholder="4"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">gap</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">size</div>
+      <div class="prop-detail">detail</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="label">width</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="label">height</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">size</div>
+      <div class="prop-detail">detail</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="label">width</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="label">height</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="label">minW</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="label">minH</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="label">maxW</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="label">maxH</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">overflow</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">Typography</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">color</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" type="color" value="#666666"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">fontSize</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="size (preset, select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">fontWeight</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="size (preset, select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">fontStyle</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="fontStyle (preset, select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">fontFamily</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="fontFamily (preset, select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">textAlign</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="unset"/><div class="chip">left</div><div class="chip">center</div><div class="chip">right</div><div class="chip">justify</div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="기타 속성 (select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="속성 값 (text field)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">Position</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">position</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="position (select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">offset</div>
+      <div class="prop-detail">detail</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="offset (text field)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">offset</div>
+      <div class="prop-detail">detail</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="offset (text field)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="top"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="chip">right</div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="bottom"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="chip">left</div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">z-index</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="preset (select box)"/><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">Spacing</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">margin</div>
+      <div class="prop-detail">detail</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="0"/><input class="input" placeholder="2"/><input class="input" placeholder="4"/><input class="input" placeholder="8"/><input class="input" placeholder="12"/><input class="input" placeholder="textfield"/><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">detail</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="top"/><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="chip">right</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="bottom"/><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">padding</div>
+      <div class="prop-detail">detail</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="0"/><input class="input" placeholder="2"/><input class="input" placeholder="4"/><input class="input" placeholder="8"/><input class="input" placeholder="12"/><input class="input" placeholder="textfield"/><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">detail</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="top"/><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="chip">right</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="bottom"/><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">Border</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">border</div>
+      <div class="prop-detail">detail</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">detail</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="label">color</div><input class="input" type="color" value="#666666"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="type"/><input class="input" placeholder="select box"/><div class="col-span-1"></div><div class="label">weight</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">radius</div>
+      <div class="prop-detail">detail</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="0"/><input class="input" placeholder="4"/><input class="input" placeholder="8"/><input class="input" placeholder="12"/><input class="input" placeholder="16"/><input class="input" placeholder="text field"/><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">detail</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="top"/><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="chip">right</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="bottom"/><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="chip">left</div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">Background</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">background</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="select box (mode)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">color </div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" type="color" value="#666666"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">image</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="label">size</div><input class="input" placeholder="select box"/><div class="col-span-1"></div><div class="label">repeat</div><input class="input" placeholder="select box"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="label">position</div><input class="input" placeholder="select box"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">Effects</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">opacicy</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="0"/><input class="input" placeholder="0.25"/><input class="input" placeholder="0.5"/><input class="input" placeholder="0.75"/><input class="input" placeholder="1"/><input class="input" placeholder="select box"/><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">gradient</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="select box"/><div class="col-span-1"></div><input class="input" placeholder="select box"/><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="stops"/><input class="input" type="color" value="#666666"/><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><input class="input" placeholder="add 버튼"/><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="col-span-1"></div><input class="input" type="color" value="#666666"/><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><input class="input" placeholder="x 버튼"/><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">shadow</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="select box (preset)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="add shadow 버튼"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">items</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" type="color" value="#666666"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="x 버튼"/><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="select box"/><div class="col-span-1"></div><input class="input" placeholder="text field"/><input class="input" placeholder="text field"/><input class="input" placeholder="text field"/><input class="input" placeholder="text field"/><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">filter</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"><svg viewBox="0 0 24 24"><path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm6-6h-1V9a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Zm-7-2a3 3 0 0 1 6 0v2H11V9Z"/></svg></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="select box (preset)"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="add fitler 버튼"/><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      <div class="prop-detail">items</div>
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="select box"/><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><input class="input" placeholder="x 버튼"/><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">Custom</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main">items</div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="add items 버튼"/><div class="col-span-1"></div><div class="col-span-1"></div><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+
+    <div class="row">
+      
+    <div class="left5">
+      <div class="prop-main"></div>
+      
+      <button class="lock-btn" title="Lock" aria-label="Lock"></button>
+    </div>
+    
+      <div class="right">
+        <div class="controls"><input class="input" placeholder="text field"/><div class="col-span-1"></div><input class="input" placeholder="text field"/><div class="col-span-1"></div><div class="col-span-1"></div><input class="input" placeholder="x 버튼"/><div class="col-span-1"></div></div>
+        <div class="detail-col"><button class="btn">상세</button></div>
+      </div>
+    </div>
+    
+    </div>
+  </aside>
+</div>
+</body></html>

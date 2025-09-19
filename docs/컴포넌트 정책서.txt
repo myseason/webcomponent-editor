@@ -1,0 +1,101 @@
+컴포넌트 정책 명세서 v2.0
+1. 개요
+본 문서는 Actionable Web Component 기반 에디터의 핵심 구성 요소인 컴포넌트와, Inspector 패널의 동작을 제어하는 정책(Policy) 시스템의 상세 기획 내용을 정의합니다. 이 시스템의 목표는 컴포넌트의 재사용성을 극대화하고, 디자이너와 개발자 간의 일관된 디자인 시스템을 구축하는 것입니다.
+
+2. 핵심 개념 정의
+2.1. Actionable Web Component
+정의: 단순한 UI 조각을 넘어, 자체적인 동작(애니메이션, 기본 동작)과 규칙(이벤트 핸들러, 데이터 바인딩)을 가진 살아있는 부품을 의미합니다. 사용자는 컴포넌트를 캔버스에 배치하는 것만으로 즉시 동작 가능한 결과물을 경험할 수 있습니다.
+
+유형:
+
+단일 컴포넌트: 텍스트, 이미지, 버튼처럼 더 이상 분해할 수 없는 가장 기본적인 원자 단위 요소입니다.
+
+복합 컴포넌트: 여러 단일 컴포넌트(또는 다른 복합 컴포넌트)를 조합하여 만들어진, 하나의 독립적인 기능을 수행하는 부품 단위입니다. (예: 이미지 + 텍스트 + 버튼으로 구성된 '상품 카드')
+
+2.2. 컴포넌트와 인스턴스
+컴포넌트 (Component / Fragment): 재사용 가능한 UI의 **"설계도"**입니다. project.fragments에 저장되며, "컴포넌트 개발 모드"에서 이 설계도를 편집합니다.
+
+인스턴스 (Instance): "설계도"를 바탕으로 캔버스 위에 실제로 그려진 **"복제본"**입니다. 페이지의 nodes 트리에 존재하며, "페이지 개발 모드"에서 이 인스턴스를 사용합니다.
+
+2.3. "유리 상자 (Glass Box)" 모델
+복합 컴포넌트는 완전히 내부가 숨겨진 "블랙박스"가 아닌, 제작자의 의도에 따라 내부를 들여다보고 제한적으로 제어할 수 있는 **"유리 상자"**로 취급합니다.
+
+"페이지 개발 모드"에서 사용자는 복합 컴포넌트의 내부 구조를 수정할 수는 없지만, 내부로 진입하여 제작자가 허용한 특정 내부 요소의 속성을 개별적으로 수정할 수 있습니다.
+
+3. UI/UX 개선 방안
+사용자가 현재 편집 대상을 명확하게 인지할 수 있도록 다음과 같은 시각적 장치를 제공합니다.
+
+컴포넌트 인디케이터: Layers 패널과 Inspector 패널 제목에, 컴포넌트 인스턴스임을 나타내는 **특수 아이콘 (예: 💠)**을 표시합니다.
+
+계층적 선택 (Drill-down Selection):
+
+"페이지 개발 모드"에서 복합 컴포넌트 인스턴스를 더블 클릭하면 해당 인스턴스의 내부로 "진입"하여 내부 요소들을 개별적으로 선택하고 수정할 수 있습니다.
+
+내부 요소 선택 시, Inspector 상단에 브레드크럼(Breadcrumb) (예: 상품 카드 > 구매 버튼)을 표시하여 현재 편집 중인 요소의 경로와 컨텍스트를 명확히 알려줍니다.
+
+4. 계층적 ComponentPolicy 설계
+복합 컴포넌트의 내부 요소별 정책을 정교하게 관리하기 위해, ComponentPolicy를 계층적(Hierarchical) 구조로 설계합니다.
+
+4.1. 자료 구조 정의
+ComponentPolicy는 컴포넌트의 최상위 노드(root)에 대한 정책과 함께, 하위 노드들의 정책을 관리하는 children 맵을 갖습니다.
+
+TypeScript
+
+// in: core/types.ts
+export interface ComponentPolicy {
+    version: '2.0'; // 정책 버전 명시
+    componentId: string; // 이 정책이 적용되는 컴포넌트의 ID (e.g., 'product-card')
+
+    /**
+     * 컴포넌트의 최상위 노드(루트)에 적용될 정책
+     */
+    root: {
+        visible?: boolean; // Inspector에 노출 여부 (기본값: true)
+        readonly?: string[]; // 잠긴(수정 불가) 속성 경로 목록 (예: ['styles.layout.display'])
+    };
+
+    /**
+     * 자식 노드들에 대한 정책 맵
+     * Key: 자식 노드의 ID
+     * Value: 해당 자식 노드에 적용될 개별 정책
+     */
+    children?: {
+        [nodeId: string]: Partial<ComponentPolicy['root']>;
+    };
+}
+4.2. 정책 적용 시나리오
+컴포넌트 개발 모드 (규칙 정의)
+
+개발자가 '상품 카드' 복합 컴포넌트를 생성합니다. (내부 요소: image-1, title-text, buy-button)
+
+buy-button을 선택하고, Inspector에서 backgroundColor 속성을 "잠금(비노출)" 처리합니다.
+
+이 액션은 '상품 카드'의 ComponentPolicy에 다음과 같이 기록됩니다.
+
+JSON
+
+{
+  "componentId": "product-card",
+  "root": { "readonly": ["styles.layout.width"] },
+  "children": {
+    "buy-button": {
+      "visible": false
+    }
+  }
+}
+위 예시에서 buy-button의 visible이 false로 설정되어, "페이지 개발 모드"에서 buy-button 자체는 보이지만 Inspector에서는 해당 버튼의 스타일 패널이 노출되지 않음을 의미할 수 있습니다. 또는 readonly에 속성 경로를 추가하여 특정 속성만 비노출시킬 수 있습니다.
+
+페이지 개발 모드 (규칙 소비)
+
+사용자가 '상품 카드' 인스턴스를 페이지에 배치합니다.
+
+Inspector에는 '상품 카드'의 root 정책에 따라 width 속성이 비활성화된 채로 보입니다.
+
+사용자가 '상품 카드'를 더블 클릭하여 내부로 진입 후 buy-button을 선택합니다.
+
+Inspector는 ComponentPolicy.children['buy-button'] 정책을 읽어, 관련 스타일 패널을 아예 표시하지 않습니다. (잠금 = 비노출)
+
+5. 고급 모드 (Expert Mode)
+동작: Inspector 상단의 "고급" 토글을 ON 하면, 현재 선택된 컴포넌트에 적용된 ComponentPolicy가 모두 임시로 무시됩니다.
+
+결과: StylePolicy와 TagPolicy에 따른 모든 스타일 속성이 다시 표시되어 자유로운 편집이 가능해지며, 이 상태에서 **"새로운 컴포넌트로 저장"**이 가능해집니다.

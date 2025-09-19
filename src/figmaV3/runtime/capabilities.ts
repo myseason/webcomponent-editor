@@ -1,132 +1,114 @@
-/**
- * ✨ [Policy Engine v1.1]
- * 태그/스타일/컴포넌트 정책을 기반으로 특정 노드의 허용 능력(capabilities)을 계산합니다.
- * Inspector는 이 파일의 유틸리티를 사용하여 동적으로 UI를 렌더링합니다.
- */
-import {
-    Project,
-    Node,
-    ComponentDefinition,
-    EffectivePolicies,
-    ProjectSettingsPoliciesOverride,
-    TagPolicy,
-    StylePolicy,
-    NodeId, ComponentPolicy,
-} from '../core/types';
-import { getDefinition } from '../core/registry';
-import { GLOBAL_TAG_POLICIES } from '../policy/globalTagPolicy';
+// - 순수 함수. 어떤 store도 접근하지 않음.
+// - 정책 우선순위: TagPolicy → GlobalStylePolicy → (페이지-기본일 때만) ComponentPolicy
+import type {ProjectLike, UIStateLike, StyleGroupKey, StyleKey, TagName} from '../core/types';
+import { GLOBAL_TAG_POLICY } from '../policy/globalTagPolicy';
 import { GLOBAL_STYLE_POLICY } from '../policy/globalStylePolicy';
-import { deepMerge } from './deepMerge';
+import { KEY_TO_STYLEGROUP } from '../policy/StyleGroupKeys';
 
-// ... (buildEffectivePolicies, getEffectiveTag, getTagPolicy, getEffectivePoliciesForNode 함수는 변경 없음)
-export function buildEffectivePolicies(
-    overrides?: ProjectSettingsPoliciesOverride
-): EffectivePolicies {
-    const effective: EffectivePolicies = {
-        tag: deepMerge({}, GLOBAL_TAG_POLICIES, overrides?.tag ?? {}) as Record<string, TagPolicy>,
-        style: deepMerge({}, GLOBAL_STYLE_POLICY, overrides?.style ?? {}) as StylePolicy,
-        components: deepMerge({}, {}, overrides?.components ?? {}) as Record<string, ComponentPolicy>,
-    };
-    return effective;
-}
-
-export function getEffectiveTag(node: Node, def?: ComponentDefinition): string {
-    const p = node.props as Record<string, unknown>;
-    const d = def ?? getDefinition(node.componentId);
-    return (p?.__tag as string) || d?.capabilities?.defaultTag || 'div';
-}
-
-export function getTagPolicy(policies: EffectivePolicies, tag: string): TagPolicy | undefined {
-    return policies.tag[tag];
-}
-
-export function getEffectivePoliciesForNode(project: Project, nodeId: NodeId | null) {
-    if (!nodeId) return null;
-    const node = project.nodes[nodeId];
-    if (!node) return null;
-    const def = getDefinition(node.componentId);
-    if (!def) return null;
-
-    const effectivePolicies = buildEffectivePolicies(project.policies);
-    const tag = getEffectiveTag(node, def);
-    const tagPolicy = getTagPolicy(effectivePolicies, tag);
-    const componentPolicy = effectivePolicies.components?.[def.id];
-
-    return {
-        node,
-        def,
-        tag,
-        effectivePolicies,
-        tagPolicy,
-        stylePolicy: effectivePolicies.style,
-        componentPolicy,
-    };
-}
-
-
-/**
- * 특정 노드의 Inspector에 표시될 수 있는 모든 스타일 키 목록을 반환합니다.
- * @param project 전체 프로젝트 객체
- * @param nodeId 대상 노드 ID
- * @param expertMode 전문가 모드 활성화 여부
- * @returns 허용된 스타일 키 Set
- */
-export function getAllowedStyleKeysForNode(project: Project, nodeId: NodeId, expertMode: boolean): Set<string> {
-    const policyInfo = getEffectivePoliciesForNode(project, nodeId);
-    if (!policyInfo) return new Set();
-
-    const { tagPolicy, stylePolicy, componentPolicy } = policyInfo;
-
-    // ✅ [수정] 전문가 모드일 경우, TagPolicy에 정의된 모든 스타일 키를 반환하도록 로직 변경
-    // 이렇게 함으로써 Box와 같은 기본 컨테이너가 모든 스타일 옵션을 가질 수 있도록 보장합니다.
-    if (expertMode) {
-        const allKeys = new Set<string>();
-        if (tagPolicy?.styles?.groups) {
-            Object.values(tagPolicy.styles.groups).forEach(groupKeys => {
-                groupKeys.forEach(key => allKeys.add(key));
-            });
-        }
-        // TagPolicy에 allow가 '*'로 되어 있다면 모든 키를 허용해야 하지만,
-        // 현재 구조에서는 groups를 사용하는 것이 더 명시적이므로 groups를 기준으로 합니다.
-        // 만약 groups에 없는 키도 허용하려면 이 부분에 추가 로직이 필요합니다.
-        if (tagPolicy?.styles?.allow?.includes('*')) {
-            // 이 경우, 모든 가능한 CSS 속성을 추가해야 하지만, 현실적으로 어렵습니다.
-            // 따라서 groups에 모든 편집 가능한 속성을 정의하는 것이 중요합니다.
-        }
-        stylePolicy.deny?.forEach(key => allKeys.delete(key));
-        tagPolicy?.styles?.deny?.forEach(key => allKeys.delete(key));
-        return allKeys;
+// 'styles:group.key' | 'styles:key' | 'key' → 'key'
+function normalizeControlPathToKey(path: string): StyleKey | null {
+    if (!path) return null;
+    const norm = path.replace(/:/g, '.');
+    const parts = norm.split('.');
+    if (parts[0] === 'styles') {
+        if (parts.length === 2) return parts[1];
+        if (parts.length >= 3) return parts.slice(2).join('.');
+        return null;
     }
+    return path;
+}
 
-    // --- 기본 모드 (페이지 빌더) ---
-    let allowed = new Set<string>();
-    if (stylePolicy.allow?.includes('*')) {
-        // TagPolicy에 정의된 모든 키를 기본 허용 목록으로 시작
-        if (tagPolicy?.styles?.groups) {
-            Object.values(tagPolicy.styles.groups).flat().forEach(key => allowed.add(key));
-        }
-    } else if (stylePolicy.allow) {
-        allowed = new Set(stylePolicy.allow);
+function isTagName(x: string): x is TagName {
+    // SSOT: GLOBAL_TAG_POLICY.allowedTags를 신뢰해 런타임 가드
+    return (GLOBAL_TAG_POLICY.allowedTags as string[]).includes(x);
+}
+
+function getNode(project: ProjectLike, nodeId: string) {
+    return project?.nodes?.[nodeId] ?? null;
+}
+
+function getTag(project: ProjectLike, nodeId: string): TagName {
+    const n = getNode(project, nodeId);
+    const raw = (n?.props?.__tag as string) ?? GLOBAL_TAG_POLICY.defaultTag ?? 'div';
+    return isTagName(raw) ? raw : 'div';
+}
+
+function tagAllowsGroup(tag: TagName, group: StyleGroupKey): boolean {
+    const map = GLOBAL_TAG_POLICY.allowedSectionsByTag;
+    // TS7053 방지: tag는 이제 TagName
+    const arr = map[tag];
+    return Array.isArray(arr) ? arr.includes(group) : false;
+}
+
+function styleAllowedByGlobal(tag: TagName, key: string): boolean {
+    // deny 우선
+    if (GLOBAL_STYLE_POLICY.deny?.includes(key)) return false;
+    if (GLOBAL_STYLE_POLICY.byTag?.[tag]?.deny?.includes(key)) return false;
+
+    if (GLOBAL_STYLE_POLICY.allow?.includes(key)) return true;
+    if (GLOBAL_STYLE_POLICY.byTag?.[tag]?.allow?.includes(key)) return true;
+
+    return false;
+}
+
+function componentPolicyHidden(project: ProjectLike, nodeId: string, key: string, group: StyleGroupKey, ui: UIStateLike): boolean {
+    const isPageBasic = ui?.mode === 'Page' && !ui?.expertMode;
+    if (!isPageBasic) return false; // 페이지-고급/컴포넌트 모드는 CP 무시
+
+    const n = getNode(project, nodeId);
+    const compId = n?.componentId;
+    if (!compId) return false;
+    const cp = project?.policies?.components?.[compId];
+    if (!cp?.inspector) return false;
+
+    const gvis = cp.inspector[group]?.visible;
+    if (gvis === false) return true; // 그룹 숨김 시 전부 숨김
+
+    const cvis = cp.inspector[group]?.controls?.[key]?.visible;
+    if (cvis === false) return true;
+
+    return false;
+}
+
+export function getAllowedStyleKeysForNode(
+    project: ProjectLike,
+    nodeId: string,
+    opts?: { expertMode?: boolean }
+): Set<string> {
+    const tag = getTag(project, nodeId);
+    const keys = Object.keys(KEY_TO_STYLEGROUP);
+    // ui.expertMode만 넘어온 경우를 고려해 내부 ui 작성
+    const ui: UIStateLike = { mode: 'Page', expertMode: !!opts?.expertMode };
+
+    const allowed: string[] = [];
+    for (const key of keys) {
+        const group = KEY_TO_STYLEGROUP[key] as StyleGroupKey;
+
+        if (!tagAllowsGroup(tag, group)) continue;
+        if (!styleAllowedByGlobal(tag, key)) continue;
+        if (componentPolicyHidden(project, nodeId, key, group, ui)) continue;
+
+        allowed.push(key);
     }
+    return new Set(allowed);
+}
 
-    // 전역 deny 적용
-    stylePolicy.deny?.forEach(key => allowed.delete(key));
+export function isControlVisibleForNode(
+    project: ProjectLike,
+    ui: UIStateLike,
+    nodeId: string,
+    controlPath: string
+): boolean {
+    const key = normalizeControlPathToKey(controlPath);
+    if (!key) return false;
 
-    // 태그별 deny 적용
-    tagPolicy?.styles?.deny?.forEach(key => allowed.delete(key));
+    const tag = getTag(project, nodeId);
+    const group = KEY_TO_STYLEGROUP[key] as StyleGroupKey | undefined;
+    if (!group) return false;
 
-    // 컴포넌트 정책(visible: false)으로 최종 필터링
-    if (componentPolicy?.inspector?.controls) {
-        Object.entries(componentPolicy.inspector.controls).forEach(([key, control]) => {
-            if (control.visible === false) {
-                // key가 'props:propName' 또는 'styles:styleName' 형식이므로 분리
-                const [type, name] = key.split(':');
-                if (type === 'styles') {
-                    allowed.delete(name);
-                }
-            }
-        });
-    }
+    if (!tagAllowsGroup(tag, group)) return false;
+    if (!styleAllowedByGlobal(tag, key)) return false;
+    if (componentPolicyHidden(project, nodeId, key, group, ui)) return false;
 
-    return allowed;
+    return true;
 }

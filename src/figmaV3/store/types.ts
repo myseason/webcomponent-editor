@@ -100,6 +100,7 @@ export interface UiSlice {
 
     _setLastActivePageId: (pageId: string | null) => void;
     _setLastActiveFragmentId: (fragmentId: string | null) => void;
+    _setInspectorForceTagPolicy: (force: boolean) => void;
 }
 
 // --- Main Store Type ---
