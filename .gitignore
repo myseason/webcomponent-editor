@@ -40,4 +40,5 @@ next-env.d.ts
 .doc
 /package-lock.json
 package.json
-*.sh
+.sh
+.cjs
